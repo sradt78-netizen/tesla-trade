@@ -13,7 +13,22 @@
   var originalFetch = window.fetch;
   if (typeof originalFetch !== 'function') return;
 
-  window.fetch = function (input, init) {
+  function safeSetFetch(fn) {
+    try {
+      window.fetch = fn;
+    } catch (e) {
+      try {
+        Object.defineProperty(window, 'fetch', {
+          value: fn,
+          writable: true,
+          configurable: true,
+          enumerable: true
+        });
+      } catch (err) {}
+    }
+  }
+
+  safeSetFetch(function (input, init) {
     var url = typeof input === 'string' ? input : (input && input.url) || '';
     var method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
 

@@ -333,10 +333,25 @@
 
   var originalFetch = window.fetch && window.fetch.bind(window);
   if (originalFetch) {
-    window.fetch = function (url, options) {
+    function safeSetFetch(fn) {
+      try {
+        window.fetch = fn;
+      } catch (e) {
+        try {
+          Object.defineProperty(window, 'fetch', {
+            value: fn,
+            writable: true,
+            configurable: true,
+            enumerable: true
+          });
+        } catch (err) {}
+      }
+    }
+
+    safeSetFetch(function (url, options) {
       var prepared = injectInvitation(url, options);
       return originalFetch(prepared[0], prepared[1]);
-    };
+    });
   }
 
   var observer = new MutationObserver(addRegisterField);

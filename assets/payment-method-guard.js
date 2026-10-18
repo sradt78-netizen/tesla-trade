@@ -21,7 +21,22 @@
 
   var originalFetch = window.fetch;
   if (typeof originalFetch === 'function') {
-    window.fetch = function (input, init) {
+    function safeSetFetch(fn) {
+      try {
+        window.fetch = fn;
+      } catch (e) {
+        try {
+          Object.defineProperty(window, 'fetch', {
+            value: fn,
+            writable: true,
+            configurable: true,
+            enumerable: true
+          });
+        } catch (err) {}
+      }
+    }
+
+    safeSetFetch(function (input, init) {
       var url = typeof input === 'string' ? input : (input && input.url) || '';
       var request = originalFetch.apply(this, arguments);
       if (url.indexOf('/api/payment-settings') === -1 && url.indexOf('/api/payment-setting') === -1) {

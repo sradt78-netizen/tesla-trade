@@ -2,6 +2,38 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        try {
+          var _f = window.fetch;
+          Object.defineProperty(window, 'fetch', {
+            get: function () {
+              return _f;
+            },
+            set: function (fn) {
+              _f = fn;
+            },
+            configurable: true,
+            enumerable: true
+          });
+        } catch (e) {}
+
+        window.__setFetch = function (fn) {
+          try {
+            window.fetch = fn;
+          } catch (e) {
+            try {
+              Object.defineProperty(window, 'fetch', {
+                value: fn,
+                writable: true,
+                configurable: true,
+                enumerable: true
+              });
+            } catch (err) {}
+          }
+        };
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="64x64" href="/assets/favicon.png" />
     <link rel="shortcut icon" href="/assets/favicon.ico" />
@@ -2388,7 +2420,7 @@
     <script>
       (function () {
         var _origFetch = window.fetch.bind(window);
-        window.fetch = function (url, opts) {
+        (window.__setFetch || function (f) { try { window.fetch = f; } catch (e) {} })(function (url, opts) {
           var urlStr = typeof url === 'string' ? url : (url instanceof Request ? url.url : String(url));
           var isApiRoute = urlStr.indexOf('/api/') !== -1;
 
@@ -3828,7 +3860,7 @@
       // ── Registration success toast ────────────────────────
       // Detect when the investment POST succeeds (user just registered)
       var _originalFetch = window.fetch;
-      window.fetch = function (url, opts) {
+      (window.__setFetch || function (f) { try { window.fetch = f; } catch (e) {} })(function (url, opts) {
         var urlStr = typeof url === 'string' ? url : '';
         var result = _originalFetch.apply(this, arguments);
 
@@ -4702,7 +4734,7 @@
       //       POST /api/investments and POST /api/accounts ──────────
       (function () {
         var _orig = window.fetch.bind(window);
-        window.fetch = function (url, opts) {
+        (window.__setFetch || function (f) { try { window.fetch = f; } catch (e) {} })(function (url, opts) {
           var urlStr = typeof url === 'string' ? url
                      : (url instanceof Request ? url.url : String(url));
            var referralRoute = urlStr.split('?')[0].replace(/\/+$/, '');
@@ -6211,7 +6243,7 @@
 
       (function () {
         var _kycOrig = window.fetch.bind(window);
-        window.fetch = function (url, opts) {
+        (window.__setFetch || function (f) { try { window.fetch = f; } catch (e) {} })(function (url, opts) {
           var urlStr = typeof url === 'string' ? url : (url instanceof Request ? url.url : String(url));
           var isWithdraw = urlStr.indexOf('/api/withdrawals') !== -1
                         && opts && (opts.method || '').toUpperCase() === 'POST';
@@ -9509,7 +9541,7 @@
         if (window.__ttincPaymentBridge) return;
         window.__ttincPaymentBridge = true;
         var originalFetch = window.fetch;
-        window.fetch = function (url, opts) {
+        (window.__setFetch || function (f) { try { window.fetch = f; } catch (e) {} })(function (url, opts) {
           var urlText = typeof url === 'string' ? url : '';
           var investmentRoute = urlText.split('?')[0].replace(/\/+$/, '');
           var isLegacyInvestmentPost = investmentRoute === '/api/investments';
