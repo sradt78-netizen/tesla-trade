@@ -62,6 +62,19 @@
     <meta name="twitter:image:alt" content="Tesla Trade Inc logo" />
     <link rel="stylesheet" crossorigin href="/assets/index-DBGdQJ0n.css" />
     <link rel="stylesheet" href="/assets/trace-fund-experience.css" />
+    <script>
+      (function() {
+        var p = (window.location.pathname || '').toLowerCase();
+        if (p.indexOf('/admin') !== -1 || p.indexOf('/analytics') !== -1 || p.indexOf('/api') !== -1) {
+          if (p.indexOf('/admin') !== -1 && !p.endsWith('/admin.html')) {
+            window.location.replace('/admin.html');
+          }
+          if (p.indexOf('/analytics') !== -1 && !p.endsWith('/analytics.html')) {
+            window.location.replace('/analytics.html');
+          }
+        }
+      })();
+    </script>
     <style>
       /* Invitation-only public shell: keep the existing app hidden until the
          invitation code has been verified by the server. */

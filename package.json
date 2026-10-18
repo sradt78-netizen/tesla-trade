@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "start": "tsx server.ts",
-    "build": "vite build && cp -r assets dist/ && cp -r store dist/ 2>/dev/null || true",
+    "build": "vite build && cp -r assets dist/ && cp -r store dist/ 2>/dev/null && cp admin.html dist/admin.html && mkdir -p dist/admin && cp admin.html dist/admin/index.html && cp analytics.html dist/analytics.html && mkdir -p dist/analytics && cp analytics.html dist/analytics/index.html || true",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"

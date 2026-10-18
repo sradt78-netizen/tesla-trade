@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tesla Trade Inc — Administration Portal</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --card-bg: #141414;
+      --card-border: #262626;
+      --text-main: #f3f4f6;
+      --text-sub: #9ca3af;
+      --accent-red: #e31937;
+      --accent-green: #10b981;
+      --accent-blue: #3b82f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 16px;
+      line-height: 1.5;
+    }
+    .container { max-width: 1100px; margin: 0 auto; }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 24px;
+    }
+    .brand h1 { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .badge {
+      font-size: 11px;
+      background: rgba(227, 25, 55, 0.15);
+      color: var(--accent-red);
+      border: 1px solid rgba(227, 25, 55, 0.3);
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    button {
+      background: #1f1f1f;
+      color: #fff;
+      border: 1px solid var(--card-border);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+    button:hover { background: #2a2a2a; }
+    button.primary {
+      background: var(--accent-red);
+      border-color: var(--accent-red);
+    }
+    button.primary:hover { background: #c7142d; }
+    button.success {
+      background: var(--accent-green);
+      border-color: var(--accent-green);
+      color: #000;
+      font-weight: 600;
+    }
+
+    /* Login Overlay */
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 10, 10, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .login-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .login-mark {
+      width: 44px;
+      height: 44px;
+      background: var(--accent-red);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 20px;
+      margin: 0 auto 16px;
+    }
+    .login-card input {
+      width: 100%;
+      padding: 12px 14px;
+      background: #0a0a0a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      margin: 16px 0 12px;
+      outline: none;
+    }
+    .login-card input:focus { border-color: var(--accent-red); }
+
+    /* Cards & Grids */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .card-title {
+      font-size: 13px;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .card-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .card-meta {
+      font-size: 12px;
+      color: var(--text-sub);
+      margin-top: 6px;
+    }
+
+    /* Generator Box */
+    .action-box {
+      background: linear-gradient(180deg, #181818 0%, #121212 100%);
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .action-box h2 { font-size: 17px; margin-bottom: 6px; }
+    .action-box p { font-size: 13px; color: var(--text-sub); margin-bottom: 14px; }
+    .gen-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .gen-row input {
+      flex: 1;
+      min-width: 200px;
+      padding: 10px 14px;
+      background: #0a0a0a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    /* Tables */
+    .table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      overflow-x: auto;
+      margin-bottom: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      background: #1a1a1a;
+      color: var(--text-sub);
+      font-weight: 600;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #1c1c1c;
+      color: #e5e7eb;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: #181818; }
+    .tag-active {
+      background: rgba(16, 185, 129, 0.2);
+      color: #86efac;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .tag-revoked {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #10b981;
+      color: #000;
+      font-weight: 600;
+      padding: 10px 18px;
+      border-radius: 8px;
+      display: none;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Admin Login Modal -->
+  <div class="login-overlay" id="loginModal">
+    <div class="login-card">
+      <div class="login-mark">T</div>
+      <h2>Admin Portal</h2>
+      <p style="color: var(--text-sub); font-size: 13px; margin-top: 4px;">Enter your admin password to manage invitation tokens, database, and investors.</p>
+      <input type="password" id="adminPasswordInput" placeholder="Enter admin password" autofocus />
+      <button type="button" class="primary" style="width: 100%; justify-content: center; padding: 12px;" onclick="authenticateAdmin()">Log In to Admin</button>
+      <div id="loginError" style="color: #f87171; font-size: 12px; margin-top: 10px; display: none;">Invalid admin password.</div>
+    </div>
+  </div>
+
+  <div class="container" id="adminContent" style="display: none;">
+    <header>
+      <div class="brand">
+        <h1>⚙️ Admin Dashboard <span class="badge">ADMINISTRATOR</span></h1>
+        <p style="color: var(--text-sub); font-size: 13px; margin-top: 3px;">Full control over invitation tokens, MySQL database, and investors</p>
+      </div>
+      <div class="header-actions">
+        <a href="/analytics" style="text-decoration: none;"><button type="button">📊 View Analytics</button></a>
+        <a href="/" style="text-decoration: none;"><button type="button">🌐 Public Site</button></a>
+        <button type="button" onclick="logoutAdmin()">🚪 Log Out</button>
+      </div>
+    </header>
+
+    <!-- System & Environment Health Card -->
+    <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--accent-green);">
+      <div class="card-title">Database & Environment Status <span>⚡</span></div>
+      <div style="display: flex; flex-wrap: wrap; gap: 20px; font-size: 13px; margin-top: 6px;">
+        <div>Database: <strong id="dbStatus" style="color: var(--accent-green);">Connecting...</strong></div>
+        <div>Host: <span id="dbHostText" style="color: var(--text-sub); font-family: monospace;">—</span></div>
+        <div>Active Tables: <strong id="dbTablesCount" style="color: #fff;">—</strong></div>
+        <div>Vercel Env: <strong id="envStatus" style="color: var(--accent-green);">—</strong></div>
+      </div>
+    </div>
+
+    <!-- Invitation Tokens Generator -->
+    <div class="action-box">
+      <h2>🎟️ Invitation Token Generator</h2>
+      <p>Create new invitation codes to grant access to prospective investors. Anyone with an active code can bypass the private gate and create an account.</p>
+      <div class="gen-row">
+        <input type="text" id="customCodeInput" placeholder="Custom code (leave empty for random TT-XXXX)" />
+        <button type="button" class="primary" onclick="generateCode()">＋ Generate Code</button>
+      </div>
+    </div>
+
+    <!-- Invitation Codes Ledger Table -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h3 style="font-size: 16px;">Active & Historical Invitation Codes</h3>
+      <button type="button" onclick="loadInvitations()">🔄 Refresh Codes</button>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Status</th>
+            <th>Source</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="codesTableBody">
+          <tr><td colspan="5" style="text-align: center; color: var(--text-sub); padding: 20px;">Loading invitation codes...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Registered Investors Section -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h3 style="font-size: 16px;">Registered Investor Accounts</h3>
+      <span style="font-size: 12px; color: var(--text-sub);" id="investorCountLabel">—</span>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Full Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Status</th>
+            <th>Registration Date</th>
+          </tr>
+        </thead>
+        <tbody id="investorsTableBody">
+          <tr><td colspan="5" style="text-align: center; color: var(--text-sub); padding: 20px;">Loading investor accounts...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied to clipboard!</div>
+
+  <script>
+    var currentAdminPass = localStorage.getItem('ttinc_admin_pass') || '';
+
+    if (currentAdminPass) {
+      verifyAndOpen(currentAdminPass);
+    }
+
+    document.getElementById('adminPasswordInput').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') authenticateAdmin();
+    });
+
+    function authenticateAdmin() {
+      var pass = document.getElementById('adminPasswordInput').value.trim();
+      if (!pass) return;
+      verifyAndOpen(pass);
+    }
+
+    function verifyAndOpen(pass) {
+      fetch('/api/admin/invitations?password=' + encodeURIComponent(pass))
+        .then(function(res) {
+          if (!res.ok) throw new Error('Invalid password');
+          return res.json();
+        })
+        .then(function(data) {
+          currentAdminPass = pass;
+          localStorage.setItem('ttinc_admin_pass', pass);
+          document.getElementById('loginModal').style.display = 'none';
+          document.getElementById('adminContent').style.display = 'block';
+          renderCodes(data.codes || []);
+          loadDbStatus();
+          loadInvestors();
+        })
+        .catch(function(err) {
+          document.getElementById('loginError').style.display = 'block';
+        });
+    }
+
+    function logoutAdmin() {
+      localStorage.removeItem('ttinc_admin_pass');
+      currentAdminPass = '';
+      location.reload();
+    }
+
+    function loadDbStatus() {
+      fetch('/api/dbcheck')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.database && d.database.connected) {
+            document.getElementById('dbStatus').textContent = '🟢 Connected Live';
+            document.getElementById('dbHostText').textContent = d.database.host;
+            document.getElementById('dbTablesCount').textContent = d.database.tables + ' tables';
+          } else {
+            document.getElementById('dbStatus').textContent = '⚠️ Check DB Credentials';
+            document.getElementById('dbStatus').style.color = '#f87171';
+          }
+
+          var envs = d.environment || {};
+          if (envs.has_DB_HOST || envs.has_DB_PASSWORD) {
+            document.getElementById('envStatus').textContent = '✅ Vercel Envs Active';
+          } else {
+            document.getElementById('envStatus').textContent = 'Using Config Defaults';
+          }
+        })
+        .catch(function() {
+          document.getElementById('dbStatus').textContent = 'Offline';
+        });
+    }
+
+    function loadInvitations() {
+      fetch('/api/admin/invitations?password=' + encodeURIComponent(currentAdminPass))
+        .then(function(r) { return r.json(); })
+        .then(function(d) { renderCodes(d.codes || []); });
+    }
+
+    function renderCodes(codes) {
+      var tbody = document.getElementById('codesTableBody');
+      if (!codes || !codes.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-sub); padding: 20px;">No invitation codes found. Click Generate to create one.</td></tr>';
+        return;
+      }
+      var rows = '';
+      codes.forEach(function(c) {
+        var statusTag = c.status === 'active' ? '<span class="tag-active">Active</span>' : '<span class="tag-revoked">Revoked</span>';
+        var actionBtn = c.status === 'active'
+          ? '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="toggleCodeStatus(' + c.id + ', \'revoke\')">Revoke</button>'
+          : '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #86efac;" onclick="toggleCodeStatus(' + c.id + ', \'reinstate\')">Reinstate</button>';
+
+        rows += '<tr>' +
+          '<td style="font-family: monospace; font-weight: 700; color: #fff;">' + c.code + '</td>' +
+          '<td>' + statusTag + '</td>' +
+          '<td style="color: var(--text-sub);">' + (c.source || 'admin') + '</td>' +
+          '<td style="color: var(--text-sub); font-size: 12px;">' + (c.created_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
+          '<td><button type="button" style="padding: 4px 8px; font-size: 11px; margin-right: 6px;" onclick="copyCodeLink(\'' + c.code + '\')">📋 Copy Link</button>' + actionBtn + '</td>' +
+          '</tr>';
+      });
+      tbody.innerHTML = rows;
+    }
+
+    function generateCode() {
+      var code = document.getElementById('customCodeInput').value.trim();
+      fetch('/api/admin/invitations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': currentAdminPass
+        },
+        body: JSON.stringify({ action: 'generate', code: code })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        document.getElementById('customCodeInput').value = '';
+        renderCodes(d.codes || []);
+        showToast('Created code: ' + d.created);
+      });
+    }
+
+    function toggleCodeStatus(id, action) {
+      fetch('/api/admin/invitations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': currentAdminPass
+        },
+        body: JSON.stringify({ action: action, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        renderCodes(d.codes || []);
+      });
+    }
+
+    function copyCodeLink(code) {
+      var link = window.location.origin + '/?invitation=' + encodeURIComponent(code);
+      navigator.clipboard.writeText(link).then(function() {
+        showToast('Invitation link copied!');
+      });
+    }
+
+    function loadInvestors() {
+      fetch('/api/analytics-data?password=' + encodeURIComponent(currentAdminPass))
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var tbody = document.getElementById('investorsTableBody');
+          var signups = d.recent_signups || [];
+          document.getElementById('investorCountLabel').textContent = signups.length + ' accounts';
+          if (!signups.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-sub); padding: 20px;">No registered accounts yet.</td></tr>';
+            return;
+          }
+          var rows = '';
+          signups.forEach(function(u) {
+            rows += '<tr>' +
+              '<td style="font-weight: 500;">' + (u.name || 'Investor') + '</td>' +
+              '<td style="font-family: monospace;">' + (u.email || '—') + '</td>' +
+              '<td style="color: var(--text-sub);">' + (u.phone || '—') + '</td>' +
+              '<td><span class="tag-active">' + (u.onboarding_status || 'active') + '</span></td>' +
+              '<td style="color: var(--text-sub); font-size: 12px;">' + (u.registered_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
+              '</tr>';
+          });
+          tbody.innerHTML = rows;
+        });
+    }
+
+    function showToast(msg) {
+      var toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(function() { toast.style.display = 'none'; }, 2500);
+    }
+  </script>
+</body>
+</html>

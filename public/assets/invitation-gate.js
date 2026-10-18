@@ -5,7 +5,7 @@
   if (
     currentPath.indexOf('/admin') !== -1 ||
     currentPath.indexOf('/analytics') !== -1 ||
-    currentPath.indexOf('/api') === 0
+    currentPath.indexOf('/api') !== -1
   ) {
     document.documentElement.classList.remove('ttinc-invitation-locked');
     return;
