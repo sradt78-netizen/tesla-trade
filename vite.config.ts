@@ -16,6 +16,7 @@ export default defineConfig(() => {
         input: {
           main: path.resolve(__dirname, 'index.html'),
           analytics: path.resolve(__dirname, 'analytics.html'),
+          admin: path.resolve(__dirname, 'admin.html'),
         },
       },
     },

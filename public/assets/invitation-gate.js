@@ -1,6 +1,16 @@
 (function () {
   'use strict';
 
+  var currentPath = (window.location.pathname || '').toLowerCase();
+  if (
+    currentPath.indexOf('/admin') !== -1 ||
+    currentPath.indexOf('/analytics') !== -1 ||
+    currentPath.indexOf('/api') === 0
+  ) {
+    document.documentElement.classList.remove('ttinc-invitation-locked');
+    return;
+  }
+
   var STORAGE_KEY = 'ttinc_invitation_code';
   var nativeFetch = window.fetch ? window.fetch.bind(window) : null;
   var KNOWN_PATHS = [
