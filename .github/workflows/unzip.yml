@@ -1,0 +1,58 @@
+name: Auto Unzip Project
+
+on:
+  push:
+    paths:
+      - '*.zip'
+
+permissions:
+  contents: write
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Unzip uploaded archive
+        run: |
+          for f in *.zip; do
+            if [ -f "$f" ]; then
+              echo "Extracting $f..."
+              unzip -o "$f"
+              rm "$f"
+            fi
+          done
+
+      - name: Ensure vercel.json exists
+        run: |
+          if [ ! -f "vercel.json" ]; then
+            cat << 'EOF' > vercel.json
+          {
+            "functions": {
+              "api/*.php": {
+                "runtime": "vercel-php@0.7.1"
+              },
+              "*.php": {
+                "runtime": "vercel-php@0.7.1"
+              }
+            },
+            "routes": [
+              { "src": "/api/(.*)", "dest": "/api/$1" },
+              { "src": "/assets/(.*)", "dest": "/assets/$1" },
+              { "src": "/store/(.*)", "dest": "/store/$1" },
+              { "src": "/(.*)", "dest": "/$1" }
+            ]
+          }
+          EOF
+          fi
+
+      - name: Commit and push extracted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-extract project files for Vercel" && git push)
