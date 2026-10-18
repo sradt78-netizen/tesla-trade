@@ -58,7 +58,7 @@
     }
 
     return originalFetch.call(this, input, init);
-  };
+  });
 
   /*
    * The compiled dashboard withdrawal modal used to render only amount and

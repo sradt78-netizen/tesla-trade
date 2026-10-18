@@ -33,7 +33,8 @@ function get_db(): PDO {
             'PDO MySQL is not enabled for this PHP version. Enable the pdo_mysql extension in Hestia.'
         );
     }
-    $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+    $portPart = defined('DB_PORT') && DB_PORT !== '' ? ';port=' . DB_PORT : '';
+    $dsn = 'mysql:host=' . DB_HOST . $portPart . ';dbname=' . DB_NAME . ';charset=utf8mb4';
     $pdo = new PDO($dsn, DB_USER, DB_PASS, [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

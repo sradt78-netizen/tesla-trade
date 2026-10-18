@@ -52,7 +52,7 @@
           });
         }).catch(function () { return response; });
       });
-    };
+    });
   }
 
   removeGiftCardNodes(document);

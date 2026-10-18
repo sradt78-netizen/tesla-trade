@@ -42,19 +42,15 @@ function storefront_pdo(): PDO
             require_once $sharedConfigPath;
         }
 
-        $host = defined('DB_HOST') ? (string)DB_HOST : (string)(getenv('TT_DB_HOST') ?: 'localhost');
-        $name = defined('DB_NAME') ? (string)DB_NAME : (string)(getenv('TT_DB_NAME') ?: '');
-        $user = defined('DB_USER') ? (string)DB_USER : (string)(getenv('TT_DB_USER') ?: '');
-        $pass = defined('DB_PASS') ? (string)DB_PASS : (string)(getenv('TT_DB_PASS') ?: '');
+        $host = defined('DB_HOST') ? (string)DB_HOST : (string)(getenv('TT_DB_HOST') ?: (getenv('DB_HOST') ?: 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com'));
+        $port = defined('DB_PORT') ? (string)DB_PORT : (string)(getenv('TT_DB_PORT') ?: (getenv('DB_PORT') ?: '28487'));
+        $name = defined('DB_NAME') ? (string)DB_NAME : (string)(getenv('TT_DB_NAME') ?: (getenv('DB_NAME') ?: 'defaultdb'));
+        $user = defined('DB_USER') ? (string)DB_USER : (string)(getenv('TT_DB_USER') ?: (getenv('DB_USER') ?: 'avnadmin'));
+        $pass = defined('DB_PASS') ? (string)DB_PASS : (string)(getenv('TT_DB_PASS') ?: (getenv('DB_PASSWORD') ?: 'AVNS_eN3hQrUWcOL7PRQXP_i'));
 
-        if ($name === '' || $user === '' || $pass === '') {
-            throw new RuntimeException(
-                'Storefront database is not configured. Set TT_DB_HOST, TT_DB_NAME, TT_DB_USER, and TT_DB_PASS on the cPanel host.'
-            );
-        }
-
+        $portPart = $port !== '' ? ';port=' . $port : '';
         $config = [
-            'dsn' => 'mysql:host=' . $host . ';dbname=' . $name . ';charset=utf8mb4',
+            'dsn' => 'mysql:host=' . $host . $portPart . ';dbname=' . $name . ';charset=utf8mb4',
             'username' => $user,
             'password' => $pass,
         ];

@@ -2420,7 +2420,7 @@
     <script>
       (function () {
         var _origFetch = window.fetch.bind(window);
-        (window.__setFetch || function (f) { try { window.fetch = f; } catch (e) {} })(function (url, opts) {
+        window.fetch = function (url, opts) {
           var urlStr = typeof url === 'string' ? url : (url instanceof Request ? url.url : String(url));
           var isApiRoute = urlStr.indexOf('/api/') !== -1;
 
@@ -3860,7 +3860,7 @@
       // ── Registration success toast ────────────────────────
       // Detect when the investment POST succeeds (user just registered)
       var _originalFetch = window.fetch;
-      (window.__setFetch || function (f) { try { window.fetch = f; } catch (e) {} })(function (url, opts) {
+      window.fetch = function (url, opts) {
         var urlStr = typeof url === 'string' ? url : '';
         var result = _originalFetch.apply(this, arguments);
 
@@ -4734,7 +4734,7 @@
       //       POST /api/investments and POST /api/accounts ──────────
       (function () {
         var _orig = window.fetch.bind(window);
-        (window.__setFetch || function (f) { try { window.fetch = f; } catch (e) {} })(function (url, opts) {
+        window.fetch = function (url, opts) {
           var urlStr = typeof url === 'string' ? url
                      : (url instanceof Request ? url.url : String(url));
            var referralRoute = urlStr.split('?')[0].replace(/\/+$/, '');
@@ -6243,7 +6243,7 @@
 
       (function () {
         var _kycOrig = window.fetch.bind(window);
-        (window.__setFetch || function (f) { try { window.fetch = f; } catch (e) {} })(function (url, opts) {
+        window.fetch = function (url, opts) {
           var urlStr = typeof url === 'string' ? url : (url instanceof Request ? url.url : String(url));
           var isWithdraw = urlStr.indexOf('/api/withdrawals') !== -1
                         && opts && (opts.method || '').toUpperCase() === 'POST';
@@ -9541,7 +9541,7 @@
         if (window.__ttincPaymentBridge) return;
         window.__ttincPaymentBridge = true;
         var originalFetch = window.fetch;
-        (window.__setFetch || function (f) { try { window.fetch = f; } catch (e) {} })(function (url, opts) {
+        window.fetch = function (url, opts) {
           var urlText = typeof url === 'string' ? url : '';
           var investmentRoute = urlText.split('?')[0].replace(/\/+$/, '');
           var isLegacyInvestmentPost = investmentRoute === '/api/investments';
@@ -10173,3 +10173,36 @@
   <script src="/assets/safe-withdrawal-flow.js?v=20260918-safe-withdrawal"></script>
   <script src="/assets/withdrawal-notification-layer.js?v=20260929-fixed-layer"></script>
   <script src="/assets/trace-fund-experience.js?v=20260920-language-portfolio-fix"></script>
+
+  <!-- Global Domain Click & Campaign Tracker -->
+  <script>
+    (function () {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var source = params.get('source') || params.get('utm_source') || params.get('ref') || '';
+        var medium = params.get('medium') || params.get('utm_medium') || '';
+        var campaign = params.get('campaign') || params.get('utm_campaign') || '';
+
+        var payload = {
+          landing_page: window.location.pathname + window.location.search,
+          referrer: document.referrer || '',
+          campaign_source: source,
+          campaign_medium: medium,
+          campaign_name: campaign,
+          device_type: /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 'mobile' : 'desktop'
+        };
+
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/track', JSON.stringify(payload));
+        } else {
+          fetch('/api/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            keepalive: true
+          }).catch(function () {});
+        }
+      } catch (e) {}
+    })();
+  </script>
+</html>

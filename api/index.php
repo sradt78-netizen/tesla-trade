@@ -364,6 +364,110 @@ if ($uri === '/plans' && $method === 'GET') {
     json_out(['plans' => $plans]);
 }
 
+// ── POST or GET /track — log domain clicks & visitor traffic ──
+if ($uri === '/track') {
+    $db = get_db();
+    $b = body();
+    if (empty($b) && !empty($_GET)) {
+        $b = $_GET;
+    }
+
+    $ip = trim((string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''));
+    if (strpos($ip, ',') !== false) {
+        $ip = trim(explode(',', $ip)[0]);
+    }
+
+    $ref = trim((string)($b['referrer'] ?? $_SERVER['HTTP_REFERER'] ?? ''));
+    $landing = trim((string)($b['landing_page'] ?? $_SERVER['REQUEST_URI'] ?? '/'));
+    $source = trim((string)($b['campaign_source'] ?? $b['source'] ?? $b['ref'] ?? ''));
+    if ($source === '') {
+        if (strpos($ref, 'google.') !== false) $source = 'google';
+        elseif (strpos($ref, 'twitter.com') !== false || strpos($ref, 't.co') !== false || strpos($ref, 'x.com') !== false) $source = 'x/twitter';
+        elseif (strpos($ref, 'facebook.com') !== false || strpos($ref, 'fb.com') !== false) $source = 'facebook';
+        elseif (strpos($ref, 'instagram.com') !== false) $source = 'instagram';
+        elseif (strpos($ref, 'telegram.') !== false || strpos($ref, 't.me') !== false) $source = 'telegram';
+        elseif (strpos($ref, 'whatsapp.') !== false || strpos($ref, 'wa.me') !== false) $source = 'whatsapp';
+        elseif ($ref !== '') $source = 'referral';
+        else $source = 'direct';
+    }
+
+    $device = trim((string)($b['device_type'] ?? ''));
+    if ($device === '') {
+        $ua = strtolower((string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
+        $device = (strpos($ua, 'mobile') !== false || strpos($ua, 'android') !== false || strpos($ua, 'iphone') !== false) ? 'mobile' : 'desktop';
+    }
+
+    $ua = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500);
+
+    try {
+        $st = $db->prepare('INSERT INTO analytics_clicks (ip_address, referrer, landing_page, campaign_source, device_type, user_agent) VALUES (?, ?, ?, ?, ?, ?)');
+        $st->execute([substr($ip, 0, 45), substr($ref, 0, 500), substr($landing, 0, 255), substr($source, 0, 100), substr($device, 0, 20), $ua]);
+    } catch (Exception $e) {}
+
+    json_out(['success' => true]);
+}
+
+// ── GET /analytics-data — comprehensive analytics stats ────────
+if ($uri === '/analytics-data' && $method === 'GET') {
+    $db = get_db();
+
+    $authPass = trim((string)($_GET['password'] ?? $_SERVER['HTTP_X_ADMIN_PASSWORD'] ?? ''));
+    $isAuthed = is_admin() || ($authPass !== '' && tt_admin_password_matches($authPass));
+
+    $totalClicks = (int)$db->query('SELECT COUNT(*) FROM analytics_clicks')->fetchColumn();
+    $uniqueVisitors = (int)$db->query('SELECT COUNT(DISTINCT ip_address) FROM analytics_clicks')->fetchColumn();
+    $clicksToday = (int)$db->query('SELECT COUNT(*) FROM analytics_clicks WHERE created_at >= CURDATE()')->fetchColumn();
+
+    $totalSignups = (int)$db->query('SELECT COUNT(*) FROM investor_accounts')->fetchColumn();
+    $signupsToday = (int)$db->query('SELECT COUNT(*) FROM investor_accounts WHERE registered_at >= CURDATE()')->fetchColumn();
+
+    $invRow = $db->query('SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as volume FROM investments')->fetch();
+    $totalInvestments = (int)($invRow['count'] ?? 0);
+    $totalVolume = (float)($invRow['volume'] ?? 0);
+
+    $totalOrders = (int)$db->query('SELECT COUNT(*) FROM ev_orders')->fetchColumn();
+
+    $sources = $db->query('SELECT campaign_source, COUNT(*) as count FROM analytics_clicks GROUP BY campaign_source ORDER BY count DESC LIMIT 10')->fetchAll();
+    $devices = $db->query('SELECT device_type, COUNT(*) as count FROM analytics_clicks GROUP BY device_type ORDER BY count DESC')->fetchAll();
+    $recentClicks = $db->query('SELECT id, ip_address, referrer, landing_page, campaign_source, device_type, created_at FROM analytics_clicks ORDER BY id DESC LIMIT 50')->fetchAll();
+
+    $recentSignups = [];
+    if ($isAuthed) {
+        $recentSignups = $db->query('SELECT email, name, phone, onboarding_status, registered_at FROM investor_accounts ORDER BY registered_at DESC LIMIT 20')->fetchAll();
+    } else {
+        $raw = $db->query('SELECT email, name, onboarding_status, registered_at FROM investor_accounts ORDER BY registered_at DESC LIMIT 20')->fetchAll();
+        foreach ($raw as $r) {
+            $parts = explode('@', $r['email']);
+            $masked = substr($parts[0], 0, 3) . '***@' . ($parts[1] ?? '');
+            $recentSignups[] = [
+                'email' => $masked,
+                'name' => $r['name'],
+                'onboarding_status' => $r['onboarding_status'],
+                'registered_at' => $r['registered_at'],
+            ];
+        }
+    }
+
+    json_out([
+        'authenticated' => $isAuthed,
+        'summary' => [
+            'total_clicks' => $totalClicks,
+            'unique_visitors' => $uniqueVisitors,
+            'clicks_today' => $clicksToday,
+            'total_signups' => $totalSignups,
+            'signups_today' => $signupsToday,
+            'conversion_rate' => $totalClicks > 0 ? round(($totalSignups / $totalClicks) * 100, 2) : 0,
+            'total_investments' => $totalInvestments,
+            'investment_volume' => $totalVolume,
+            'total_orders' => $totalOrders,
+        ],
+        'sources' => $sources,
+        'devices' => $devices,
+        'recent_clicks' => $recentClicks,
+        'recent_signups' => $recentSignups,
+    ]);
+}
+
 // ── GET /my-status?email=xxx ───────────────────────────────────
 if ($uri === '/my-status' && $method === 'GET') {
     $email = normalize_email((string)($_GET['email'] ?? ''));

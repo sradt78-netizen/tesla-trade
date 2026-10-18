@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 576" role="img" aria-labelledby="title desc">
+  <title id="title">Tesla Model X</title>
+  <desc id="desc">A dark showroom illustration of a Tesla Model X SUV.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08090b"/>
+      <stop offset=".55" stop-color="#20252b"/>
+      <stop offset="1" stop-color="#090a0c"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eef1f4"/>
+      <stop offset=".5" stop-color="#8e969e"/>
+      <stop offset="1" stop-color="#30363c"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#263442"/>
+      <stop offset="1" stop-color="#070a0d"/>
+    </linearGradient>
+    <filter id="shadow"><feGaussianBlur stdDeviation="18"/></filter>
+  </defs>
+  <rect width="1024" height="576" fill="url(#bg)"/>
+  <ellipse cx="530" cy="455" rx="355" ry="42" fill="#000" opacity=".7" filter="url(#shadow)"/>
+  <path d="M170 385c25-72 94-119 186-132l121-17c93-13 190 13 252 73l88 84c12 11 18 26 18 42v22H157v-28c0-16 4-30 13-44Z" fill="url(#body)" stroke="#f4f5f6" stroke-opacity=".35" stroke-width="4"/>
+  <path d="m350 257 120-16c65-9 138 8 186 47l57 47H285l39-51c7-9 16-18 26-27Z" fill="url(#glass)" stroke="#b9c0c6" stroke-opacity=".6" stroke-width="4"/>
+  <path d="m467 244 8 91M652 289l-4 46" stroke="#9ca5ad" stroke-opacity=".55" stroke-width="4"/>
+  <path d="M229 361h548" stroke="#fff" stroke-opacity=".22" stroke-width="4"/>
+  <path d="M182 393h65M765 393h66" stroke="#e31937" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="280" cy="410" r="57" fill="#090b0d" stroke="#737b84" stroke-width="10"/>
+  <circle cx="280" cy="410" r="27" fill="#30363c" stroke="#aeb5bb" stroke-width="5"/>
+  <circle cx="741" cy="410" r="57" fill="#090b0d" stroke="#737b84" stroke-width="10"/>
+  <circle cx="741" cy="410" r="27" fill="#30363c" stroke="#aeb5bb" stroke-width="5"/>
+  <path d="M141 438h710" stroke="#d4af37" stroke-opacity=".25" stroke-width="2"/>
+</svg>
