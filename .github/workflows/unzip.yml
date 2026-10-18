@@ -27,16 +27,13 @@ jobs:
             fi
           done
 
-      - name: Ensure vercel.json exists
+      - name: Configure vercel.json if PHP files exist
         run: |
-          if [ ! -f "vercel.json" ]; then
+          if [ -d "api" ] && ls api/*.php 1> /dev/null 2>&1; then
             cat << 'EOF' > vercel.json
           {
             "functions": {
-              "api/*.php": {
-                "runtime": "vercel-php@0.7.1"
-              },
-              "*.php": {
+              "api/**/*.php": {
                 "runtime": "vercel-php@0.7.1"
               }
             },
@@ -45,6 +42,17 @@ jobs:
               { "src": "/assets/(.*)", "dest": "/assets/$1" },
               { "src": "/store/(.*)", "dest": "/store/$1" },
               { "src": "/(.*)", "dest": "/$1" }
+            ]
+          }
+          EOF
+          elif [ ! -f "vercel.json" ]; then
+            cat << 'EOF' > vercel.json
+          {
+            "rewrites": [
+              {
+                "source": "/(.*)",
+                "destination": "/index.html"
+              }
             ]
           }
           EOF

@@ -1,14 +1,5 @@
 -- Teslawealths.org / Tesla Trade Inc
 -- Consolidated MySQL/MariaDB schema for the investment platform and storefront.
---
--- IMPORTANT:
--- 1. Select the target database in phpMyAdmin before importing this file.
--- 2. This script creates tables only; it does not drop or delete existing data.
--- 3. The application normally uses the same database for the main site and
---    store. If store/api/config.php points to another database, run the
---    storefront section in that separate database instead.
--- 4. Do not put passwords, API keys, wallet secrets, or payment credentials
---    in this file. Those belong in the cPanel environment configuration.
 
 SET NAMES utf8mb4;
 
@@ -363,37 +354,3 @@ CREATE TABLE IF NOT EXISTS ev_finance_inquiries (
   INDEX idx_ev_finance_status_created (status, created_at),
   INDEX idx_ev_finance_email (customer_email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- Optional post-import checks
--- ============================================================
-
-SELECT TABLE_NAME
-FROM information_schema.TABLES
-WHERE TABLE_SCHEMA = DATABASE()
-  AND TABLE_NAME IN (
-    'otps',
-    'investor_credentials',
-    'investor_accounts',
-    'investments',
-    'withdrawals',
-    'account_transactions',
-    'app_settings',
-    'invitation_codes',
-    'referral_codes',
-    'referral_earnings',
-    'referral_bonuses',
-    'kyc_submissions',
-    'user_profiles',
-    'marketing_emails_log',
-    'onboarding_email_events',
-    'chat_sessions',
-    'chat_messages',
-    'connected_wallets',
-    'vehicle_orders',
-    'financing_applications',
-    'ev_orders',
-    'ev_order_items',
-    'ev_finance_inquiries'
-  )
-ORDER BY TABLE_NAME;
