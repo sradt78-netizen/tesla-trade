@@ -1,0 +1,8 @@
+{
+  "name": "Vercel Web App",
+  "description": "Production-ready web application configured for deployment on Vercel with Supabase and Resend integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
