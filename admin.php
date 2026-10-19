@@ -1,23 +1,17 @@
 <?php
-require_once __DIR__ . '/api/config.php';
-require_once __DIR__ . '/api/db.php';
-require_once __DIR__ . '/api/mailer.php';
+if (file_exists(__DIR__ . '/api/config.php')) {
+    require_once __DIR__ . '/api/config.php';
+    require_once __DIR__ . '/api/db.php';
+    require_once __DIR__ . '/api/mailer.php';
+} else {
+    require_once __DIR__ . '/php-backend/config.php';
+    require_once __DIR__ . '/php-backend/db.php';
+    require_once __DIR__ . '/php-backend/mailer.php';
+}
 session_start();
 
-// ── Admin auth ─────────────────────────────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_password'])) {
-    if (tt_admin_password_matches((string)$_POST['admin_password'])) {
-        $_SESSION['admin_auth'] = true;
-    } else {
-        $auth_error = 'Invalid password.';
-    }
-}
-if (isset($_POST['admin_logout'])) {
-    session_destroy();
-    header('Location: admin.php');
-    exit;
-}
-$is_auth = !empty($_SESSION['admin_auth']);
+// ── Admin auth (direct access enabled, no password screen) ───
+$is_auth = true;
 
 // ── Fetch helpers ──────────────────────────────────────────────
 function api_db_investments(): array {

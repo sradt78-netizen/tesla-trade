@@ -3,49 +3,117 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tesla Trade Inc — Administration Portal</title>
+  <title>Tesla Trade Inc — Administration Dashboard</title>
   <style>
     :root {
       --bg: #0a0a0a;
       --card-bg: #141414;
       --card-border: #262626;
-      --text-main: #f3f4f6;
-      --text-sub: #9ca3af;
-      --accent-red: #e31937;
-      --accent-green: #10b981;
-      --accent-blue: #3b82f6;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --red: #e31937;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --blue: #3b82f6;
+      --sidebar-w: 240px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background-color: var(--bg);
-      color: var(--text-main);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      padding: 16px;
-      line-height: 1.5;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
     }
-    .container { max-width: 1100px; margin: 0 auto; }
+    /* Sidebar */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: #111;
+      border-right: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; bottom: 0; left: 0;
+      z-index: 50;
+    }
+    .sidebar-header {
+      padding: 18px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .sidebar-logo {
+      width: 32px; height: 32px;
+      background: var(--red);
+      color: #fff;
+      font-weight: 800;
+      font-size: 16px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sidebar-brand { font-size: 15px; font-weight: 700; }
+    .sidebar-brand span { color: var(--red); }
+    .sidebar-nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 10px 12px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+    }
+    .nav-btn:hover { background: #1a1a1a; color: #fff; }
+    .nav-btn.active {
+      background: rgba(227, 25, 55, 0.12);
+      border-color: rgba(227, 25, 55, 0.3);
+      color: #fff;
+    }
+    .badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-weight: 700;
+      background: #2a2a2a;
+      color: #bbb;
+    }
+    .badge.red { background: rgba(227, 25, 55, 0.2); color: #f87171; }
+    .badge.green { background: rgba(16, 185, 129, 0.2); color: #86efac; }
+    .badge.amber { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+
+    /* Main Area */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      padding: 24px;
+      min-width: 0;
+    }
     header {
       display: flex;
-      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
-      gap: 12px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid var(--card-border);
       margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
     }
-    .brand h1 { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-    .badge {
-      font-size: 11px;
-      background: rgba(227, 25, 55, 0.15);
-      color: var(--accent-red);
-      border: 1px solid rgba(227, 25, 55, 0.3);
-      padding: 3px 8px;
-      border-radius: 999px;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-    }
-    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .header-title h1 { font-size: 22px; font-weight: 700; }
+    .header-title p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .header-actions { display: flex; gap: 8px; }
+
     button {
       background: #1f1f1f;
       color: #fff;
@@ -61,68 +129,21 @@
     }
     button:hover { background: #2a2a2a; }
     button.primary {
-      background: var(--accent-red);
-      border-color: var(--accent-red);
+      background: var(--red);
+      border-color: var(--red);
     }
-    button.primary:hover { background: #c7142d; }
+    button.primary:hover { background: #c0102a; }
     button.success {
-      background: var(--accent-green);
-      border-color: var(--accent-green);
+      background: var(--green);
+      border-color: var(--green);
       color: #000;
       font-weight: 600;
     }
 
-    /* Login Overlay */
-    .login-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(10, 10, 10, 0.95);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      padding: 20px;
-    }
-    .login-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 16px;
-      padding: 32px 24px;
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    }
-    .login-mark {
-      width: 44px;
-      height: 44px;
-      background: var(--accent-red);
-      color: #fff;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 20px;
-      margin: 0 auto 16px;
-    }
-    .login-card input {
-      width: 100%;
-      padding: 12px 14px;
-      background: #0a0a0a;
-      border: 1px solid #333;
-      border-radius: 8px;
-      color: #fff;
-      font-size: 14px;
-      margin: 16px 0 12px;
-      outline: none;
-    }
-    .login-card input:focus { border-color: var(--accent-red); }
-
-    /* Cards & Grids */
+    /* Cards & Stats */
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 16px;
       margin-bottom: 24px;
     }
@@ -130,52 +151,19 @@
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: 12px;
-      padding: 18px;
+      padding: 16px;
     }
     .card-title {
-      font-size: 13px;
-      color: var(--text-sub);
+      font-size: 12px;
+      color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
+      margin-bottom: 6px;
     }
-    .card-value {
-      font-size: 26px;
-      font-weight: 700;
-      color: #fff;
-    }
-    .card-meta {
-      font-size: 12px;
-      color: var(--text-sub);
-      margin-top: 6px;
-    }
-
-    /* Generator Box */
-    .action-box {
-      background: linear-gradient(180deg, #181818 0%, #121212 100%);
-      border: 1px solid #333;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 24px;
-    }
-    .action-box h2 { font-size: 17px; margin-bottom: 6px; }
-    .action-box p { font-size: 13px; color: var(--text-sub); margin-bottom: 14px; }
-    .gen-row { display: flex; flex-wrap: wrap; gap: 10px; }
-    .gen-row input {
-      flex: 1;
-      min-width: 200px;
-      padding: 10px 14px;
-      background: #0a0a0a;
-      border: 1px solid #333;
-      border-radius: 8px;
-      color: #fff;
-      font-size: 14px;
-    }
+    .card-val { font-size: 24px; font-weight: 700; color: #fff; }
 
     /* Tables */
-    .table-container {
+    .table-box {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: 12px;
@@ -189,11 +177,12 @@
       font-size: 13px;
     }
     th {
-      background: #1a1a1a;
-      color: var(--text-sub);
+      background: #181818;
+      color: var(--muted);
       font-weight: 600;
       padding: 12px 14px;
       border-bottom: 1px solid var(--card-border);
+      white-space: nowrap;
     }
     td {
       padding: 12px 14px;
@@ -201,342 +190,811 @@
       color: #e5e7eb;
     }
     tr:last-child td { border-bottom: none; }
-    tr:hover { background: #181818; }
-    .tag-active {
-      background: rgba(16, 185, 129, 0.2);
-      color: #86efac;
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .tag-revoked {
-      background: rgba(239, 68, 68, 0.2);
-      color: #fca5a5;
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 600;
-    }
+    tr:hover { background: #161616; }
 
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    .modal-content {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 14px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0a0a0a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+    }
     .toast {
       position: fixed;
       bottom: 20px;
       right: 20px;
-      background: #10b981;
+      background: var(--green);
       color: #000;
       font-weight: 600;
       padding: 10px 18px;
       border-radius: 8px;
       display: none;
       box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      z-index: 200;
+    }
+    @media(max-width: 768px) {
+      body { flex-direction: column; }
+      .sidebar {
+        width: 100%;
+        position: relative;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--card-border);
+      }
+      .sidebar-nav { flex-direction: row; overflow-x: auto; padding: 8px; }
+      .nav-btn { flex: 0 0 auto; width: auto; font-size: 12px; padding: 6px 10px; }
+      .main { margin-left: 0; padding: 14px; }
     }
   </style>
 </head>
 <body>
 
-  <!-- Admin Login Modal -->
-  <div class="login-overlay" id="loginModal">
-    <div class="login-card">
-      <div class="login-mark">T</div>
-      <h2>Admin Portal</h2>
-      <p style="color: var(--text-sub); font-size: 13px; margin-top: 4px;">Enter your admin password to manage invitation tokens, database, and investors.</p>
-      <input type="password" id="adminPasswordInput" placeholder="Enter admin password (Heartofwisdom101@$)" autofocus />
-      <button type="button" class="primary" style="width: 100%; justify-content: center; padding: 12px;" onclick="authenticateAdmin()">Log In to Admin</button>
-      <div id="loginError" style="color: #f87171; font-size: 12px; margin-top: 10px; display: none;"></div>
-
-      <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #222;">
-        <button type="button" style="width: 100%; justify-content: center; padding: 8px; font-size: 12px; background: #1a1a1a;" onclick="checkSystemDiagnostics()">⚡ Check Database & Environment Status</button>
-        <div id="diagResult" style="font-size: 11px; color: var(--text-sub); margin-top: 8px; text-align: left; display: none; background: #080808; padding: 10px; border-radius: 6px; border: 1px solid #222;"></div>
-      </div>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">T</div>
+      <div class="sidebar-brand">Tesla <span>Trade</span> Admin</div>
     </div>
-  </div>
+    <nav class="sidebar-nav">
+      <button class="nav-btn active" onclick="switchTab('investors')">
+        <span>👥 Investors</span> <span class="badge" id="b-investors">0</span>
+      </button>
+      <button class="nav-btn" onclick="switchTab('receipts')">
+        <span>🧾 Shop Receipts</span> <span class="badge amber" id="b-receipts">0</span>
+      </button>
+      <button class="nav-btn" onclick="switchTab('kyc')">
+        <span>🪪 KYC Submissions</span> <span class="badge amber" id="b-kyc">0</span>
+      </button>
+      <button class="nav-btn" onclick="switchTab('withdrawals')">
+        <span>💸 Withdrawals</span> <span class="badge red" id="b-withdrawals">0</span>
+      </button>
+      <button class="nav-btn" onclick="switchTab('financing')">
+        <span>🚘 Financing</span> <span class="badge" id="b-financing">0</span>
+      </button>
+      <button class="nav-btn" onclick="switchTab('access')">
+        <span>🔐 Invitation Codes</span> <span class="badge green" id="b-codes">0</span>
+      </button>
+      <button class="nav-btn" onclick="switchTab('marketing')">
+        <span>📣 Marketing & Clicks</span>
+      </button>
+      <button class="nav-btn" onclick="switchTab('settings')">
+        <span>⚙️ Settings & Envs</span>
+      </button>
+    </nav>
+  </aside>
 
-  <div class="container" id="adminContent" style="display: none;">
+  <!-- Main Content Area -->
+  <main class="main">
     <header>
-      <div class="brand">
-        <h1>⚙️ Admin Dashboard <span class="badge">ADMINISTRATOR</span></h1>
-        <p style="color: var(--text-sub); font-size: 13px; margin-top: 3px;">Full control over invitation tokens, MySQL database, and investors</p>
+      <div class="header-title">
+        <h1 id="panelTitle">Investor Management</h1>
+        <p id="panelDesc">View all registered accounts, credit money/balance, and manage investments</p>
       </div>
       <div class="header-actions">
-        <a href="/analytics" style="text-decoration: none;"><button type="button">📊 View Analytics</button></a>
+        <button type="button" class="success" onclick="openCreditModal()">💰 Add Money to Investor</button>
+        <button type="button" onclick="loadDashboardData()">🔄 Refresh</button>
         <a href="/" style="text-decoration: none;"><button type="button">🌐 Public Site</button></a>
-        <button type="button" onclick="logoutAdmin()">🚪 Log Out</button>
       </div>
     </header>
 
-    <!-- System & Environment Health Card -->
-    <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--accent-green);">
-      <div class="card-title">Database & Environment Status <span>⚡</span></div>
-      <div style="display: flex; flex-wrap: wrap; gap: 20px; font-size: 13px; margin-top: 6px;">
-        <div>Database: <strong id="dbStatus" style="color: var(--accent-green);">Connecting...</strong></div>
-        <div>Host: <span id="dbHostText" style="color: var(--text-sub); font-family: monospace;">—</span></div>
-        <div>Active Tables: <strong id="dbTablesCount" style="color: #fff;">—</strong></div>
-        <div>Vercel Env: <strong id="envStatus" style="color: var(--accent-green);">—</strong></div>
+    <!-- TAB 1: INVESTORS -->
+    <section id="tab-investors">
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">Total Investors</div>
+          <div class="card-val" id="stat-investors">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Total Funded Volume</div>
+          <div class="card-val" id="stat-volume">$0.00</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Active Investments</div>
+          <div class="card-val" id="stat-active-inv">0</div>
+        </div>
       </div>
-    </div>
 
-    <!-- Invitation Tokens Generator -->
-    <div class="action-box">
-      <h2>🎟️ Invitation Token Generator</h2>
-      <p>Create new invitation codes to grant access to prospective investors. Anyone with an active code can bypass the private gate and create an account.</p>
-      <div class="gen-row">
-        <input type="text" id="customCodeInput" placeholder="Custom code (leave empty for random TT-XXXX)" />
-        <button type="button" class="primary" onclick="generateCode()">＋ Generate Code</button>
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Investor Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Status</th>
+              <th>Invested Balance</th>
+              <th>Current Value</th>
+              <th>Registered</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="investorsTableBody">
+            <tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading investor accounts...</td></tr>
+          </tbody>
+        </table>
       </div>
-    </div>
+    </section>
 
-    <!-- Invitation Codes Ledger Table -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-      <h3 style="font-size: 16px;">Active & Historical Invitation Codes</h3>
-      <button type="button" onclick="loadInvitations()">🔄 Refresh Codes</button>
-    </div>
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Code</th>
-            <th>Status</th>
-            <th>Source</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="codesTableBody">
-          <tr><td colspan="5" style="text-align: center; color: var(--text-sub); padding: 20px;">Loading invitation codes...</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <!-- TAB 2: SHOP RECEIPTS / PAYMENT PROOFS -->
+    <section id="tab-receipts" style="display: none;">
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Customer</th>
+              <th>Email</th>
+              <th>Payment Method</th>
+              <th>Reference</th>
+              <th>Receipt Image</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="receiptsTableBody">
+            <tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading shop orders and payment receipts...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-    <!-- Registered Investors Section -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-      <h3 style="font-size: 16px;">Registered Investor Accounts</h3>
-      <span style="font-size: 12px; color: var(--text-sub);" id="investorCountLabel">—</span>
-    </div>
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Full Name</th>
-            <th>Email</th>
-            <th>Phone</th>
-            <th>Status</th>
-            <th>Registration Date</th>
-          </tr>
-        </thead>
-        <tbody id="investorsTableBody">
-          <tr><td colspan="5" style="text-align: center; color: var(--text-sub); padding: 20px;">Loading investor accounts...</td></tr>
-        </tbody>
-      </table>
+    <!-- TAB 3: KYC SUBMISSIONS -->
+    <section id="tab-kyc" style="display: none;">
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>ID Type & Number</th>
+              <th>Address</th>
+              <th>ID Photo</th>
+              <th>Selfie Photo</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="kycTableBody">
+            <tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading KYC verification submissions...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 4: WITHDRAWALS -->
+    <section id="tab-withdrawals" style="display: none;">
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>User Email</th>
+              <th>Amount</th>
+              <th>Payout Method</th>
+              <th>Receiving Address / Bank</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="withdrawalsTableBody">
+            <tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">Loading withdrawal requests...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 5: FINANCING -->
+    <section id="tab-financing" style="display: none;">
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Applicant</th>
+              <th>Email & Phone</th>
+              <th>Vehicle</th>
+              <th>Income</th>
+              <th>Down Payment</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="financingTableBody">
+            <tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">Loading financing applications...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 6: INVITATION CODES -->
+    <section id="tab-access" style="display: none;">
+      <div class="card" style="margin-bottom: 20px;">
+        <h3 style="font-size: 15px; margin-bottom: 6px;">🎟️ Generate New Invitation Code</h3>
+        <p style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">Create custom or random invitation tokens. Share with investors to grant them signup access.</p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <input type="text" id="newCodeInput" placeholder="Custom code (leave empty for random TT-XXXX)" style="flex: 1; min-width: 200px; padding: 10px 12px; background: #0a0a0a; border: 1px solid #333; border-radius: 8px; color: #fff;" />
+          <button type="button" class="primary" onclick="generateInvitationCode()">＋ Generate Code</button>
+        </div>
+      </div>
+
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Invitation Code</th>
+              <th>Status</th>
+              <th>Source</th>
+              <th>Created Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="codesTableBody">
+            <tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 24px;">Loading invitation tokens...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 7: MARKETING & CLICKS -->
+    <section id="tab-marketing" style="display: none;">
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">Domain Clicks</div>
+          <div class="card-val" id="stat-clicks">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Campaign Generator</div>
+          <a href="/analytics" style="text-decoration: none;"><button type="button" class="primary" style="margin-top: 6px;">Open Analytics Dashboard</button></a>
+        </div>
+      </div>
+
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Source</th>
+              <th>Landing Page</th>
+              <th>Device</th>
+              <th>Referrer</th>
+              <th>IP Address</th>
+            </tr>
+          </thead>
+          <tbody id="clicksTableBody">
+            <tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 24px;">Loading click logs...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 8: SETTINGS & ENVS -->
+    <section id="tab-settings" style="display: none;">
+      <div class="card" style="margin-bottom: 20px;">
+        <h3 style="font-size: 15px; margin-bottom: 10px;">⚡ Database & Environment Variables Status</h3>
+        <div id="envDiagnosticBox" style="font-size: 13px; line-height: 1.8; color: var(--muted);">
+          Checking database connection and Vercel environment variables...
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 15px; margin-bottom: 14px;">⚙️ Payment Wallet Addresses</h3>
+        <div class="form-group">
+          <label>USDT Wallet (TRC20)</label>
+          <input type="text" id="cfg-usdt" placeholder="e.g. TR7NHkorwbQ82DuP2nJvdN5v7v7uE8oA7r" />
+        </div>
+        <div class="form-group">
+          <label>Bitcoin Wallet (BTC)</label>
+          <input type="text" id="cfg-btc" placeholder="e.g. 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" />
+        </div>
+        <div class="form-group">
+          <label>Ethereum Wallet (ETH)</label>
+          <input type="text" id="cfg-eth" placeholder="e.g. 0x71C...8976F" />
+        </div>
+        <button type="button" class="primary" onclick="saveSettings()">Save Wallet Settings</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: ADD MONEY / CREDIT BALANCE -->
+  <div class="modal-overlay" id="creditModal">
+    <div class="modal-content">
+      <div class="modal-title">💰 Credit Balance to Investor Account</div>
+      <div class="form-group">
+        <label>Investor Email Address</label>
+        <input type="email" id="creditEmailInput" placeholder="investor@example.com" />
+      </div>
+      <div class="form-group">
+        <label>Amount to Add ($ USD)</label>
+        <input type="number" id="creditAmountInput" placeholder="1000.00" step="any" min="1" />
+      </div>
+      <div class="form-group">
+        <label>Note / Transaction Description</label>
+        <input type="text" id="creditNoteInput" placeholder="Deposit match, manual deposit credit, profit" />
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+        <button type="button" onclick="closeCreditModal()">Cancel</button>
+        <button type="button" class="success" onclick="submitCreditBalance()">Add Funds</button>
+      </div>
     </div>
   </div>
 
-  <div class="toast" id="toast">Copied to clipboard!</div>
+  <!-- MODAL: IMAGE PREVIEW -->
+  <div class="modal-overlay" id="imageModal" onclick="closeImageModal()">
+    <div class="modal-content" style="max-width: 700px; text-align: center; background: #000;" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 15px;" id="imageModalTitle">Receipt Preview</h3>
+        <button type="button" onclick="closeImageModal()">✕ Close</button>
+      </div>
+      <img id="imageModalImg" src="" style="max-width: 100%; max-height: 70vh; border-radius: 8px; border: 1px solid #333;" />
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Notification</div>
 
   <script>
-    var currentAdminPass = localStorage.getItem('ttinc_admin_pass') || '';
+    var globalData = {};
 
-    if (currentAdminPass) {
-      verifyAndOpen(currentAdminPass);
-    }
-
-    document.getElementById('adminPasswordInput').addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') authenticateAdmin();
-    });
-
-    function authenticateAdmin() {
-      var pass = document.getElementById('adminPasswordInput').value.trim();
-      if (!pass) return;
-      verifyAndOpen(pass);
-    }
-
-    function verifyAndOpen(pass) {
-      var errBox = document.getElementById('loginError');
-      errBox.style.display = 'none';
-
-      fetch('/api/admin?password=' + encodeURIComponent(pass), {
-        headers: { 'x-admin-password': pass }
-      })
-      .then(function(res) {
-        return res.json().then(function(data) {
-          if (!res.ok || !data.success) {
-            throw new Error(data.error || 'Invalid admin password. Default is: Heartofwisdom101@$');
-          }
-          return data;
-        });
-      })
-      .then(function(data) {
-        currentAdminPass = pass;
-        localStorage.setItem('ttinc_admin_pass', pass);
-        document.getElementById('loginModal').style.display = 'none';
-        document.getElementById('adminContent').style.display = 'block';
-        renderCodes(data.codes || []);
-        loadDbStatus();
-        loadInvestors();
-      })
-      .catch(function(err) {
-        errBox.textContent = err.message || 'Invalid admin password.';
-        errBox.style.display = 'block';
+    function switchTab(tabId) {
+      var tabs = ['investors', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'settings'];
+      tabs.forEach(function(t) {
+        var el = document.getElementById('tab-' + t);
+        if (el) el.style.display = (t === tabId) ? 'block' : 'none';
       });
-    }
 
-    function checkSystemDiagnostics() {
-      var diagBox = document.getElementById('diagResult');
-      diagBox.style.display = 'block';
-      diagBox.innerHTML = '<span style="color:#aaa;">Checking database and environment variables...</span>';
+      var btns = document.querySelectorAll('.nav-btn');
+      btns.forEach(function(b) {
+        b.classList.remove('active');
+        if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf(tabId) !== -1) {
+          b.classList.add('active');
+        }
+      });
 
-      fetch('/api/dbcheck')
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          var dbOk = d.database && d.database.connected;
-          var html = '<div style="margin-bottom:4px;color:' + (dbOk ? '#4ade80' : '#f87171') + ';font-weight:600;">' + (dbOk ? '🟢 Database: Connected Live' : '⚠️ Database: ' + (d.database?.error || 'Offline')) + '</div>';
-          html += '<div>Host: ' + (d.database?.host || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com') + '</div>';
-          if (d.database?.tables_count) html += '<div>Tables: ' + d.database.tables_count + ' active tables</div>';
-          var env = d.environment || {};
-          html += '<div style="margin-top:4px;border-top:1px solid #222;padding-top:4px;">';
-          html += '<div>DB_HOST: ' + (env.has_DB_HOST ? '✅ Active from Vercel' : '⚡ Using default') + '</div>';
-          html += '<div>DB_PASSWORD: ' + (env.has_DB_PASSWORD ? '✅ Active from Vercel' : '⚡ Using default') + '</div>';
-          html += '<div>ADMIN_PASSWORD: ' + (env.has_ADMIN_PASSWORD ? '✅ Active from Vercel' : '⚡ Using default (Heartofwisdom101@$)') + '</div>';
-          html += '</div>';
-          diagBox.innerHTML = html;
-        })
-        .catch(function(e) {
-          diagBox.innerHTML = '<div style="color:#f87171;">Diagnostic check failed: ' + e.message + '</div>';
-        });
-    }
+      var titles = {
+        investors: ['Investor Management', 'View all registered accounts, credit money/balance, and manage investments'],
+        receipts: ['Shop Receipts & Payment Proofs', 'Review customer payment receipts and verify orders'],
+        kyc: ['KYC Document Review', 'Verify government IDs and identity verification submissions'],
+        withdrawals: ['Withdrawal Requests', 'Review and process investor payout requests'],
+        financing: ['Vehicle Financing Applications', 'Approve or decline customer financing applications'],
+        access: ['Private Invitation Access', 'Manage active and revoked investor invitation tokens'],
+        marketing: ['Marketing & Click Analytics', 'Track domain clicks, referral sources, and campaigns'],
+        settings: ['System Settings & Environment', 'Database health, Vercel environment variables, and wallets']
+      };
 
-    function logoutAdmin() {
-      localStorage.removeItem('ttinc_admin_pass');
-      currentAdminPass = '';
-      location.reload();
-    }
-
-    function loadDbStatus() {
-      fetch('/api/dbcheck')
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (d.database && d.database.connected) {
-            document.getElementById('dbStatus').textContent = '🟢 Connected Live';
-            document.getElementById('dbHostText').textContent = d.database.host;
-            document.getElementById('dbTablesCount').textContent = d.database.tables + ' tables';
-          } else {
-            document.getElementById('dbStatus').textContent = '⚠️ Check DB Credentials';
-            document.getElementById('dbStatus').style.color = '#f87171';
-          }
-
-          var envs = d.environment || {};
-          if (envs.has_DB_HOST || envs.has_DB_PASSWORD) {
-            document.getElementById('envStatus').textContent = '✅ Vercel Envs Active';
-          } else {
-            document.getElementById('envStatus').textContent = 'Using Config Defaults';
-          }
-        })
-        .catch(function() {
-          document.getElementById('dbStatus').textContent = 'Offline';
-        });
-    }
-
-    function loadInvitations() {
-      fetch('/api/admin/invitations?password=' + encodeURIComponent(currentAdminPass))
-        .then(function(r) { return r.json(); })
-        .then(function(d) { renderCodes(d.codes || []); });
-    }
-
-    function renderCodes(codes) {
-      var tbody = document.getElementById('codesTableBody');
-      if (!codes || !codes.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-sub); padding: 20px;">No invitation codes found. Click Generate to create one.</td></tr>';
-        return;
+      if (titles[tabId]) {
+        document.getElementById('panelTitle').textContent = titles[tabId][0];
+        document.getElementById('panelDesc').textContent = titles[tabId][1];
       }
-      var rows = '';
-      codes.forEach(function(c) {
-        var statusTag = c.status === 'active' ? '<span class="tag-active">Active</span>' : '<span class="tag-revoked">Revoked</span>';
-        var actionBtn = c.status === 'active'
-          ? '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="toggleCodeStatus(' + c.id + ', \'revoke\')">Revoke</button>'
-          : '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #86efac;" onclick="toggleCodeStatus(' + c.id + ', \'reinstate\')">Reinstate</button>';
-
-        rows += '<tr>' +
-          '<td style="font-family: monospace; font-weight: 700; color: #fff;">' + c.code + '</td>' +
-          '<td>' + statusTag + '</td>' +
-          '<td style="color: var(--text-sub);">' + (c.source || 'admin') + '</td>' +
-          '<td style="color: var(--text-sub); font-size: 12px;">' + (c.created_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
-          '<td><button type="button" style="padding: 4px 8px; font-size: 11px; margin-right: 6px;" onclick="copyCodeLink(\'' + c.code + '\')">📋 Copy Link</button>' + actionBtn + '</td>' +
-          '</tr>';
-      });
-      tbody.innerHTML = rows;
     }
 
-    function generateCode() {
-      var code = document.getElementById('customCodeInput').value.trim();
-      fetch('/api/admin/invitations', {
+    function loadDashboardData() {
+      fetch('/api/admin?action=all_data')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.success) return;
+          globalData = data;
+          renderDashboard(data);
+        })
+        .catch(function(err) {
+          console.error('Error fetching admin data:', err);
+        });
+
+      loadDbDiagnostics();
+    }
+
+    function renderDashboard(data) {
+      // 1. Investors
+      var invBody = document.getElementById('investorsTableBody');
+      var investors = data.investors || [];
+      var investments = data.investments || [];
+      document.getElementById('stat-investors').textContent = investors.length;
+      document.getElementById('b-investors').textContent = investors.length;
+
+      var invMap = {};
+      var totalVol = 0;
+      var activeCount = 0;
+      investments.forEach(function(inv) {
+        var em = (inv.user_email || '').toLowerCase();
+        invMap[em] = inv;
+        totalVol += parseFloat(inv.total || '0');
+        if (inv.status === 'active') activeCount++;
+      });
+      document.getElementById('stat-volume').textContent = '$' + totalVol.toLocaleString('en-US', { minimumFractionDigits: 2 });
+      document.getElementById('stat-active-inv').textContent = activeCount;
+
+      if (!investors.length) {
+        invBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No registered accounts found.</td></tr>';
+      } else {
+        var iRows = '';
+        investors.forEach(function(u) {
+          var em = (u.email || '').toLowerCase();
+          var inv = invMap[em] || {};
+          var bal = parseFloat(inv.total || '0');
+          var cur = parseFloat(inv.total_current_value || inv.total || '0');
+          var statusBadge = u.onboarding_status === 'verified' ? '<span class="badge green">Verified</span>' : '<span class="badge amber">' + (u.onboarding_status || 'active') + '</span>';
+
+          iRows += '<tr>' +
+            '<td style="font-weight: 600;">' + (u.name || 'Investor') + '</td>' +
+            '<td style="font-family: monospace;">' + (u.email || '—') + '</td>' +
+            '<td style="color: var(--muted);">' + (u.phone || '—') + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td style="color: #4ade80; font-weight: 600;">$' + bal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+            '<td style="color: #60a5fa; font-weight: 600;">$' + cur.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+            '<td style="color: var(--muted); font-size: 12px;">' + (u.registered_at || '').substring(0, 10) + '</td>' +
+            '<td><button type="button" class="success" style="padding: 4px 8px; font-size: 11px;" onclick="openCreditForEmail(\'' + u.email + '\')">＋ Add Money</button></td>' +
+            '</tr>';
+        });
+        invBody.innerHTML = iRows;
+      }
+
+      // 2. Shop Receipts
+      var rBody = document.getElementById('receiptsTableBody');
+      var orders = data.orders || [];
+      document.getElementById('b-receipts').textContent = orders.length;
+      if (!orders.length) {
+        rBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No shop orders submitted yet.</td></tr>';
+      } else {
+        var rRows = '';
+        orders.forEach(function(o) {
+          var imgBtn = o.payment_proof_path
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + o.payment_proof_path + '\', \'Order Receipt #' + o.id + '\')">🔍 View Receipt</button>'
+            : '<span style="color: var(--muted); font-size: 11px;">No proof</span>';
+
+          var statusBadge = o.status === 'approved' ? '<span class="badge green">Approved</span>' : '<span class="badge amber">' + (o.status || 'pending') + '</span>';
+
+          rRows += '<tr>' +
+            '<td>#' + o.id + '</td>' +
+            '<td style="font-weight: 500;">' + (o.customer_name || '—') + '</td>' +
+            '<td style="font-family: monospace;">' + (o.customer_email || '—') + '</td>' +
+            '<td>' + (o.payment_method || 'Crypto') + '</td>' +
+            '<td style="font-family: monospace; font-size: 12px;">' + (o.payment_reference || '—') + '</td>' +
+            '<td>' + imgBtn + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="orderAction(' + o.id + ', \'approve_receipt\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="orderAction(' + o.id + ', \'reject_receipt\')">Reject</button>' +
+            '</td>' +
+            '</tr>';
+        });
+        rBody.innerHTML = rRows;
+      }
+
+      // 3. KYC
+      var kBody = document.getElementById('kycTableBody');
+      var kycList = data.kyc || [];
+      document.getElementById('b-kyc').textContent = kycList.length;
+      if (!kycList.length) {
+        kBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No KYC submissions pending.</td></tr>';
+      } else {
+        var kRows = '';
+        kycList.forEach(function(k) {
+          var idImg = k.id_document_path
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + k.id_document_path + '\', \'ID Document - ' + (k.full_name || '') + '\')">🪪 View ID</button>'
+            : '—';
+          var selfieImg = k.selfie_path
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + k.selfie_path + '\', \'Selfie - ' + (k.full_name || '') + '\')">🤳 View Selfie</button>'
+            : '—';
+          var statusBadge = k.status === 'approved' ? '<span class="badge green">Approved</span>' : '<span class="badge amber">' + (k.status || 'pending') + '</span>';
+
+          kRows += '<tr>' +
+            '<td style="font-weight: 500;">' + (k.full_name || '—') + '</td>' +
+            '<td style="font-family: monospace;">' + (k.user_email || '—') + '</td>' +
+            '<td>' + (k.id_type || 'Passport') + ' - ' + (k.id_number || '—') + '</td>' +
+            '<td style="font-size: 12px; color: var(--muted);">' + (k.address || '—') + '</td>' +
+            '<td>' + idImg + '</td>' +
+            '<td>' + selfieImg + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="kycAction(' + k.id + ', \'approve_kyc\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="kycAction(' + k.id + ', \'reject_kyc\')">Reject</button>' +
+            '</td>' +
+            '</tr>';
+        });
+        kBody.innerHTML = kRows;
+      }
+
+      // 4. Withdrawals
+      var wBody = document.getElementById('withdrawalsTableBody');
+      var wds = data.withdrawals || [];
+      document.getElementById('b-withdrawals').textContent = wds.length;
+      if (!wds.length) {
+        wBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">No withdrawal requests found.</td></tr>';
+      } else {
+        var wRows = '';
+        wds.forEach(function(w) {
+          var statusBadge = w.status === 'approved' ? '<span class="badge green">Approved</span>' : '<span class="badge red">' + (w.status || 'pending') + '</span>';
+          wRows += '<tr>' +
+            '<td style="font-size: 12px; color: var(--muted);">' + (w.created_at || '').substring(0, 10) + '</td>' +
+            '<td style="font-family: monospace;">' + (w.user_email || '—') + '</td>' +
+            '<td style="font-weight: 600; color: #f87171;">$' + Number(w.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+            '<td>' + (w.method || 'Crypto') + '</td>' +
+            '<td style="font-family: monospace; font-size: 12px;">' + (w.destination || '—') + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="wdAction(' + w.id + ', \'approve_withdrawal\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="wdAction(' + w.id + ', \'reject_withdrawal\')">Reject</button>' +
+            '</td>' +
+            '</tr>';
+        });
+        wBody.innerHTML = wRows;
+      }
+
+      // 5. Financing
+      var fBody = document.getElementById('financingTableBody');
+      var fins = data.financing || [];
+      document.getElementById('b-financing').textContent = fins.length;
+      if (!fins.length) {
+        fBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">No financing applications submitted.</td></tr>';
+      } else {
+        var fRows = '';
+        fins.forEach(function(f) {
+          fRows += '<tr>' +
+            '<td style="font-weight: 500;">' + (f.applicant_name || '—') + '</td>' +
+            '<td>' + (f.applicant_email || '—') + ' (' + (f.applicant_phone || '') + ')</td>' +
+            '<td>' + (f.vehicle_model || 'Tesla') + '</td>' +
+            '<td>$' + Number(f.monthly_income || 0).toLocaleString() + '</td>' +
+            '<td>$' + Number(f.down_payment || 0).toLocaleString() + '</td>' +
+            '<td><span class="badge amber">' + (f.status || 'pending') + '</span></td>' +
+            '<td>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="finAction(' + f.id + ', \'approve_financing\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="finAction(' + f.id + ', \'reject_financing\')">Decline</button>' +
+            '</td>' +
+            '</tr>';
+        });
+        fBody.innerHTML = fRows;
+      }
+
+      // 6. Invitation Codes
+      var cBody = document.getElementById('codesTableBody');
+      var codes = data.codes || [];
+      document.getElementById('b-codes').textContent = codes.length;
+      if (!codes.length) {
+        cBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 24px;">No invitation codes found. Generate one above.</td></tr>';
+      } else {
+        var cRows = '';
+        codes.forEach(function(c) {
+          var statusTag = c.status === 'active' ? '<span class="badge green">Active</span>' : '<span class="badge red">Revoked</span>';
+          var actionBtn = c.status === 'active'
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="codeStatus(' + c.id + ', \'revoke_code\')">Revoke</button>'
+            : '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #86efac;" onclick="codeStatus(' + c.id + ', \'reinstate_code\')">Reinstate</button>';
+
+          cRows += '<tr>' +
+            '<td style="font-family: monospace; font-weight: 700; color: #fff;">' + c.code + '</td>' +
+            '<td>' + statusTag + '</td>' +
+            '<td style="color: var(--muted);">' + (c.source || 'admin') + '</td>' +
+            '<td style="color: var(--muted); font-size: 12px;">' + (c.created_at || '').substring(0, 10) + '</td>' +
+            '<td><button type="button" style="padding: 4px 8px; font-size: 11px; margin-right: 6px;" onclick="copyCodeLink(\'' + c.code + '\')">📋 Copy Link</button>' + actionBtn + '</td>' +
+            '</tr>';
+        });
+        cBody.innerHTML = cRows;
+      }
+
+      // 7. Clicks / Marketing
+      var clkBody = document.getElementById('clicksTableBody');
+      var clicks = data.clicks || [];
+      document.getElementById('stat-clicks').textContent = clicks.length;
+      if (!clicks.length) {
+        clkBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 24px;">No click logs recorded yet.</td></tr>';
+      } else {
+        var clkRows = '';
+        clicks.forEach(function(c) {
+          clkRows += '<tr>' +
+            '<td style="color: var(--muted); font-size: 12px;">' + (c.created_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
+            '<td><span class="badge">' + (c.campaign_source || 'direct') + '</span></td>' +
+            '<td>' + (c.landing_page || '/') + '</td>' +
+            '<td>' + (c.device_type || 'desktop') + '</td>' +
+            '<td style="color: var(--muted); font-size: 12px;">' + (c.referrer || 'Direct') + '</td>' +
+            '<td style="font-family: monospace; font-size: 12px;">' + (c.ip_address || '—') + '</td>' +
+            '</tr>';
+        });
+        clkBody.innerHTML = clkRows;
+      }
+
+      // 8. Settings
+      var s = data.settings || {};
+      if (s.wallet_usdt) document.getElementById('cfg-usdt').value = s.wallet_usdt;
+      if (s.wallet_btc) document.getElementById('cfg-btc').value = s.wallet_btc;
+      if (s.wallet_eth) document.getElementById('cfg-eth').value = s.wallet_eth;
+    }
+
+    // Modal Actions
+    function openCreditModal() { document.getElementById('creditModal').style.display = 'flex'; }
+    function closeCreditModal() { document.getElementById('creditModal').style.display = 'none'; }
+    function openCreditForEmail(em) {
+      document.getElementById('creditEmailInput').value = em;
+      openCreditModal();
+    }
+
+    function submitCreditBalance() {
+      var em = document.getElementById('creditEmailInput').value.trim();
+      var amt = document.getElementById('creditAmountInput').value.trim();
+      var note = document.getElementById('creditNoteInput').value.trim();
+      if (!em || !amt) { alert('Enter investor email and amount'); return; }
+
+      fetch('/api/admin', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-password': currentAdminPass
-        },
-        body: JSON.stringify({ action: 'generate', code: code })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'credit_balance', email: em, amount: amt, note: note })
       })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        document.getElementById('customCodeInput').value = '';
-        renderCodes(d.codes || []);
+        if (d.success) {
+          showToast(d.message || 'Funds credited successfully!');
+          closeCreditModal();
+          loadDashboardData();
+        } else {
+          alert(d.error || 'Failed to credit funds');
+        }
+      });
+    }
+
+    function kycAction(id, act) {
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'KYC updated');
+        loadDashboardData();
+      });
+    }
+
+    function orderAction(id, act) {
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Order updated');
+        loadDashboardData();
+      });
+    }
+
+    function wdAction(id, act) {
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Withdrawal updated');
+        loadDashboardData();
+      });
+    }
+
+    function finAction(id, act) {
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Financing updated');
+        loadDashboardData();
+      });
+    }
+
+    function generateInvitationCode() {
+      var c = document.getElementById('newCodeInput').value.trim();
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate_code', code: c })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        document.getElementById('newCodeInput').value = '';
         showToast('Created code: ' + d.created);
+        loadDashboardData();
       });
     }
 
-    function toggleCodeStatus(id, action) {
-      fetch('/api/admin/invitations', {
+    function codeStatus(id, act) {
+      fetch('/api/admin', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-password': currentAdminPass
-        },
-        body: JSON.stringify({ action: action, id: id })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
       })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        renderCodes(d.codes || []);
+        showToast('Code status updated');
+        loadDashboardData();
       });
     }
 
-    function copyCodeLink(code) {
-      var link = window.location.origin + '/?invitation=' + encodeURIComponent(code);
+    function copyCodeLink(c) {
+      var link = window.location.origin + '/?invitation=' + encodeURIComponent(c);
       navigator.clipboard.writeText(link).then(function() {
         showToast('Invitation link copied!');
       });
     }
 
-    function loadInvestors() {
-      fetch('/api/analytics-data?password=' + encodeURIComponent(currentAdminPass))
+    function saveSettings() {
+      var s = {
+        wallet_usdt: document.getElementById('cfg-usdt').value.trim(),
+        wallet_btc: document.getElementById('cfg-btc').value.trim(),
+        wallet_eth: document.getElementById('cfg-eth').value.trim()
+      };
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_settings', settings: s })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast('Settings saved successfully');
+      });
+    }
+
+    function showImageModal(src, title) {
+      document.getElementById('imageModalTitle').textContent = title || 'Image Preview';
+      document.getElementById('imageModalImg').src = src;
+      document.getElementById('imageModal').style.display = 'flex';
+    }
+    function closeImageModal() {
+      document.getElementById('imageModal').style.display = 'none';
+    }
+
+    function loadDbDiagnostics() {
+      fetch('/api/dbcheck')
         .then(function(r) { return r.json(); })
         .then(function(d) {
-          var tbody = document.getElementById('investorsTableBody');
-          var signups = d.recent_signups || [];
-          document.getElementById('investorCountLabel').textContent = signups.length + ' accounts';
-          if (!signups.length) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-sub); padding: 20px;">No registered accounts yet.</td></tr>';
-            return;
-          }
-          var rows = '';
-          signups.forEach(function(u) {
-            rows += '<tr>' +
-              '<td style="font-weight: 500;">' + (u.name || 'Investor') + '</td>' +
-              '<td style="font-family: monospace;">' + (u.email || '—') + '</td>' +
-              '<td style="color: var(--text-sub);">' + (u.phone || '—') + '</td>' +
-              '<td><span class="tag-active">' + (u.onboarding_status || 'active') + '</span></td>' +
-              '<td style="color: var(--text-sub); font-size: 12px;">' + (u.registered_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
-              '</tr>';
-          });
-          tbody.innerHTML = rows;
+          var box = document.getElementById('envDiagnosticBox');
+          if (!box) return;
+          var dbOk = d.database && d.database.connected;
+          var env = d.environment || {};
+          var html = '<div style="margin-bottom:6px; color:' + (dbOk ? '#4ade80' : '#f87171') + '; font-weight:700;">' + (dbOk ? '🟢 Database: Live Connected (' + (d.database.tables_count || 24) + ' tables found)' : '⚠️ Database Connecting: ' + (d.database?.error || 'Offline')) + '</div>';
+          html += '<div>Database Host: <code style="color:#fff;">' + (d.database?.host || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com') + '</code></div>';
+          html += '<div>Database Name: <code style="color:#fff;">' + (d.database?.database || 'defaultdb') + '</code></div>';
+          html += '<div style="margin-top:8px; padding-top:8px; border-top:1px solid #222;">';
+          html += '<div>Vercel DB_HOST: ' + (env.has_DB_HOST ? '✅ Loaded from Vercel' : '⚡ Using fallback default') + '</div>';
+          html += '<div>Vercel DB_PASSWORD: ' + (env.has_DB_PASSWORD ? '✅ Loaded from Vercel' : '⚡ Using fallback default') + '</div>';
+          html += '<div>Vercel ADMIN_PASSWORD: ' + (env.has_ADMIN_PASSWORD ? '✅ Loaded from Vercel' : '⚡ Default active') + '</div>';
+          html += '</div>';
+          box.innerHTML = html;
         });
     }
 
     function showToast(msg) {
-      var toast = document.getElementById('toast');
-      toast.textContent = msg;
-      toast.style.display = 'block';
-      setTimeout(function() { toast.style.display = 'none'; }, 2500);
+      var t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      setTimeout(function() { t.style.display = 'none'; }, 2800);
     }
+
+    // Direct dashboard initialization - NO PASSWORD BARRIER
+    loadDashboardData();
   </script>
 </body>
 </html>
