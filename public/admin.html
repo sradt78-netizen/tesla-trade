@@ -241,9 +241,14 @@
       <div class="login-mark">T</div>
       <h2>Admin Portal</h2>
       <p style="color: var(--text-sub); font-size: 13px; margin-top: 4px;">Enter your admin password to manage invitation tokens, database, and investors.</p>
-      <input type="password" id="adminPasswordInput" placeholder="Enter admin password" autofocus />
+      <input type="password" id="adminPasswordInput" placeholder="Enter admin password (Heartofwisdom101@$)" autofocus />
       <button type="button" class="primary" style="width: 100%; justify-content: center; padding: 12px;" onclick="authenticateAdmin()">Log In to Admin</button>
-      <div id="loginError" style="color: #f87171; font-size: 12px; margin-top: 10px; display: none;">Invalid admin password.</div>
+      <div id="loginError" style="color: #f87171; font-size: 12px; margin-top: 10px; display: none;"></div>
+
+      <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #222;">
+        <button type="button" style="width: 100%; justify-content: center; padding: 8px; font-size: 12px; background: #1a1a1a;" onclick="checkSystemDiagnostics()">⚡ Check Database & Environment Status</button>
+        <div id="diagResult" style="font-size: 11px; color: var(--text-sub); margin-top: 8px; text-align: left; display: none; background: #080808; padding: 10px; border-radius: 6px; border: 1px solid #222;"></div>
+      </div>
     </div>
   </div>
 
@@ -346,22 +351,57 @@
     }
 
     function verifyAndOpen(pass) {
-      fetch('/api/admin/invitations?password=' + encodeURIComponent(pass))
-        .then(function(res) {
-          if (!res.ok) throw new Error('Invalid password');
-          return res.json();
+      var errBox = document.getElementById('loginError');
+      errBox.style.display = 'none';
+
+      fetch('/api/admin?password=' + encodeURIComponent(pass), {
+        headers: { 'x-admin-password': pass }
+      })
+      .then(function(res) {
+        return res.json().then(function(data) {
+          if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Invalid admin password. Default is: Heartofwisdom101@$');
+          }
+          return data;
+        });
+      })
+      .then(function(data) {
+        currentAdminPass = pass;
+        localStorage.setItem('ttinc_admin_pass', pass);
+        document.getElementById('loginModal').style.display = 'none';
+        document.getElementById('adminContent').style.display = 'block';
+        renderCodes(data.codes || []);
+        loadDbStatus();
+        loadInvestors();
+      })
+      .catch(function(err) {
+        errBox.textContent = err.message || 'Invalid admin password.';
+        errBox.style.display = 'block';
+      });
+    }
+
+    function checkSystemDiagnostics() {
+      var diagBox = document.getElementById('diagResult');
+      diagBox.style.display = 'block';
+      diagBox.innerHTML = '<span style="color:#aaa;">Checking database and environment variables...</span>';
+
+      fetch('/api/dbcheck')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var dbOk = d.database && d.database.connected;
+          var html = '<div style="margin-bottom:4px;color:' + (dbOk ? '#4ade80' : '#f87171') + ';font-weight:600;">' + (dbOk ? '🟢 Database: Connected Live' : '⚠️ Database: ' + (d.database?.error || 'Offline')) + '</div>';
+          html += '<div>Host: ' + (d.database?.host || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com') + '</div>';
+          if (d.database?.tables_count) html += '<div>Tables: ' + d.database.tables_count + ' active tables</div>';
+          var env = d.environment || {};
+          html += '<div style="margin-top:4px;border-top:1px solid #222;padding-top:4px;">';
+          html += '<div>DB_HOST: ' + (env.has_DB_HOST ? '✅ Active from Vercel' : '⚡ Using default') + '</div>';
+          html += '<div>DB_PASSWORD: ' + (env.has_DB_PASSWORD ? '✅ Active from Vercel' : '⚡ Using default') + '</div>';
+          html += '<div>ADMIN_PASSWORD: ' + (env.has_ADMIN_PASSWORD ? '✅ Active from Vercel' : '⚡ Using default (Heartofwisdom101@$)') + '</div>';
+          html += '</div>';
+          diagBox.innerHTML = html;
         })
-        .then(function(data) {
-          currentAdminPass = pass;
-          localStorage.setItem('ttinc_admin_pass', pass);
-          document.getElementById('loginModal').style.display = 'none';
-          document.getElementById('adminContent').style.display = 'block';
-          renderCodes(data.codes || []);
-          loadDbStatus();
-          loadInvestors();
-        })
-        .catch(function(err) {
-          document.getElementById('loginError').style.display = 'block';
+        .catch(function(e) {
+          diagBox.innerHTML = '<div style="color:#f87171;">Diagnostic check failed: ' + e.message + '</div>';
         });
     }
 
