@@ -1,4 +1,4 @@
-import mysql from 'mysql2/promise';
+import { getDbConnection } from './dbcheck.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -8,11 +8,6 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const host = process.env.DB_HOST || process.env.TT_DB_HOST || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com';
-  const port = parseInt(process.env.DB_PORT || process.env.TT_DB_PORT || '28487', 10);
-  const user = process.env.DB_USER || process.env.TT_DB_USER || 'avnadmin';
-  const password = process.env.DB_PASSWORD || process.env.TT_DB_PASS || 'AVNS_eN3hQrUWcOL7PRQXP_i';
-  const database = process.env.DB_NAME || process.env.TT_DB_NAME || 'defaultdb';
   const adminPass = process.env.ADMIN_PASSWORD || process.env.TT_ADMIN_PASSWORD || 'Heartofwisdom101@$';
 
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -20,7 +15,7 @@ export default async function handler(req, res) {
   const isAuthed = pass === adminPass;
 
   try {
-    const conn = await mysql.createConnection({ host, port, user, password, database, ssl: { rejectUnauthorized: false } });
+    const conn = await getDbConnection();
 
     const [[{ total_clicks }]] = await conn.query('SELECT COUNT(*) as total_clicks FROM analytics_clicks');
     const [[{ unique_visitors }]] = await conn.query('SELECT COUNT(DISTINCT ip_address) as unique_visitors FROM analytics_clicks');

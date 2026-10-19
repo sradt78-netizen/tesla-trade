@@ -3,6 +3,10 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mysql from 'mysql2/promise';
+import adminHandler from './api/admin.js';
+import dbcheckHandler from './api/dbcheck.js';
+import paymentSettingsHandler from './api/payment-settings.js';
+import paymentSubmitHandler from './api/payment-submit.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -193,59 +197,14 @@ function verifyAdminPassword(input: any): boolean {
   return false;
 }
 
-// ── 5. Admin API: /api/admin and /api/admin/invitations ─────────
-app.all(['/api/admin', '/api/admin/invitations'], async (req, res) => {
-  const queryPass = req.query.password;
-  const headerPass = req.headers['x-admin-password'];
-  const bodyPass = req.body?.password;
-  const pass = cleanString(queryPass || headerPass || bodyPass);
-
-  if (req.query.action === 'check-env') {
-    return res.json({
-      status: 'ok',
-      has_DB_HOST: !!process.env.DB_HOST,
-      has_DB_PASSWORD: !!process.env.DB_PASSWORD,
-      has_ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
-      default_accepted: true
-    });
-  }
-
-  if (!verifyAdminPassword(pass)) {
-    return res.status(401).json({ error: 'Unauthorized: Invalid admin password' });
-  }
-
-  const conn = await getDbConnection();
-
-  if (req.method === 'GET') {
-    const [codes] = await conn.query('SELECT * FROM invitation_codes ORDER BY created_at DESC');
-    await conn.end();
-    return res.json({ success: true, codes });
-  }
-
-  if (req.method === 'POST') {
-    const action = req.body?.action || 'generate';
-    if (action === 'generate') {
-      const randomCode = 'TT-' + Math.random().toString(36).substring(2, 8).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-      const customCode = req.body?.code ? req.body.code.trim().toUpperCase() : randomCode;
-      await conn.query('INSERT INTO invitation_codes (code, status, source) VALUES (?, "active", "admin")', [customCode]);
-      const [codes] = await conn.query('SELECT * FROM invitation_codes ORDER BY created_at DESC');
-      await conn.end();
-      return res.json({ success: true, created: customCode, codes });
-    }
-
-    if (action === 'revoke' || action === 'reinstate') {
-      const id = req.body?.id;
-      const newStatus = action === 'revoke' ? 'revoked' : 'active';
-      await conn.query('UPDATE invitation_codes SET status=? WHERE id=?', [newStatus, id]);
-      const [codes] = await conn.query('SELECT * FROM invitation_codes ORDER BY created_at DESC');
-      await conn.end();
-      return res.json({ success: true, codes });
-    }
-  }
-
-  await conn.end();
-  return res.status(400).json({ error: 'Unknown action' });
-});
+// ── 5. Admin & Payment APIs ──────────────────────────────────────
+app.all(['/api/admin', '/api/admin.php', '/api/admin/*'], (req, res) => adminHandler(req, res));
+app.all(['/api/dbcheck', '/api/dbcheck.php', '/api/healthz'], (req, res) => dbcheckHandler(req, res));
+app.all(['/api/payment-settings', '/api/payment-settings.php'], (req, res) => paymentSettingsHandler(req, res));
+app.all(
+  ['/api/payment-submit', '/api/payment-submit.php', '/api/payment-proof', '/api/payment-proof.php', '/api/investments'],
+  (req, res) => paymentSubmitHandler(req, res)
+);
 
 // ── 6. Direct Portal Routes (NO INVITATION REQUIRED) ─────────────
 app.get(['/admin', '/admin.php', '/admin.html'], (req, res) => {

@@ -266,6 +266,9 @@
       <button class="nav-btn active" onclick="switchTab('investors')">
         <span>👥 Investors</span> <span class="badge" id="b-investors">0</span>
       </button>
+      <button class="nav-btn" onclick="switchTab('investment-receipts')">
+        <span>💰 Deposit Receipts</span> <span class="badge amber" id="b-dep-receipts">0</span>
+      </button>
       <button class="nav-btn" onclick="switchTab('receipts')">
         <span>🧾 Shop Receipts</span> <span class="badge amber" id="b-receipts">0</span>
       </button>
@@ -327,10 +330,10 @@
             <tr>
               <th>Investor Name</th>
               <th>Email</th>
-              <th>Phone</th>
               <th>Status</th>
               <th>Invested Balance</th>
               <th>Current Value</th>
+              <th>Deposit Receipt</th>
               <th>Registered</th>
               <th>Actions</th>
             </tr>
@@ -342,7 +345,30 @@
       </div>
     </section>
 
-    <!-- TAB 2: SHOP RECEIPTS / PAYMENT PROOFS -->
+    <!-- TAB 2: INVESTMENT DEPOSIT RECEIPTS -->
+    <section id="tab-investment-receipts" style="display: none;">
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Investor Email</th>
+              <th>Plan</th>
+              <th>Deposit Amount</th>
+              <th>Method</th>
+              <th>Reference</th>
+              <th>Payment Receipt Image</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="depReceiptsTableBody">
+            <tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading investment deposit receipts...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 3: SHOP RECEIPTS / VEHICLE ORDERS -->
     <section id="tab-receipts" style="display: none;">
       <div class="table-box">
         <table>
@@ -353,7 +379,7 @@
               <th>Email</th>
               <th>Payment Method</th>
               <th>Reference</th>
-              <th>Receipt Image</th>
+              <th>Shop Receipt Image</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -365,7 +391,7 @@
       </div>
     </section>
 
-    <!-- TAB 3: KYC SUBMISSIONS -->
+    <!-- TAB 4: KYC SUBMISSIONS -->
     <section id="tab-kyc" style="display: none;">
       <div class="table-box">
         <table>
@@ -388,7 +414,7 @@
       </div>
     </section>
 
-    <!-- TAB 4: WITHDRAWALS -->
+    <!-- TAB 5: WITHDRAWALS -->
     <section id="tab-withdrawals" style="display: none;">
       <div class="table-box">
         <table>
@@ -410,7 +436,7 @@
       </div>
     </section>
 
-    <!-- TAB 5: FINANCING -->
+    <!-- TAB 6: FINANCING -->
     <section id="tab-financing" style="display: none;">
       <div class="table-box">
         <table>
@@ -432,7 +458,7 @@
       </div>
     </section>
 
-    <!-- TAB 6: INVITATION CODES -->
+    <!-- TAB 7: INVITATION CODES -->
     <section id="tab-access" style="display: none;">
       <div class="card" style="margin-bottom: 20px;">
         <h3 style="font-size: 15px; margin-bottom: 6px;">🎟️ Generate New Invitation Code</h3>
@@ -461,7 +487,7 @@
       </div>
     </section>
 
-    <!-- TAB 7: MARKETING & CLICKS -->
+    <!-- TAB 8: MARKETING & CLICKS -->
     <section id="tab-marketing" style="display: none;">
       <div class="grid">
         <div class="card">
@@ -493,7 +519,7 @@
       </div>
     </section>
 
-    <!-- TAB 8: SETTINGS & ENVS -->
+    <!-- TAB 9: SETTINGS & ENVS -->
     <section id="tab-settings" style="display: none;">
       <div class="card" style="margin-bottom: 20px;">
         <h3 style="font-size: 15px; margin-bottom: 10px;">⚡ Database & Environment Variables Status</h3>
@@ -503,20 +529,44 @@
       </div>
 
       <div class="card">
-        <h3 style="font-size: 15px; margin-bottom: 14px;">⚙️ Payment Wallet Addresses</h3>
-        <div class="form-group">
-          <label>USDT Wallet (TRC20)</label>
-          <input type="text" id="cfg-usdt" placeholder="e.g. TR7NHkorwbQ82DuP2nJvdN5v7v7uE8oA7r" />
+        <h3 style="font-size: 15px; margin-bottom: 14px;">⚙️ Payment Wallet & Bank Settings</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+          <div>
+            <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Crypto Receiving Wallets</h4>
+            <div class="form-group">
+              <label>USDT Wallet (TRC20)</label>
+              <input type="text" id="cfg-usdt" placeholder="e.g. TR7NHkorwbQ82DuP2nJvdN5v7v7uE8oA7r" />
+            </div>
+            <div class="form-group">
+              <label>Bitcoin Wallet (BTC)</label>
+              <input type="text" id="cfg-btc" placeholder="e.g. 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" />
+            </div>
+            <div class="form-group">
+              <label>Ethereum Wallet (ETH)</label>
+              <input type="text" id="cfg-eth" placeholder="e.g. 0x71C...8976F" />
+            </div>
+          </div>
+          <div>
+            <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Bank Wire Transfer Details</h4>
+            <div class="form-group">
+              <label>Bank Name</label>
+              <input type="text" id="cfg-bank-name" placeholder="e.g. JPMorgan Chase Bank, N.A." />
+            </div>
+            <div class="form-group">
+              <label>Account Number</label>
+              <input type="text" id="cfg-bank-account" placeholder="e.g. 8839201948" />
+            </div>
+            <div class="form-group">
+              <label>Routing Number</label>
+              <input type="text" id="cfg-bank-routing" placeholder="e.g. 021000021" />
+            </div>
+            <div class="form-group">
+              <label>SWIFT / BIC Code</label>
+              <input type="text" id="cfg-bank-swift" placeholder="e.g. CHASUS33" />
+            </div>
+          </div>
         </div>
-        <div class="form-group">
-          <label>Bitcoin Wallet (BTC)</label>
-          <input type="text" id="cfg-btc" placeholder="e.g. 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" />
-        </div>
-        <div class="form-group">
-          <label>Ethereum Wallet (ETH)</label>
-          <input type="text" id="cfg-eth" placeholder="e.g. 0x71C...8976F" />
-        </div>
-        <button type="button" class="primary" onclick="saveSettings()">Save Wallet Settings</button>
+        <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save Payment Settings</button>
       </div>
     </section>
   </main>
@@ -546,12 +596,18 @@
 
   <!-- MODAL: IMAGE PREVIEW -->
   <div class="modal-overlay" id="imageModal" onclick="closeImageModal()">
-    <div class="modal-content" style="max-width: 700px; text-align: center; background: #000;" onclick="event.stopPropagation()">
+    <div class="modal-content" style="max-width: 760px; text-align: center; background: #000;" onclick="event.stopPropagation()">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h3 style="font-size: 15px;" id="imageModalTitle">Receipt Preview</h3>
-        <button type="button" onclick="closeImageModal()">✕ Close</button>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" id="imageModalOpenBtn" style="font-size: 12px; padding: 4px 10px;">↗ Open Full Size</button>
+          <button type="button" onclick="closeImageModal()">✕ Close</button>
+        </div>
       </div>
-      <img id="imageModalImg" src="" style="max-width: 100%; max-height: 70vh; border-radius: 8px; border: 1px solid #333;" />
+      <div style="overflow: auto; max-height: 75vh; border-radius: 8px; border: 1px solid #333; background: #0d0d0d; padding: 4px;">
+        <img id="imageModalImg" src="" style="max-width: 100%; display: block; margin: 0 auto; border-radius: 6px;" />
+        <iframe id="imageModalPdf" src="" style="width: 100%; height: 70vh; border: none; display: none;"></iframe>
+      </div>
     </div>
   </div>
 
@@ -561,7 +617,7 @@
     var globalData = {};
 
     function switchTab(tabId) {
-      var tabs = ['investors', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'settings'];
+      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'settings'];
       tabs.forEach(function(t) {
         var el = document.getElementById('tab-' + t);
         if (el) el.style.display = (t === tabId) ? 'block' : 'none';
@@ -576,8 +632,9 @@
       });
 
       var titles = {
-        investors: ['Investor Management', 'View all registered accounts, credit money/balance, and manage investments'],
-        receipts: ['Shop Receipts & Payment Proofs', 'Review customer payment receipts and verify orders'],
+        investors: ['Investor Management', 'View all registered accounts, credit money/balance, and view investment receipts'],
+        'investment-receipts': ['Deposit & Investment Receipts', 'Review proof of payment uploaded by investors for their deposits'],
+        receipts: ['Shop Receipts & Vehicle Orders', 'Review customer payment receipts and verify EV store orders'],
         kyc: ['KYC Document Review', 'Verify government IDs and identity verification submissions'],
         withdrawals: ['Withdrawal Requests', 'Review and process investor payout requests'],
         financing: ['Vehicle Financing Applications', 'Approve or decline customer financing applications'],
@@ -608,7 +665,7 @@
     }
 
     function renderDashboard(data) {
-      // 1. Investors
+      // 1. Investors & Investments
       var invBody = document.getElementById('investorsTableBody');
       var investors = data.investors || [];
       var investments = data.investments || [];
@@ -618,14 +675,23 @@
       var invMap = {};
       var totalVol = 0;
       var activeCount = 0;
+      var depReceiptsList = [];
+
       investments.forEach(function(inv) {
         var em = (inv.user_email || '').toLowerCase();
-        invMap[em] = inv;
+        if (!invMap[em] || (!invMap[em].payment_proof_path && inv.payment_proof_path)) {
+          invMap[em] = inv;
+        }
         totalVol += parseFloat(inv.total || '0');
         if (inv.status === 'active') activeCount++;
+        // Include in Deposit Receipts list if proof is attached, OR pending approval, OR reference provided, OR amount > 0
+        if (inv.payment_proof_path || inv.payment_proof_name || inv.payment_reference || inv.status === 'pending_approval' || (inv.total && parseFloat(inv.total) > 0)) {
+          depReceiptsList.push(inv);
+        }
       });
       document.getElementById('stat-volume').textContent = '$' + totalVol.toLocaleString('en-US', { minimumFractionDigits: 2 });
       document.getElementById('stat-active-inv').textContent = activeCount;
+      document.getElementById('b-dep-receipts').textContent = depReceiptsList.length;
 
       if (!investors.length) {
         invBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No registered accounts found.</td></tr>';
@@ -638,13 +704,17 @@
           var cur = parseFloat(inv.total_current_value || inv.total || '0');
           var statusBadge = u.onboarding_status === 'verified' ? '<span class="badge green">Verified</span>' : '<span class="badge amber">' + (u.onboarding_status || 'active') + '</span>';
 
+          var rcptBtn = inv.payment_proof_path
+            ? '<button type="button" class="primary" style="padding: 3px 6px; font-size: 11px;" onclick="showImageModal(\'' + inv.payment_proof_path + '\', \'Deposit Receipt: ' + em + '\')">🔍 View Receipt</button>'
+            : (inv.payment_reference ? '<span style="color: var(--muted); font-size: 11px;">Ref: ' + inv.payment_reference + '</span>' : '<span style="color: var(--muted); font-size: 11px;">None</span>');
+
           iRows += '<tr>' +
             '<td style="font-weight: 600;">' + (u.name || 'Investor') + '</td>' +
             '<td style="font-family: monospace;">' + (u.email || '—') + '</td>' +
-            '<td style="color: var(--muted);">' + (u.phone || '—') + '</td>' +
             '<td>' + statusBadge + '</td>' +
             '<td style="color: #4ade80; font-weight: 600;">$' + bal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
             '<td style="color: #60a5fa; font-weight: 600;">$' + cur.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+            '<td>' + rcptBtn + '</td>' +
             '<td style="color: var(--muted); font-size: 12px;">' + (u.registered_at || '').substring(0, 10) + '</td>' +
             '<td><button type="button" class="success" style="padding: 4px 8px; font-size: 11px;" onclick="openCreditForEmail(\'' + u.email + '\')">＋ Add Money</button></td>' +
             '</tr>';
@@ -652,7 +722,37 @@
         invBody.innerHTML = iRows;
       }
 
-      // 2. Shop Receipts
+      // 2. Investment Deposit Receipts Panel
+      var depBody = document.getElementById('depReceiptsTableBody');
+      if (!depReceiptsList.length) {
+        depBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No investment deposit receipts uploaded yet.</td></tr>';
+      } else {
+        var dRows = '';
+        depReceiptsList.forEach(function(inv) {
+          var imgBtn = inv.payment_proof_path
+            ? '<button type="button" class="primary" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + inv.payment_proof_path + '\', \'Deposit Receipt: ' + (inv.user_email || '') + '\')">🔍 View Receipt</button>'
+            : '<span style="color: var(--muted); font-size: 11px;">' + (inv.payment_reference ? 'Ref: ' + inv.payment_reference : 'No file attached') + '</span>';
+
+          var statusBadge = inv.status === 'active' ? '<span class="badge green">Active / Approved</span>' : (inv.status === 'declined' ? '<span class="badge red">Declined</span>' : '<span class="badge amber">' + (inv.status || 'pending_approval') + '</span>');
+
+          dRows += '<tr>' +
+            '<td style="font-family: monospace; font-weight: 500;">' + (inv.user_email || '—') + '</td>' +
+            '<td>' + (inv.plan_label || inv.plan_name || 'Standard') + '</td>' +
+            '<td style="color: #4ade80; font-weight: 600;">$' + Number(inv.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+            '<td>' + (inv.method || 'Crypto') + '</td>' +
+            '<td style="font-family: monospace; font-size: 12px;">' + (inv.payment_reference || '—') + '</td>' +
+            '<td>' + imgBtn + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="depositAction(' + inv.id + ', \'approve_deposit\')">Approve Deposit</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="depositAction(' + inv.id + ', \'reject_deposit\')">Decline</button>' +
+            '</td>' +
+            '</tr>';
+        });
+        depBody.innerHTML = dRows;
+      }
+
+      // 3. Shop Receipts / EV Orders
       var rBody = document.getElementById('receiptsTableBody');
       var orders = data.orders || [];
       document.getElementById('b-receipts').textContent = orders.length;
@@ -684,7 +784,7 @@
         rBody.innerHTML = rRows;
       }
 
-      // 3. KYC
+      // 4. KYC
       var kBody = document.getElementById('kycTableBody');
       var kycList = data.kyc || [];
       document.getElementById('b-kyc').textContent = kycList.length;
@@ -718,7 +818,7 @@
         kBody.innerHTML = kRows;
       }
 
-      // 4. Withdrawals
+      // 5. Withdrawals
       var wBody = document.getElementById('withdrawalsTableBody');
       var wds = data.withdrawals || [];
       document.getElementById('b-withdrawals').textContent = wds.length;
@@ -744,7 +844,7 @@
         wBody.innerHTML = wRows;
       }
 
-      // 5. Financing
+      // 6. Financing
       var fBody = document.getElementById('financingTableBody');
       var fins = data.financing || [];
       document.getElementById('b-financing').textContent = fins.length;
@@ -769,7 +869,7 @@
         fBody.innerHTML = fRows;
       }
 
-      // 6. Invitation Codes
+      // 7. Invitation Codes
       var cBody = document.getElementById('codesTableBody');
       var codes = data.codes || [];
       document.getElementById('b-codes').textContent = codes.length;
@@ -794,7 +894,7 @@
         cBody.innerHTML = cRows;
       }
 
-      // 7. Clicks / Marketing
+      // 8. Clicks / Marketing
       var clkBody = document.getElementById('clicksTableBody');
       var clicks = data.clicks || [];
       document.getElementById('stat-clicks').textContent = clicks.length;
@@ -815,11 +915,15 @@
         clkBody.innerHTML = clkRows;
       }
 
-      // 8. Settings
+      // 9. Settings
       var s = data.settings || {};
-      if (s.wallet_usdt) document.getElementById('cfg-usdt').value = s.wallet_usdt;
-      if (s.wallet_btc) document.getElementById('cfg-btc').value = s.wallet_btc;
-      if (s.wallet_eth) document.getElementById('cfg-eth').value = s.wallet_eth;
+      if (s.wallet_usdt && document.getElementById('cfg-usdt')) document.getElementById('cfg-usdt').value = s.wallet_usdt;
+      if (s.wallet_btc && document.getElementById('cfg-btc')) document.getElementById('cfg-btc').value = s.wallet_btc;
+      if (s.wallet_eth && document.getElementById('cfg-eth')) document.getElementById('cfg-eth').value = s.wallet_eth;
+      if (s.bank_name && document.getElementById('cfg-bank-name')) document.getElementById('cfg-bank-name').value = s.bank_name;
+      if (s.bank_account && document.getElementById('cfg-bank-account')) document.getElementById('cfg-bank-account').value = s.bank_account;
+      if (s.bank_routing && document.getElementById('cfg-bank-routing')) document.getElementById('cfg-bank-routing').value = s.bank_routing;
+      if (s.bank_swift && document.getElementById('cfg-bank-swift')) document.getElementById('cfg-bank-swift').value = s.bank_swift;
     }
 
     // Modal Actions
@@ -850,6 +954,19 @@
         } else {
           alert(d.error || 'Failed to credit funds');
         }
+      });
+    }
+
+    function depositAction(id, act) {
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Deposit status updated');
+        loadDashboardData();
       });
     }
 
@@ -942,9 +1059,13 @@
 
     function saveSettings() {
       var s = {
-        wallet_usdt: document.getElementById('cfg-usdt').value.trim(),
-        wallet_btc: document.getElementById('cfg-btc').value.trim(),
-        wallet_eth: document.getElementById('cfg-eth').value.trim()
+        wallet_usdt: (document.getElementById('cfg-usdt')?.value || '').trim(),
+        wallet_btc: (document.getElementById('cfg-btc')?.value || '').trim(),
+        wallet_eth: (document.getElementById('cfg-eth')?.value || '').trim(),
+        bank_name: (document.getElementById('cfg-bank-name')?.value || '').trim(),
+        bank_account: (document.getElementById('cfg-bank-account')?.value || '').trim(),
+        bank_routing: (document.getElementById('cfg-bank-routing')?.value || '').trim(),
+        bank_swift: (document.getElementById('cfg-bank-swift')?.value || '').trim()
       };
       fetch('/api/admin', {
         method: 'POST',
@@ -953,17 +1074,49 @@
       })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        showToast('Settings saved successfully');
+        showToast(d.message || 'Payment settings saved successfully!');
+        loadDashboardData();
       });
     }
 
     function showImageModal(src, title) {
-      document.getElementById('imageModalTitle').textContent = title || 'Image Preview';
-      document.getElementById('imageModalImg').src = src;
+      if (!src) {
+        showToast('No receipt file attached for this deposit.');
+        return;
+      }
+      document.getElementById('imageModalTitle').textContent = title || 'Receipt Preview';
+      var img = document.getElementById('imageModalImg');
+      var pdf = document.getElementById('imageModalPdf');
+      var openBtn = document.getElementById('imageModalOpenBtn');
+
+      if (src.toLowerCase().endsWith('.pdf') || src.indexOf('application/pdf') !== -1) {
+        img.style.display = 'none';
+        pdf.style.display = 'block';
+        pdf.src = src;
+      } else {
+        pdf.style.display = 'none';
+        img.style.display = 'block';
+        img.src = src;
+      }
+
+      openBtn.onclick = function() {
+        var w = window.open('');
+        if (w) {
+          if (src.indexOf('application/pdf') !== -1 || src.toLowerCase().endsWith('.pdf')) {
+            w.location.href = src;
+          } else {
+            w.document.write('<title>' + (title || 'Receipt') + '</title><body style="margin:0;background:#0d0d0d;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="' + src + '" style="max-width:96%;max-height:96vh;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,0.8);" /></body>');
+          }
+        }
+      };
+
       document.getElementById('imageModal').style.display = 'flex';
     }
+
     function closeImageModal() {
       document.getElementById('imageModal').style.display = 'none';
+      document.getElementById('imageModalImg').src = '';
+      if (document.getElementById('imageModalPdf')) document.getElementById('imageModalPdf').src = '';
     }
 
     function loadDbDiagnostics() {
@@ -973,14 +1126,31 @@
           var box = document.getElementById('envDiagnosticBox');
           if (!box) return;
           var dbOk = d.database && d.database.connected;
-          var env = d.environment || {};
-          var html = '<div style="margin-bottom:6px; color:' + (dbOk ? '#4ade80' : '#f87171') + '; font-weight:700;">' + (dbOk ? '🟢 Database: Live Connected (' + (d.database.tables_count || 24) + ' tables found)' : '⚠️ Database Connecting: ' + (d.database?.error || 'Offline')) + '</div>';
-          html += '<div>Database Host: <code style="color:#fff;">' + (d.database?.host || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com') + '</code></div>';
-          html += '<div>Database Name: <code style="color:#fff;">' + (d.database?.database || 'defaultdb') + '</code></div>';
-          html += '<div style="margin-top:8px; padding-top:8px; border-top:1px solid #222;">';
-          html += '<div>Vercel DB_HOST: ' + (env.has_DB_HOST ? '✅ Loaded from Vercel' : '⚡ Using fallback default') + '</div>';
-          html += '<div>Vercel DB_PASSWORD: ' + (env.has_DB_PASSWORD ? '✅ Loaded from Vercel' : '⚡ Using fallback default') + '</div>';
-          html += '<div>Vercel ADMIN_PASSWORD: ' + (env.has_ADMIN_PASSWORD ? '✅ Loaded from Vercel' : '⚡ Default active') + '</div>';
+          var env = d.environment_variables || d.environment || {};
+          var detected = env.detected || {};
+          var detectedKeys = Object.keys(detected);
+
+          var html = '<div style="margin-bottom:8px; font-size:14px; color:' + (dbOk ? '#4ade80' : '#f87171') + '; font-weight:700;">' + (dbOk ? '🟢 Database: Live Connected (' + (d.database.tables_count || 0) + ' tables found)' : '⚠️ Database Connecting: ' + (d.database?.error || 'Offline')) + '</div>';
+          html += '<div style="display:grid; grid-template-columns: 140px 1fr; gap:6px; font-size:12px; margin-bottom:8px;">';
+          html += '<span style="color:var(--muted);">Connection Source:</span><code>' + (d.database?.source || 'Auto-resolved') + '</code>';
+          html += '<span style="color:var(--muted);">Database Host:</span><code style="color:#fff;">' + (d.database?.host || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com') + '</code>';
+          html += '<span style="color:var(--muted);">Database Name:</span><code style="color:#fff;">' + (d.database?.database || 'defaultdb') + '</code>';
+          html += '</div>';
+
+          html += '<div style="margin-top:10px; padding-top:10px; border-top:1px solid #222;">';
+          html += '<div style="font-weight:600; margin-bottom:6px; font-size:12px; color:#93c5fd;">Vercel Environment Variables Status:</div>';
+
+          if (detectedKeys.length > 0) {
+            html += '<div style="color:#4ade80; font-size:12px; margin-bottom:6px;">✅ ' + detectedKeys.length + ' Environment Variable(s) Detected in Vercel Runtime:</div>';
+            html += '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">';
+            detectedKeys.forEach(function(k) {
+              html += '<span style="background:#1e3a29; color:#86efac; border:1px solid #22c55e44; padding:3px 8px; border-radius:4px; font-family:monospace; font-size:11px;">' + k + ': ' + detected[k] + '</span>';
+            });
+            html += '</div>';
+          } else {
+            html += '<div style="color:#fbbf24; font-size:12px; margin-bottom:6px;">⚡ Connected via built-in default database configuration.</div>';
+            html += '<div style="font-size:11px; color:var(--muted); line-height:1.5;">Notice: If you added variables to Vercel Settings → Environment Variables, remember to trigger a <strong>Redeployment</strong> in Vercel so they take effect. You can also configure all wallets and bank details in the fields below!</div>';
+          }
           html += '</div>';
           box.innerHTML = html;
         });
