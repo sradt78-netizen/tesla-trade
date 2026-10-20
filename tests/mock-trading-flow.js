@@ -3,10 +3,8 @@
  * Mock API regression test for the investor trading flow.
  * Uses only Node's standard library so it can run in a clean ZIP export.
  */
-'use strict';
-
-const assert = require('node:assert/strict');
-const http = require('node:http');
+import assert from 'node:assert/strict';
+import http from 'node:http';
 
 const state = {
   now: 1000,

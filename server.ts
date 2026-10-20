@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
@@ -7,6 +8,10 @@ import adminHandler from './api/admin.js';
 import dbcheckHandler from './api/dbcheck.js';
 import paymentSettingsHandler from './api/payment-settings.js';
 import paymentSubmitHandler from './api/payment-submit.js';
+import otpHandler from './api/otp.js';
+import authHandler from './api/auth.js';
+import supabaseConfigHandler from './api/supabase-config.js';
+import accountsHandler from './api/accounts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +36,8 @@ async function getDbConnection() {
     user,
     password,
     database,
-    ssl: { rejectUnauthorized: false }
+    ssl: { rejectUnauthorized: false },
+    connectTimeout: 2500
   });
 }
 
@@ -197,14 +203,155 @@ function verifyAdminPassword(input: any): boolean {
   return false;
 }
 
-// ── 5. Admin & Payment APIs ──────────────────────────────────────
+// ── 5. Full API Endpoints ────────────────────────────────────────
 app.all(['/api/admin', '/api/admin.php', '/api/admin/*'], (req, res) => adminHandler(req, res));
 app.all(['/api/dbcheck', '/api/dbcheck.php', '/api/healthz'], (req, res) => dbcheckHandler(req, res));
+app.all(['/api/supabase-config', '/api/supabase-config.php'], (req, res) => supabaseConfigHandler(req, res));
+app.all(
+  ['/api/otp/send', '/api/otp/verify', '/api/otp/resend', '/api/otp-send.php', '/api/otp-verify.php', '/api/otp/*'],
+  (req, res) => otpHandler(req, res)
+);
+app.all(
+  ['/api/auth/login', '/api/auth/set-password', '/api/auth/social-session', '/api/auth/*'],
+  (req, res) => authHandler(req, res)
+);
+app.all(
+  ['/api/accounts', '/api/profile', '/api/my-status', '/api/account-status', '/api/transactions'],
+  (req, res) => accountsHandler(req, res)
+);
 app.all(['/api/payment-settings', '/api/payment-settings.php'], (req, res) => paymentSettingsHandler(req, res));
 app.all(
   ['/api/payment-submit', '/api/payment-submit.php', '/api/payment-proof', '/api/payment-proof.php', '/api/investments'],
   (req, res) => paymentSubmitHandler(req, res)
 );
+
+// ── In-Memory Trading Store & Handlers for Mock / Live Support ──
+const mockTradingInvestments: Record<string, any> = {
+  'mock-funded': { id: 'mock-funded', status: 'active', total: 1000, totalCurrentValue: 1000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null },
+  'mock-empty': { id: 'mock-empty', status: 'active', total: 0, totalCurrentValue: 0, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null },
+  'sim_inv_1': { id: 'sim_inv_1', status: 'active', total: 1000, totalCurrentValue: 1000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null }
+};
+
+let serverTradingSettings = {
+  profitIntervalSeconds: 3,
+  lossIntervalSeconds: 2,
+  profitRatePercent: 2,
+  lossRatePercent: 1
+};
+
+function computeTradeValue(inv: any, now: number) {
+  const balance = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : inv.total || 0);
+  if (inv.tradingStatus !== 'active' || !inv.tradingStartedAt) {
+    return {
+      status: 'idle',
+      availableBalance: balance,
+      tradeValue: 0,
+      pnl: 0,
+      pnlPercent: 0,
+      phase: 'profit',
+      history: []
+    };
+  }
+  const elapsed = Math.max(0, now - Number(inv.tradingStartedAt));
+  const amount = Number(inv.tradingAmount || 0);
+  const cycle = serverTradingSettings.profitIntervalSeconds + serverTradingSettings.lossIntervalSeconds;
+  const inCycle = cycle > 0 ? elapsed % cycle : 0;
+  const isProfit = inCycle < serverTradingSettings.profitIntervalSeconds;
+  const phase = isProfit ? 'profit' : 'loss';
+
+  const gain = isProfit
+    ? amount * (serverTradingSettings.profitRatePercent / 100)
+    : -amount * (serverTradingSettings.lossRatePercent / 100);
+  const tradeValue = Math.max(0, Number((amount + gain).toFixed(2)));
+  const pnl = Number((tradeValue - amount).toFixed(2));
+  const pnlPercent = amount > 0 ? Number(((pnl / amount) * 100).toFixed(2)) : 0;
+
+  return {
+    status: 'active',
+    availableBalance: Math.max(0, Number((balance - amount).toFixed(2))),
+    tradeValue,
+    pnl,
+    pnlPercent,
+    phase,
+    history: [
+      { timestamp: now - 3000, value: amount },
+      { timestamp: now - 1500, value: isProfit ? amount * 1.01 : amount * 0.99 },
+      { timestamp: now, value: tradeValue }
+    ]
+  };
+}
+
+app.get('/api/admin/trading-settings', (req, res) => {
+  return res.json({ settings: serverTradingSettings });
+});
+
+app.post('/api/admin/trading-settings', (req, res) => {
+  const p = req.body || {};
+  serverTradingSettings = {
+    profitIntervalSeconds: Math.max(1, Math.min(86400, Number(p.profitIntervalSeconds || 3))),
+    lossIntervalSeconds: Math.max(1, Math.min(86400, Number(p.lossIntervalSeconds || 2))),
+    profitRatePercent: Math.max(0, Math.min(100, Number(p.profitRatePercent || 2))),
+    lossRatePercent: Math.max(0, Math.min(100, Number(p.lossRatePercent || 1)))
+  };
+  return res.json({ success: true, settings: serverTradingSettings });
+});
+
+app.get('/api/investments/:id/trading-state', (req, res) => {
+  const id = req.params.id;
+  const now = Number(req.query.now || Math.floor(Date.now() / 1000));
+  let inv = mockTradingInvestments[id];
+  if (!inv) {
+    inv = { id, status: 'active', total: 1000, totalCurrentValue: 1000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
+    mockTradingInvestments[id] = inv;
+  }
+  return res.json({
+    investmentId: id,
+    trade: computeTradeValue(inv, now)
+  });
+});
+
+app.post('/api/investments/:id/trading/start', (req, res) => {
+  const id = req.params.id;
+  const now = Number(req.query.now || Math.floor(Date.now() / 1000));
+  let inv = mockTradingInvestments[id];
+  if (!inv) {
+    inv = { id, status: 'active', total: 1000, totalCurrentValue: 1000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
+    mockTradingInvestments[id] = inv;
+  }
+  const amount = Number(req.body.amount || 0);
+  const available = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : inv.total);
+  if (available <= 0) {
+    return res.status(409).json({ error: 'You have no available funds. Top up your account before starting a trade.' });
+  }
+  if (amount <= 0 || amount > available) {
+    return res.status(422).json({ error: 'Enter an amount within your available balance.' });
+  }
+  inv.tradingStatus = 'active';
+  inv.tradingAmount = amount;
+  inv.tradingStartedAt = now;
+  return res.json({ success: true, trade: computeTradeValue(inv, now) });
+});
+
+app.post('/api/investments/:id/trading/stop', (req, res) => {
+  const id = req.params.id;
+  const now = Number(req.query.now || Math.floor(Date.now() / 1000));
+  let inv = mockTradingInvestments[id];
+  if (!inv || inv.tradingStatus !== 'active') {
+    return res.status(409).json({ error: 'There is no active trade to stop.' });
+  }
+  const active = computeTradeValue(inv, now);
+  const balance = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : inv.total);
+  inv.totalCurrentValue = Number((balance - inv.tradingAmount + active.tradeValue).toFixed(2));
+  inv.tradingStatus = 'idle';
+  inv.tradingAmount = 0;
+  inv.tradingStartedAt = null;
+  return res.json({
+    success: true,
+    stoppedTradeValue: active.tradeValue,
+    portfolioBalance: inv.totalCurrentValue,
+    trade: computeTradeValue(inv, now)
+  });
+});
 
 // ── 6. Direct Portal Routes (NO INVITATION REQUIRED) ─────────────
 app.get(['/admin', '/admin.php', '/admin.html'], (req, res) => {

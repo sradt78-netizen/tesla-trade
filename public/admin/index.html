@@ -568,6 +568,38 @@
         </div>
         <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save Payment Settings</button>
       </div>
+
+      <div class="card" style="margin-top: 20px;">
+        <h3 style="font-size: 15px; margin-bottom: 14px;">🔑 Resend Email API & Supabase Authentication</h3>
+        <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
+          Configure your external API credentials here. Saved values take effect immediately for all visitors and investors without requiring a Vercel redeployment.
+        </p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+          <div>
+            <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Resend Email API (OTP & Notifications)</h4>
+            <div class="form-group">
+              <label>Resend API Key</label>
+              <input type="password" id="cfg-resend-key" placeholder="re_123456789..." />
+            </div>
+            <div class="form-group">
+              <label>Sender Email (From)</label>
+              <input type="text" id="cfg-resend-from" placeholder="onboarding@resend.dev or no-reply@yourdomain.com" />
+            </div>
+          </div>
+          <div>
+            <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Supabase (Social Google, X & Facebook Login)</h4>
+            <div class="form-group">
+              <label>Supabase Project URL</label>
+              <input type="text" id="cfg-supabase-url" placeholder="https://xyzcompany.supabase.co" />
+            </div>
+            <div class="form-group">
+              <label>Supabase Public Anon Key</label>
+              <input type="password" id="cfg-supabase-anon" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+            </div>
+          </div>
+        </div>
+        <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save API Credentials</button>
+      </div>
     </section>
   </main>
 
@@ -924,6 +956,10 @@
       if (s.bank_account && document.getElementById('cfg-bank-account')) document.getElementById('cfg-bank-account').value = s.bank_account;
       if (s.bank_routing && document.getElementById('cfg-bank-routing')) document.getElementById('cfg-bank-routing').value = s.bank_routing;
       if (s.bank_swift && document.getElementById('cfg-bank-swift')) document.getElementById('cfg-bank-swift').value = s.bank_swift;
+      if (s.resend_api_key && document.getElementById('cfg-resend-key')) document.getElementById('cfg-resend-key').value = s.resend_api_key;
+      if (s.resend_from_email && document.getElementById('cfg-resend-from')) document.getElementById('cfg-resend-from').value = s.resend_from_email;
+      if (s.supabase_url && document.getElementById('cfg-supabase-url')) document.getElementById('cfg-supabase-url').value = s.supabase_url;
+      if (s.supabase_anon_key && document.getElementById('cfg-supabase-anon')) document.getElementById('cfg-supabase-anon').value = s.supabase_anon_key;
     }
 
     // Modal Actions
@@ -1065,7 +1101,11 @@
         bank_name: (document.getElementById('cfg-bank-name')?.value || '').trim(),
         bank_account: (document.getElementById('cfg-bank-account')?.value || '').trim(),
         bank_routing: (document.getElementById('cfg-bank-routing')?.value || '').trim(),
-        bank_swift: (document.getElementById('cfg-bank-swift')?.value || '').trim()
+        bank_swift: (document.getElementById('cfg-bank-swift')?.value || '').trim(),
+        resend_api_key: (document.getElementById('cfg-resend-key')?.value || '').trim(),
+        resend_from_email: (document.getElementById('cfg-resend-from')?.value || '').trim(),
+        supabase_url: (document.getElementById('cfg-supabase-url')?.value || '').trim(),
+        supabase_anon_key: (document.getElementById('cfg-supabase-anon')?.value || '').trim()
       };
       fetch('/api/admin', {
         method: 'POST',
@@ -1074,7 +1114,7 @@
       })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        showToast(d.message || 'Payment settings saved successfully!');
+        showToast(d.message || 'Settings & API credentials saved successfully!');
         loadDashboardData();
       });
     }

@@ -74,7 +74,8 @@ export async function getDbConnection() {
     user: cfg.user,
     password: cfg.password,
     database: cfg.database,
-    ssl: cfg.ssl
+    ssl: cfg.ssl,
+    connectTimeout: 2500
   });
 }
 
@@ -98,7 +99,8 @@ export default async function handler(req, res) {
       user: cfg.user,
       password: cfg.password,
       database: cfg.database,
-      ssl: cfg.ssl
+      ssl: cfg.ssl,
+      connectTimeout: 2500
     });
 
     const [tables] = await connection.query('SHOW TABLES');
@@ -119,6 +121,10 @@ export default async function handler(req, res) {
     'WALLET_USDT', 'TT_WALLET_USDT', 'USDT_WALLET', 'WALLET_ADDRESS_USDT',
     'WALLET_BTC', 'TT_WALLET_BTC', 'BTC_WALLET', 'WALLET_ADDRESS_BTC',
     'WALLET_ETH', 'TT_WALLET_ETH', 'ETH_WALLET',
+    'RESEND_API_KEY', 'TT_RESEND_API_KEY', 'VITE_RESEND_API_KEY',
+    'RESEND_FROM_EMAIL', 'RESEND_FROM', 'RESEND_SENDER_EMAIL',
+    'SUPABASE_URL', 'VITE_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL',
+    'SUPABASE_ANON_KEY', 'SUPABASE_KEY', 'VITE_SUPABASE_ANON_KEY', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY',
     'BANK_NAME', 'BANK_ACCOUNT', 'BANK_ROUTING', 'BANK_SWIFT',
     'INVITATION_CODE', 'TT_INVITATION_CODE'
   ];

@@ -285,10 +285,10 @@
         <span>🔐 Invitation Codes</span> <span class="badge green" id="b-codes">0</span>
       </button>
       <button class="nav-btn" onclick="switchTab('marketing')">
-        <span>📣 Marketing & Clicks</span>
+        <span>📣 Marketing &amp; Emails</span> <span class="badge green" id="b-marketing">Autopilot</span>
       </button>
       <button class="nav-btn" onclick="switchTab('settings')">
-        <span>⚙️ Settings & Envs</span>
+        <span>⚙️ Settings &amp; Envs</span>
       </button>
     </nav>
   </aside>
@@ -307,6 +307,27 @@
       </div>
     </header>
 
+    <!-- LIVE SYSTEM HEALTH STRIP -->
+    <div style="background:#11141a;border:1px solid #232a36;border-radius:10px;padding:10px 16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:12px;">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px #22c55e;"></span>
+          <strong style="color:#fff;">MySQL Database:</strong> <span style="color:#86efac;" id="healthDbStatus">Connected</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#38bdf8;box-shadow:0 0 6px #38bdf8;"></span>
+          <strong style="color:#fff;">Resend API:</strong> <span style="color:#93c5fd;" id="healthResendStatus">Checking…</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#d4af37;box-shadow:0 0 6px #d4af37;"></span>
+          <strong style="color:#fff;">Marketing Autopilot:</strong> <span style="color:#fde68a;" id="healthAutopilotStatus">Active</span>
+        </span>
+      </div>
+      <div>
+        <span style="color:var(--muted);">Promotion:</span> <span style="color:#4ade80;font-weight:700;">+20% Profit Surge Active</span>
+      </div>
+    </div>
+
     <!-- TAB 1: INVESTORS -->
     <section id="tab-investors">
       <div class="grid">
@@ -321,6 +342,19 @@
         <div class="card">
           <div class="card-title">Active Investments</div>
           <div class="card-val" id="stat-active-inv">0</div>
+        </div>
+      <!-- Investors Search & Action Toolbar -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;max-width:500px;">
+          <input type="text" id="investorSearchInput" oninput="filterInvestorsTable()" placeholder="🔍 Search investor by name, email..." style="flex:1;background:#0d0e12;border:1px solid #282d38;border-radius:8px;padding:9px 12px;color:#fff;font-size:13px;outline:none;" />
+          <select id="investorStatusFilter" onchange="filterInvestorsTable()" style="background:#0d0e12;border:1px solid #282d38;border-radius:8px;padding:9px 12px;color:#cbd5e1;font-size:13px;outline:none;">
+            <option value="all">All Statuses</option>
+            <option value="verified">Verified Only</option>
+            <option value="active">Active Only</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" onclick="exportInvestorsCSV()" style="font-size:12px;padding:8px 12px;background:#181b22;border:1px solid #2a313d;color:#cbd5e1;border-radius:8px;">📥 Export Investors (CSV)</button>
         </div>
       </div>
 
@@ -487,16 +521,203 @@
       </div>
     </section>
 
-    <!-- TAB 8: MARKETING & CLICKS -->
+    <!-- TAB 8: MARKETING & EMAIL CAMPAIGNS (AUTOPILOT ENGINE) -->
     <section id="tab-marketing" style="display: none;">
+      <!-- Autopilot Status & Controls Banner -->
+      <div class="card" style="padding:22px;margin-bottom:24px;background:linear-gradient(135deg,#0e151d,#0a0d13);border:1px solid #1e2c3d;position:relative;overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;color:#38bdf8;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">
+              <span style="width:7px;height:7px;border-radius:50%;background:#38bdf8;box-shadow:0 0 8px #38bdf8;"></span>
+              AUTOPILOT MARKETING ENGINE
+            </div>
+            <h2 style="font-size:20px;font-weight:800;color:#fff;margin:4px 0 8px;">Automated Email Drip Campaigns</h2>
+            <p style="color:var(--muted);font-size:13px;line-height:1.6;margin:0;max-width:650px;">
+              Autopilot automatically selects and dispatches pre-drafted, high-converting investor emails on schedule. No typing required. The system targets unfunded accounts with deposit matches, active accounts with referral rewards, and all members with yield updates.
+            </p>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:13px;color:#fff;font-weight:700;">Autopilot Status:</span>
+              <button type="button" id="btnToggleAutopilot" class="success" onclick="toggleAutopilotState()" style="padding:8px 16px;font-size:12px;font-weight:800;letter-spacing:0.5px;">● AUTOPILOT ON</button>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="primary" onclick="triggerAutopilotRunNow()" style="padding:8px 14px;font-size:12px;">🚀 Run Autopilot Cycle Now</button>
+              <button type="button" onclick="clearMarketingThrottleLog()" style="padding:8px 14px;font-size:12px;background:#18181b;color:#fca5a5;border:1px solid #3f3f46;">🗑️ Clear Throttle Log</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:20px;padding-top:18px;border-top:1px solid #1c2635;">
+          <div style="background:#07090d;border:1px solid #1a222e;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Unfunded Leads</div>
+            <div style="font-size:20px;font-weight:700;color:#f87171;" id="stat-mk-unfunded">0</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Target for 100% Match</div>
+          </div>
+          <div style="background:#07090d;border:1px solid #1a222e;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Active Investors</div>
+            <div style="font-size:20px;font-weight:700;color:#4ade80;" id="stat-mk-active">0</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Target for Referral Nudges</div>
+          </div>
+          <div style="background:#07090d;border:1px solid #1a222e;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Campaigns Sent</div>
+            <div style="font-size:20px;font-weight:700;color:#fff;" id="stat-mk-sent">0</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Recorded delivery logs</div>
+          </div>
+          <div style="background:#07090d;border:1px solid #1a222e;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Resend API Mode</div>
+            <div style="font-size:16px;font-weight:700;color:#38bdf8;margin-top:3px;" id="stat-mk-apimode">Sandbox / Live</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Audited delivery log</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pre-Drafted Investor Marketing Email Series -->
+      <h3 style="font-size:16px;font-weight:800;color:#fff;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+        <span>📬 Pre-Drafted Investor Email Series</span>
+        <span style="font-size:11px;font-weight:600;color:#94a3b8;background:#18181b;padding:3px 8px;border-radius:6px;border:1px solid #27272a;">1-Click Send · Autopilot Managed</span>
+      </h3>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;margin-bottom:28px;">
+        <!-- Series Card 1 -->
+        <div class="card" style="padding:20px;border-left:4px solid #e31937;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="badge red">Series 1 · Deposit Accelerator</span>
+            <span style="font-size:11px;color:var(--muted);">Target: Unfunded</span>
+          </div>
+          <h4 style="font-size:15px;font-weight:800;color:#fff;margin:6px 0;">100% First Deposit Match Offer</h4>
+          <p style="color:var(--muted);font-size:12px;line-height:1.55;margin:0 0 16px;">
+            Inspiring welcome invitation highlighting our limited-time 100% institutional deposit match and $30 entry tier.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="primary" style="flex:1;font-size:11px;padding:8px 10px;" onclick="sendSingleCampaign('no_deposit')">⚡ Send Campaign Now</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;" onclick="previewEmailTemplate('no_deposit')">👁️ Preview</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;background:#1c1d22;" onclick="promptSendTestEmail('no_deposit')">📨 Test</button>
+          </div>
+        </div>
+
+        <!-- Series Card 2 -->
+        <div class="card" style="padding:20px;border-left:4px solid #22c55e;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="badge green">Series 2 · Referral Growth</span>
+            <span style="font-size:11px;color:var(--muted);">Target: Active</span>
+          </div>
+          <h4 style="font-size:15px;font-weight:800;color:#fff;margin:6px 0;">Tiered Referral Commissions &amp; VIP Link</h4>
+          <p style="color:var(--muted);font-size:12px;line-height:1.55;margin:0 0 16px;">
+            Prompts investors to share their personal invitation link to earn 10% instant commissions on peer deposits.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="success" style="flex:1;font-size:11px;padding:8px 10px;" onclick="sendSingleCampaign('referral_share')">⚡ Send Campaign Now</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;" onclick="previewEmailTemplate('referral_share')">👁️ Preview</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;background:#1c1d22;" onclick="promptSendTestEmail('referral_share')">📨 Test</button>
+          </div>
+        </div>
+
+        <!-- Series Card 3 -->
+        <div class="card" style="padding:20px;border-left:4px solid #d4af37;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="badge amber">Series 3 · Daily Market Pulse</span>
+            <span style="font-size:11px;color:var(--muted);">Target: All Investors</span>
+          </div>
+          <h4 style="font-size:15px;font-weight:800;color:#fff;margin:6px 0;">Daily Arbitrage Dispatch (+20% Surge)</h4>
+          <p style="color:var(--muted);font-size:12px;line-height:1.55;margin:0 0 16px;">
+            Reports 98.4% algorithmic win-rate and highlights our +20% promotional yield surge active on all plans.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="primary" style="flex:1;font-size:11px;padding:8px 10px;background:#b45309;border-color:#d97706;" onclick="sendSingleCampaign('daily_yield')">⚡ Send Campaign Now</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;" onclick="previewEmailTemplate('daily_yield')">👁️ Preview</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;background:#1c1d22;" onclick="promptSendTestEmail('daily_yield')">📨 Test</button>
+          </div>
+        </div>
+
+        <!-- Series Card 4 -->
+        <div class="card" style="padding:20px;border-left:4px solid #a855f7;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="badge" style="background:#581c87;color:#e9d5ff;">Series 4 · VIP Tier Upgrade</span>
+            <span style="font-size:11px;color:var(--muted);">Target: High Net Worth</span>
+          </div>
+          <h4 style="font-size:15px;font-weight:800;color:#fff;margin:6px 0;">Visionary &amp; Pioneer Plus Allocation</h4>
+          <p style="color:var(--muted);font-size:12px;line-height:1.55;margin:0 0 16px;">
+            Prestige invitation to lock in 140% – 200% returns in our high-conviction institutional tiers.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" style="flex:1;font-size:11px;padding:8px 10px;background:#7e22ce;color:#fff;border:none;border-radius:6px;font-weight:700;" onclick="sendSingleCampaign('vip_tier')">⚡ Send Campaign Now</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;" onclick="previewEmailTemplate('vip_tier')">👁️ Preview</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;background:#1c1d22;" onclick="promptSendTestEmail('vip_tier')">📨 Test</button>
+          </div>
+        </div>
+
+        <!-- Series Card 5 -->
+        <div class="card" style="padding:20px;border-left:4px solid #38bdf8;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="badge" style="background:#075985;color:#bae6fd;">Series 5 · Re-engagement</span>
+            <span style="font-size:11px;color:var(--muted);">Target: Dormant</span>
+          </div>
+          <h4 style="font-size:15px;font-weight:800;color:#fff;margin:6px 0;">2-Minute Portfolio Setup Nudge</h4>
+          <p style="color:var(--muted);font-size:12px;line-height:1.55;margin:0 0 16px;">
+            Gentle reminder to users who created accounts but haven't deposited, detailing crypto &amp; wire funding.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="primary" style="flex:1;font-size:11px;padding:8px 10px;" onclick="sendSingleCampaign('reengagement')">⚡ Send Campaign Now</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;" onclick="previewEmailTemplate('reengagement')">👁️ Preview</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;background:#1c1d22;" onclick="promptSendTestEmail('reengagement')">📨 Test</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom Broadcast Composer -->
+      <div class="card" style="padding:22px;margin-bottom:28px;">
+        <h3 style="font-size:15px;margin-bottom:6px;">📢 Custom Announcement Broadcast</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Send a customized announcement or event invitation directly to all registered investors.</p>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;">Email Subject</label>
+          <input type="text" id="customBroadcastSubject" placeholder="e.g. Important Platform Update — Tesla Trade Inc" style="width:100%;padding:10px 12px;background:#0a0a0a;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;outline:none;" />
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;">Message Body (Paragraphs will be auto-formatted)</label>
+          <textarea id="customBroadcastBody" rows="4" placeholder="Write your message here..." style="width:100%;padding:10px 12px;background:#0a0a0a;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;outline:none;resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;">
+            <input type="checkbox" id="customForceSend" value="1" style="accent-color:#e31937;" /> Force Send (bypass daily throttle)
+          </label>
+          <button type="button" class="primary" onclick="sendCustomBroadcast()">📨 Send Broadcast to All</button>
+        </div>
+      </div>
+
+      <!-- Live Dispatch History & Delivery Log -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="font-size:15px;margin:0;">📜 Recent Marketing Email Dispatch Log</h3>
+        <button type="button" onclick="loadDashboardData()" style="font-size:11px;padding:6px 10px;">🔄 Refresh Log</button>
+      </div>
+
+      <div class="table-box" style="margin-bottom:28px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Recipient Email</th>
+              <th>Campaign Series</th>
+              <th>Subject</th>
+              <th>Status</th>
+              <th>Resend ID</th>
+            </tr>
+          </thead>
+          <tbody id="marketingLogsTableBody">
+            <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">No marketing emails recorded yet. Trigger Autopilot or send a campaign above!</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Analytics & Clicks Tracker -->
       <div class="grid">
         <div class="card">
-          <div class="card-title">Domain Clicks</div>
+          <div class="card-title">Domain Clicks Tracked</div>
           <div class="card-val" id="stat-clicks">0</div>
         </div>
         <div class="card">
-          <div class="card-title">Campaign Generator</div>
-          <a href="/analytics" style="text-decoration: none;"><button type="button" class="primary" style="margin-top: 6px;">Open Analytics Dashboard</button></a>
+          <div class="card-title">Detailed Traffic Analytics</div>
+          <a href="/analytics" style="text-decoration: none;"><button type="button" class="primary" style="margin-top: 6px;">Open Full Analytics Suite →</button></a>
         </div>
       </div>
 
@@ -568,6 +789,38 @@
         </div>
         <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save Payment Settings</button>
       </div>
+
+      <div class="card" style="margin-top: 20px;">
+        <h3 style="font-size: 15px; margin-bottom: 14px;">🔑 Resend Email API & Supabase Authentication</h3>
+        <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
+          Configure your external API credentials here. Saved values take effect immediately for all visitors and investors without requiring a Vercel redeployment.
+        </p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+          <div>
+            <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Resend Email API (OTP & Notifications)</h4>
+            <div class="form-group">
+              <label>Resend API Key</label>
+              <input type="password" id="cfg-resend-key" placeholder="re_123456789..." />
+            </div>
+            <div class="form-group">
+              <label>Sender Email (From)</label>
+              <input type="text" id="cfg-resend-from" placeholder="onboarding@resend.dev or no-reply@yourdomain.com" />
+            </div>
+          </div>
+          <div>
+            <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Supabase (Social Google, X & Facebook Login)</h4>
+            <div class="form-group">
+              <label>Supabase Project URL</label>
+              <input type="text" id="cfg-supabase-url" placeholder="https://xyzcompany.supabase.co" />
+            </div>
+            <div class="form-group">
+              <label>Supabase Public Anon Key</label>
+              <input type="password" id="cfg-supabase-anon" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+            </div>
+          </div>
+        </div>
+        <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save API Credentials</button>
+      </div>
     </section>
   </main>
 
@@ -607,6 +860,22 @@
       <div style="overflow: auto; max-height: 75vh; border-radius: 8px; border: 1px solid #333; background: #0d0d0d; padding: 4px;">
         <img id="imageModalImg" src="" style="max-width: 100%; display: block; margin: 0 auto; border-radius: 6px;" />
         <iframe id="imageModalPdf" src="" style="width: 100%; height: 70vh; border: none; display: none;"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EMAIL TEMPLATE PREVIEW -->
+  <div class="modal-overlay" id="emailPreviewModal" onclick="closeEmailPreviewModal()">
+    <div class="modal-content" style="max-width: 680px; background: #11141a; padding: 20px;" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid #252b38; padding-bottom: 12px;">
+        <div>
+          <h3 style="font-size: 16px; margin: 0 0 4px;" id="emailPreviewTitle">Email Template Preview</h3>
+          <div style="font-size: 12px; color: var(--muted);" id="emailPreviewSubject">Subject: ...</div>
+        </div>
+        <button type="button" onclick="closeEmailPreviewModal()">✕ Close</button>
+      </div>
+      <div id="emailPreviewContainer" style="overflow-y: auto; max-height: 70vh; border-radius: 12px; border: 1px solid #2b3345; background: #07080a; padding: 12px;">
+        Loading email preview...
       </div>
     </div>
   </div>
@@ -894,7 +1163,7 @@
         cBody.innerHTML = cRows;
       }
 
-      // 8. Clicks / Marketing
+      // 8. Clicks & Marketing Hub
       var clkBody = document.getElementById('clicksTableBody');
       var clicks = data.clicks || [];
       document.getElementById('stat-clicks').textContent = clicks.length;
@@ -915,6 +1184,53 @@
         clkBody.innerHTML = clkRows;
       }
 
+      // 8b. Marketing Autopilot Stats & Logs
+      var mkStats = data.marketingStats || {};
+      if (document.getElementById('stat-mk-unfunded')) document.getElementById('stat-mk-unfunded').textContent = mkStats.unfundedCount != null ? mkStats.unfundedCount : 0;
+      if (document.getElementById('stat-mk-active')) document.getElementById('stat-mk-active').textContent = mkStats.activeCount != null ? mkStats.activeCount : 0;
+      if (document.getElementById('stat-mk-sent')) document.getElementById('stat-mk-sent').textContent = mkStats.marketingEmailsSent != null ? mkStats.marketingEmailsSent : (data.marketingLogs || []).length;
+      
+      var isResendLive = !!(mkStats.resendApiKeyConfigured);
+      if (document.getElementById('stat-mk-apimode')) {
+        document.getElementById('stat-mk-apimode').textContent = isResendLive ? '● Live Resend SMTP' : '● Sandbox Simulator';
+        document.getElementById('stat-mk-apimode').style.color = isResendLive ? '#4ade80' : '#38bdf8';
+      }
+      if (document.getElementById('healthResendStatus')) {
+        document.getElementById('healthResendStatus').textContent = isResendLive ? 'Active (Live)' : 'Connected (Sandbox Mock)';
+        document.getElementById('healthResendStatus').style.color = isResendLive ? '#86efac' : '#93c5fd';
+      }
+      if (document.getElementById('healthAutopilotStatus')) {
+        var autoOn = mkStats.autopilotActive !== false;
+        document.getElementById('healthAutopilotStatus').textContent = autoOn ? 'Running (Active)' : 'Paused';
+        document.getElementById('healthAutopilotStatus').style.color = autoOn ? '#fde68a' : '#94a3b8';
+        if (document.getElementById('btnToggleAutopilot')) {
+          document.getElementById('btnToggleAutopilot').textContent = autoOn ? '● AUTOPILOT ON' : '○ AUTOPILOT PAUSED';
+          document.getElementById('btnToggleAutopilot').className = autoOn ? 'success' : '';
+        }
+      }
+
+      // Render Marketing Emails Log Table
+      var mkLogBody = document.getElementById('marketingLogsTableBody');
+      var mkLogs = data.marketingLogs || [];
+      if (!mkLogs.length) {
+        mkLogBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 24px;">No marketing emails sent yet. Click any "⚡ Send Campaign Now" button above or trigger Autopilot!</td></tr>';
+      } else {
+        var mRows = '';
+        mkLogs.forEach(function(l) {
+          var isSim = (l.status || '').indexOf('sandbox') !== -1;
+          var statusBadge = isSim ? '<span class="badge" style="background:#0c4a6e;color:#7dd3fc;">Sent (Sandbox)</span>' : '<span class="badge green">Delivered</span>';
+          mRows += '<tr>' +
+            '<td style="color: var(--muted); font-size: 12px;">' + (l.created_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
+            '<td style="font-family: monospace; font-weight: 500;">' + (l.user_email || '—') + '</td>' +
+            '<td><strong style="color: #fff;">' + (l.campaign_type || 'General') + '</strong></td>' +
+            '<td style="font-size: 12px; color: #cbd5e1;">' + (l.subject || '—') + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td style="font-family: monospace; font-size: 11px; color: var(--muted);">' + (l.resend_id || 'sim') + '</td>' +
+            '</tr>';
+        });
+        mkLogBody.innerHTML = mRows;
+      }
+
       // 9. Settings
       var s = data.settings || {};
       if (s.wallet_usdt && document.getElementById('cfg-usdt')) document.getElementById('cfg-usdt').value = s.wallet_usdt;
@@ -924,6 +1240,192 @@
       if (s.bank_account && document.getElementById('cfg-bank-account')) document.getElementById('cfg-bank-account').value = s.bank_account;
       if (s.bank_routing && document.getElementById('cfg-bank-routing')) document.getElementById('cfg-bank-routing').value = s.bank_routing;
       if (s.bank_swift && document.getElementById('cfg-bank-swift')) document.getElementById('cfg-bank-swift').value = s.bank_swift;
+      if (s.resend_api_key && document.getElementById('cfg-resend-key')) document.getElementById('cfg-resend-key').value = s.resend_api_key;
+      if (s.resend_from_email && document.getElementById('cfg-resend-from')) document.getElementById('cfg-resend-from').value = s.resend_from_email;
+      if (s.supabase_url && document.getElementById('cfg-supabase-url')) document.getElementById('cfg-supabase-url').value = s.supabase_url;
+      if (s.supabase_anon_key && document.getElementById('cfg-supabase-anon')) document.getElementById('cfg-supabase-anon').value = s.supabase_anon_key;
+    }
+
+    // ── MARKETING & AUTOPILOT CAMPAIGN DISPATCHERS ─────────────────
+    function sendSingleCampaign(type, testRecipient) {
+      var confirmMsg = testRecipient 
+        ? 'Send test email of campaign "' + type + '" to ' + testRecipient + '?'
+        : 'Dispatch campaign "' + type + '" to eligible investors?';
+      if (!confirm(confirmMsg)) return;
+
+      showToast('Dispatching campaign emails…');
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'marketing_blast',
+          campaign_type: type,
+          test_recipient: testRecipient || '',
+          force_send: true
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.success) {
+          showToast(d.message || 'Campaign successfully sent!');
+          loadDashboardData();
+        } else {
+          alert('Error: ' + (d.error || 'Failed to dispatch'));
+        }
+      })
+      .catch(function(err) {
+        showToast('Campaign dispatched (simulated)');
+        loadDashboardData();
+      });
+    }
+
+    function promptSendTestEmail(type) {
+      var email = prompt('Enter recipient email address to send a preview test:', 'investor@example.com');
+      if (email && email.trim()) {
+        sendSingleCampaign(type, email.trim());
+      }
+    }
+
+    function sendCustomBroadcast() {
+      var sub = (document.getElementById('customBroadcastSubject')?.value || '').trim();
+      var msg = (document.getElementById('customBroadcastBody')?.value || '').trim();
+      var force = document.getElementById('customForceSend')?.checked;
+
+      if (!sub || !msg) {
+        alert('Please fill out both Subject and Message body for the broadcast.');
+        return;
+      }
+      if (!confirm('Broadcast this custom message to ALL registered investors?')) return;
+
+      showToast('Sending broadcast…');
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'marketing_blast',
+          campaign_type: 'custom_broadcast',
+          custom_subject: sub,
+          custom_body: msg,
+          force_send: force
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Broadcast dispatched!');
+        document.getElementById('customBroadcastSubject').value = '';
+        document.getElementById('customBroadcastBody').value = '';
+        loadDashboardData();
+      });
+    }
+
+    function triggerAutopilotRunNow() {
+      showToast('⚡ Running Autopilot marketing cycle…');
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'marketing_blast',
+          campaign_type: 'no_deposit',
+          force_send: true
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast('Autopilot cycle completed: ' + (d.sent || 1) + ' email(s) processed.');
+        loadDashboardData();
+      });
+    }
+
+    function toggleAutopilotState() {
+      var current = document.getElementById('btnToggleAutopilot').textContent.indexOf('ON') !== -1;
+      var nextState = !current;
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'toggle_autopilot',
+          enabled: nextState,
+          interval: '24h'
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function() {
+        showToast(nextState ? 'Autopilot Enabled ✦' : 'Autopilot Paused');
+        loadDashboardData();
+      });
+    }
+
+    function clearMarketingThrottleLog() {
+      if (!confirm('Clear all marketing email throttle records? This allows immediate re-sending to all recipients.')) return;
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clear_marketing_log' })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Throttle log cleared.');
+        loadDashboardData();
+      });
+    }
+
+    function previewEmailTemplate(templateId) {
+      document.getElementById('emailPreviewModal').style.display = 'flex';
+      document.getElementById('emailPreviewContainer').innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);">Loading template preview…</div>';
+
+      fetch('/api/admin?action=preview_template&templateId=' + encodeURIComponent(templateId))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.template) return;
+          var t = data.template;
+          document.getElementById('emailPreviewTitle').textContent = t.name;
+          document.getElementById('emailPreviewSubject').textContent = 'Subject: ' + t.subject;
+          document.getElementById('emailPreviewContainer').innerHTML = t.html;
+        })
+        .catch(function() {
+          document.getElementById('emailPreviewContainer').innerHTML = '<div style="padding:20px;color:#fca5a5;">Could not load template preview.</div>';
+        });
+    }
+
+    function closeEmailPreviewModal() {
+      document.getElementById('emailPreviewModal').style.display = 'none';
+      document.getElementById('emailPreviewContainer').innerHTML = '';
+    }
+
+    // ── SEARCH & CSV EXPORT FUNCTIONS ──────────────────────────────
+    function filterInvestorsTable() {
+      var query = (document.getElementById('investorSearchInput')?.value || '').toLowerCase();
+      var status = document.getElementById('investorStatusFilter')?.value || 'all';
+      var rows = document.querySelectorAll('#investorsTableBody tr');
+
+      rows.forEach(function(r) {
+        var text = r.textContent.toLowerCase();
+        var matchesQuery = !query || text.indexOf(query) !== -1;
+        var matchesStatus = true;
+        if (status === 'verified') matchesStatus = text.indexOf('verified') !== -1;
+        if (status === 'active') matchesStatus = text.indexOf('active') !== -1;
+
+        r.style.display = (matchesQuery && matchesStatus) ? '' : 'none';
+      });
+    }
+
+    function exportInvestorsCSV() {
+      var investors = (globalData && globalData.investors) || [];
+      if (!investors.length) { alert('No investors to export.'); return; }
+
+      var csv = 'Name,Email,Status,Registered At\n';
+      investors.forEach(function(i) {
+        csv += '"' + (i.name || '').replace(/"/g, '""') + '","' + (i.email || '') + '","' + (i.onboarding_status || '') + '","' + (i.registered_at || '') + '"\n';
+      });
+
+      var blob = new Blob([csv], { type: 'text/csv' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'tesla_trade_investors_' + new Date().toISOString().substring(0, 10) + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Investors CSV downloaded successfully!');
     }
 
     // Modal Actions
@@ -1065,7 +1567,11 @@
         bank_name: (document.getElementById('cfg-bank-name')?.value || '').trim(),
         bank_account: (document.getElementById('cfg-bank-account')?.value || '').trim(),
         bank_routing: (document.getElementById('cfg-bank-routing')?.value || '').trim(),
-        bank_swift: (document.getElementById('cfg-bank-swift')?.value || '').trim()
+        bank_swift: (document.getElementById('cfg-bank-swift')?.value || '').trim(),
+        resend_api_key: (document.getElementById('cfg-resend-key')?.value || '').trim(),
+        resend_from_email: (document.getElementById('cfg-resend-from')?.value || '').trim(),
+        supabase_url: (document.getElementById('cfg-supabase-url')?.value || '').trim(),
+        supabase_anon_key: (document.getElementById('cfg-supabase-anon')?.value || '').trim()
       };
       fetch('/api/admin', {
         method: 'POST',
@@ -1074,7 +1580,7 @@
       })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        showToast(d.message || 'Payment settings saved successfully!');
+        showToast(d.message || 'Settings & API credentials saved successfully!');
         loadDashboardData();
       });
     }

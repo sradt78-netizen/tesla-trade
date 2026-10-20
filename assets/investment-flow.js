@@ -26,52 +26,52 @@
     {
       id: 'starter_ai',
       name: 'Explorer',
-      roi: '50%',
+      roi: '70%',
       term: '30 days',
       min: 30,
       max: 1000,
       range: '$30 – $1,000',
-      description: 'A straightforward starting tier for a smaller allocation.'
+      description: 'A straightforward starting tier for a smaller allocation with enhanced returns.'
     },
     {
       id: 'growth_ai',
       name: 'Pioneer',
-      roi: '80%',
+      roi: '100%',
       term: '60 days',
       min: 1000,
       max: 10000,
       range: '$1,000 – $10,000',
-      description: 'A broader allocation tier for investors seeking increased exposure.'
+      description: 'A broader allocation tier for investors seeking increased exposure and maximized profit.'
     },
     {
       id: 'elite_ai',
       name: 'Visionary',
-      roi: '120%',
+      roi: '140%',
       term: '90 days',
       min: 10000,
       max: 25000,
       range: '$10,000 – $25,000',
-      description: 'A higher-capital tier for larger participation.'
+      description: 'A higher-capital tier for larger participation with boosted institutional yield.'
     },
     {
       id: 'legacy_elite_ai',
       name: 'Pioneer Plus',
-      roi: '180%',
+      roi: '200%',
       term: '180 days',
       min: 25000,
       max: 55000,
       range: '$25,000 – $55,000',
-      description: 'The highest current tier for larger allocations.'
+      description: 'The highest tier for premier allocations with our top institutional yield tier.'
     },
     {
       id: 'dogecoin_reserve',
       name: 'Dogecoin Reserve Fund',
-      roi: '40%–120%',
+      roi: '60%–140%',
       term: '90 days',
       min: 1000,
       max: 25000,
       range: '$1,000 – $25,000',
-      description: 'A dedicated digital-asset participation option.'
+      description: 'A dedicated digital-asset participation fund with enhanced performance.'
     }
   ];
 

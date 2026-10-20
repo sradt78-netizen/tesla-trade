@@ -4,12 +4,15 @@
  * balance flow. It intentionally uses only Node's standard library so it can
  * run on a cPanel export or in a clean checkout without installing packages.
  */
-'use strict';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const assert = require('node:assert/strict');
-const http = require('node:http');
-const fs = require('node:fs');
-const vm = require('node:vm');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const state = {
   nextId: 1,
@@ -140,7 +143,7 @@ function request(base, method, path, body) {
 
 async function testBalanceRefreshScript() {
   const script = fs.readFileSync(
-    require('node:path').join(__dirname, '..', 'assets', 'balance-sync-fix.js'),
+    path.join(__dirname, '..', 'assets', 'balance-sync-fix.js'),
     'utf8'
   );
   let intervalCallback = null;

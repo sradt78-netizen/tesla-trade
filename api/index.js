@@ -4,11 +4,15 @@ import paymentSettingsHandler from './payment-settings.js';
 import paymentSubmitHandler from './payment-submit.js';
 import trackHandler from './track.js';
 import analyticsDataHandler from './analytics-data.js';
+import otpHandler from './otp.js';
+import authHandler from './auth.js';
+import supabaseConfigHandler from './supabase-config.js';
+import accountsHandler from './accounts.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-token, x-admin-password');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-token, x-admin-password, apikey');
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
@@ -31,12 +35,42 @@ export default async function handler(req, res) {
     return await dbcheckHandler(req, res);
   }
 
-  // 3. Payment settings (wallets & bank)
+  // 3. Supabase configuration proxy
+  if (normalizedPath === '/supabase-config') {
+    return await supabaseConfigHandler(req, res);
+  }
+
+  // 4. OTP verification & Resend Email API
+  if (
+    normalizedPath.startsWith('/otp/') ||
+    normalizedPath === '/otp-send' ||
+    normalizedPath === '/otp-verify'
+  ) {
+    return await otpHandler(req, res);
+  }
+
+  // 5. Authentication (Login, Set-Password, Supabase Social-Session)
+  if (normalizedPath.startsWith('/auth/')) {
+    return await authHandler(req, res);
+  }
+
+  // 6. Investor accounts, profile, status & transactions
+  if (
+    normalizedPath === '/accounts' ||
+    normalizedPath === '/profile' ||
+    normalizedPath === '/my-status' ||
+    normalizedPath === '/account-status' ||
+    normalizedPath === '/transactions'
+  ) {
+    return await accountsHandler(req, res);
+  }
+
+  // 7. Payment settings (wallets & bank)
   if (normalizedPath === '/payment-settings') {
     return await paymentSettingsHandler(req, res);
   }
 
-  // 4. Payment & Deposit submission / receipts
+  // 8. Payment & Deposit submission / receipts
   if (
     normalizedPath === '/payment-submit' ||
     normalizedPath === '/payment-proof' ||
@@ -45,7 +79,7 @@ export default async function handler(req, res) {
     return await paymentSubmitHandler(req, res);
   }
 
-  // 5. Analytics & tracking
+  // 9. Analytics & tracking
   if (normalizedPath === '/track') {
     return await trackHandler(req, res);
   }
@@ -53,15 +87,7 @@ export default async function handler(req, res) {
     return await analyticsDataHandler(req, res);
   }
 
-  // 6. Supabase configuration proxy
-  if (normalizedPath === '/supabase-config') {
-    return res.status(200).json({
-      url: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
-      key: process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || ''
-    });
-  }
-
-  // 7. Invitation verification
+  // 10. Invitation verification fallback
   if (normalizedPath === '/invitation/verify') {
     return res.status(200).json({ valid: true });
   }
