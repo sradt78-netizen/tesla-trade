@@ -1,4 +1,5 @@
-import { getDbConnection, resolveDatabaseConfig } from './dbcheck.js';
+import { getDbConnection, loadDatabase } from './db.js';
+import { logUserAction } from './logger.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -16,26 +17,22 @@ function parseJsonBody(req) {
   });
 }
 
-// In-memory fallback OTP storage when DB is offline or in development
+// In-memory fallback OTP store
 const inMemoryOtps = new Map();
 
-async function sendViaResend(apiKey, fromEmail, toEmail, toName, code) {
-  if (!apiKey) return { ok: false, error: 'No RESEND_API_KEY configured' };
-
+async function sendViaResend(apiKey, fromEmail, toEmail, name, code) {
   const sender = fromEmail || 'onboarding@resend.dev';
   const htmlBody = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; background: #0c0d0e; color: #ffffff; border-radius: 12px; border: 1px solid #222;">
-      <div style="margin-bottom: 24px; border-bottom: 1px solid #1f2023; padding-bottom: 16px;">
-        <span style="color: #e31937; font-size: 20px; font-weight: 800; letter-spacing: 0.1em;">TESLA</span>
-        <span style="color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: 0.05em;"> TRADE INC</span>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; background: #0c0d10; color: #ffffff; border-radius: 12px; border: 1px solid #27272a; padding: 32px 24px;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <div style="display: inline-block; width: 44px; height: 44px; line-height: 44px; background: #e31937; color: #ffffff; font-size: 24px; font-weight: 900; border-radius: 10px;">T</div>
+        <div style="color: #ffffff; font-size: 16px; font-weight: 800; letter-spacing: 1px; margin-top: 8px;">TESLA TRADE <span style="color: #e31937;">INC</span></div>
       </div>
-      <p style="font-size: 15px; color: #d1d5db; line-height: 1.6; margin-bottom: 16px;">
-        Hello <strong>${toName || 'Investor'}</strong>,
+      <h2 style="font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 12px; text-align: center;">Verify Your Email Address</h2>
+      <p style="font-size: 14px; color: #9ca3af; line-height: 1.6; margin-bottom: 24px; text-align: center;">
+        Hello <strong>${name || 'Investor'}</strong>, use the one-time verification code below to verify your account:
       </p>
-      <p style="font-size: 14px; color: #9ca3af; line-height: 1.6; margin-bottom: 24px;">
-        Use the following one-time verification code to complete your request:
-      </p>
-      <div style="background: #141618; border: 1px solid #2a2d32; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 24px;">
+      <div style="background: #18181b; border: 1px solid #3f3f46; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 24px;">
         <div style="font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #ffffff;">
           ${code}
         </div>
@@ -111,8 +108,8 @@ export default async function handler(req, res) {
   const pathname = url.pathname.replace(/^\/api/, '');
   const body = req.method === 'POST' ? await parseJsonBody(req) : {};
 
-  const isVerify = pathname === '/otp/verify' || pathname === '/otp-verify.php';
-  const isSend = pathname === '/otp/send' || pathname === '/otp-send.php' || pathname === '/otp/resend';
+  const isVerify = pathname === '/otp/verify' || pathname === '/otp-verify.php' || pathname === '/otp-verify';
+  const isSend = pathname === '/otp/send' || pathname === '/otp-send.php' || pathname === '/otp-send' || pathname === '/otp/resend';
 
   const email = cleanString(body.email || url.searchParams.get('email')).toLowerCase();
 
@@ -136,21 +133,14 @@ export default async function handler(req, res) {
         'SELECT * FROM otps WHERE LOWER(email)=? AND code=? AND used=0 AND expires_at >= NOW() ORDER BY id DESC LIMIT 1',
         [email, code]
       );
-      if (rows.length > 0) {
+      if (rows && rows.length > 0) {
         verified = true;
         await conn.query('UPDATE otps SET used=1 WHERE id=?', [rows[0].id]);
       }
       await conn.end();
-    } catch (e) {
-      // Fallback to in-memory check
-      const mem = inMemoryOtps.get(email);
-      if (mem && mem.code === code && mem.expiresAt > Date.now()) {
-        verified = true;
-        inMemoryOtps.delete(email);
-      }
-    }
+    } catch (e) {}
 
-    // Also accept in-memory if DB check didn't succeed
+    // Fallback to in-memory check
     if (!verified) {
       const mem = inMemoryOtps.get(email);
       if (mem && mem.code === code && mem.expiresAt > Date.now()) {
@@ -160,6 +150,13 @@ export default async function handler(req, res) {
     }
 
     if (!verified) {
+      await logUserAction(req, {
+        user_email: email,
+        action_type: 'otp.verify_failed',
+        description: `Failed OTP verification attempt for ${email}`,
+        status: 'warning',
+        details: { attemptedCode: code }
+      });
       return res.status(401).json({
         success: false,
         error: 'Incorrect or expired verification code. Request a new code and try again.',
@@ -167,6 +164,13 @@ export default async function handler(req, res) {
         canResend: true
       });
     }
+
+    await logUserAction(req, {
+      user_email: email,
+      action_type: 'otp.verified',
+      description: `OTP verified successfully for ${email}`,
+      status: 'success'
+    });
 
     const verificationToken = 'tok_' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
     return res.status(200).json({
@@ -188,46 +192,26 @@ export default async function handler(req, res) {
     );
     let resendFrom = cleanString(
       process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM || process.env.RESEND_SENDER_EMAIL
-    ) || 'onboarding@resend.dev';
+    ) || '';
+
+    try {
+      const db = loadDatabase();
+      if (db && db.app_settings) {
+        if (!resendApiKey && db.app_settings.resend_api_key) resendApiKey = cleanString(db.app_settings.resend_api_key);
+        if (!resendFrom && db.app_settings.resend_from_email) resendFrom = cleanString(db.app_settings.resend_from_email);
+      }
+    } catch (e) {}
+
+    if (!resendFrom) resendFrom = 'onboarding@resend.dev';
 
     // Store OTP in database
     try {
       const conn = await getDbConnection();
-
-      // Ensure otps table exists
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS otps (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          email VARCHAR(255) NOT NULL,
-          code VARCHAR(6) NOT NULL,
-          expires_at DATETIME NOT NULL,
-          used TINYINT(1) NOT NULL DEFAULT 0,
-          name VARCHAR(255) DEFAULT 'Investor',
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          INDEX idx_otps_email (email)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-      `);
-
-      // Read saved Resend settings from DB if not in env
-      if (!resendApiKey) {
-        try {
-          const [settings] = await conn.query('SELECT `key`, `value` FROM app_settings WHERE `key` IN ("resend_api_key", "resend_from_email")');
-          for (const s of settings) {
-            if (s.key === 'resend_api_key' && s.value) resendApiKey = s.value;
-            if (s.key === 'resend_from_email' && s.value) resendFrom = s.value;
-          }
-        } catch (e) {}
-      }
-
-      // Invalidate old unused OTPs
       await conn.query('UPDATE otps SET used=1 WHERE LOWER(email)=? AND used=0', [email]);
-
-      // Insert new OTP with 24hr expiration
       await conn.query(
         'INSERT INTO otps (email, code, expires_at, name, created_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR), ?, NOW())',
         [email, code, name]
       );
-
       await conn.end();
     } catch (dbErr) {
       console.warn('DB OTP insert warning, using memory fallback:', dbErr.message);
@@ -241,13 +225,25 @@ export default async function handler(req, res) {
     });
 
     // Send email via Resend if API key is present
-    let resendResult = { ok: false, error: 'No RESEND_API_KEY found' };
+    let resendResult = { ok: false, error: 'No RESEND_API_KEY configured' };
     if (resendApiKey) {
       resendResult = await sendViaResend(resendApiKey, resendFrom, email, name, code);
       if (!resendResult.ok) {
         console.warn('Resend send warning:', resendResult.error);
       }
     }
+
+    await logUserAction(req, {
+      user_email: email,
+      action_type: 'otp.requested',
+      description: `Verification code generated for ${email} (code: ${code})`,
+      status: resendResult.ok ? 'success' : 'warning',
+      details: {
+        code,
+        email_delivered: resendResult.ok,
+        resend_status: resendResult.ok ? 'sent' : resendResult.error
+      }
+    });
 
     return res.status(200).json({
       success: true,

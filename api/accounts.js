@@ -1,5 +1,6 @@
-import { getDbConnection } from './dbcheck.js';
+import { getDbConnection, loadDatabase } from './db.js';
 import { sendWelcomeEmail } from './mailer.js';
+import { logUserAction } from './logger.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -53,20 +54,20 @@ export default async function handler(req, res) {
     let investorName = 'Investor';
     let userInvestments = [];
 
-    // 1. Try MySQL Database
+    // Query Database / Persistent store
     try {
       const conn = await getDbConnection();
       const [accRows] = await conn.query('SELECT name, email FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
-      if (accRows.length > 0) {
+      if (accRows && accRows.length > 0) {
         hasAccount = true;
         investorName = accRows[0].name || investorName;
       }
 
       const [invRows] = await conn.query(
-        'SELECT id, status, user_name, plan_id, plan_name, total, payment_submitted_at, payment_proof_path, payment_reference FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC',
+        'SELECT id, status, user_name, plan_id, plan_name, total, total_current_value, payment_submitted_at, payment_proof_path, payment_reference, created_at FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC',
         [email]
       );
-      if (invRows.length > 0) {
+      if (invRows && invRows.length > 0) {
         hasAccount = true;
         userInvestments = invRows;
         if ((!investorName || investorName === 'Investor') && invRows[0].user_name) {
@@ -74,35 +75,29 @@ export default async function handler(req, res) {
         }
       }
       await conn.end();
-    } catch (dbErr) {}
+    } catch (dbErr) {
+      console.warn('DB my-status error:', dbErr.message);
+    }
 
-    // 2. Always check & merge in-memory deposits & mockStore
-    try {
-      const { inMemoryDeposits } = await import('./payment-submit.js');
-      const memDeposits = inMemoryDeposits.filter(d => d.user_email && d.user_email.toLowerCase() === email);
-      for (const md of memDeposits) {
+    // Also check direct persistent store
+    const db = loadDatabase();
+    if (!hasAccount && db.investor_accounts) {
+      const found = db.investor_accounts.find(u => (u.email || '').toLowerCase() === email);
+      if (found) {
         hasAccount = true;
-        if (!userInvestments.some(inv => String(inv.id) === String(md.id))) {
-          userInvestments.unshift(md);
+        investorName = found.name || investorName;
+      }
+    }
+    if (db.investments) {
+      const dbInvs = db.investments.filter(i => (i.user_email || '').toLowerCase() === email);
+      for (const di of dbInvs) {
+        if (!userInvestments.some(x => String(x.id) === String(di.id))) {
+          userInvestments.push(di);
+          hasAccount = true;
         }
       }
+    }
 
-      const { mockStore } = await import('./admin.js');
-      const mockUser = mockStore.investors.find(u => u.email.toLowerCase() === email);
-      if (mockUser) {
-        hasAccount = true;
-        if (mockUser.name) investorName = mockUser.name;
-      }
-      const mockInvs = mockStore.investments.filter(i => i.user_email && i.user_email.toLowerCase() === email);
-      for (const mi of mockInvs) {
-        hasAccount = true;
-        if (!userInvestments.some(inv => String(inv.id) === String(mi.id))) {
-          userInvestments.unshift(mi);
-        }
-      }
-    } catch (eMem) {}
-
-    // If an email was provided, treat as existing account session
     if (!hasAccount && email.includes('@')) {
       hasAccount = true;
     }
@@ -165,7 +160,7 @@ export default async function handler(req, res) {
         [email]
       );
       await conn.end();
-      return res.status(200).json(txs);
+      return res.status(200).json(txs || []);
     } catch (e) {
       return res.status(200).json([]);
     }
@@ -181,7 +176,6 @@ export default async function handler(req, res) {
         const [acc] = await conn.query('SELECT * FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
         const [inv] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC LIMIT 1', [email]);
         await conn.end();
-
         return res.status(200).json({
           email,
           name: acc[0]?.name || inv[0]?.user_name || 'Investor',
@@ -190,22 +184,7 @@ export default async function handler(req, res) {
           investment: inv[0] || null
         });
       } catch (e) {
-        try {
-          const { mockStore } = await import('./admin.js');
-          const acc = mockStore.investors.find(u => u.email.toLowerCase() === email);
-          const { inMemoryDeposits } = await import('./payment-submit.js');
-          const inv = inMemoryDeposits.find(i => i.user_email && i.user_email.toLowerCase() === email) ||
-                      mockStore.investments.find(i => i.user_email && i.user_email.toLowerCase() === email);
-          return res.status(200).json({
-            email,
-            name: acc?.name || inv?.user_name || 'Investor',
-            phone: acc?.phone || '',
-            onboarding_status: acc?.onboarding_status || (inv ? inv.status : 'active'),
-            investment: inv || null
-          });
-        } catch (err2) {
-          return res.status(200).json({ email, name: 'Investor', onboarding_status: 'active' });
-        }
+        return res.status(200).json({ email, name: 'Investor', onboarding_status: 'active' });
       }
     }
 
@@ -227,27 +206,20 @@ export default async function handler(req, res) {
           [email, name, phone, age]
         );
         await conn.end();
-      } catch (e) {}
+      } catch (e) {
+        console.warn('DB accounts upsert warning:', e.message);
+      }
 
-      try {
-        const { mockStore } = await import('./admin.js');
-        const existing = mockStore.investors.find(u => u.email.toLowerCase() === email);
-        if (existing) {
-          existing.name = name;
-          if (phone) existing.phone = phone;
-        } else {
-          mockStore.investors.unshift({
-            id: Date.now(),
-            name,
-            email,
-            phone,
-            onboarding_status: 'plan_selection',
-            registered_at: new Date().toISOString()
-          });
-        }
-      } catch (e2) {}
+      // Record in User Action Logs
+      await logUserAction(req, {
+        user_email: email,
+        action_type: 'user.signup',
+        description: `Investor registered account: ${name} (${email})`,
+        status: 'success',
+        details: { name, phone, age }
+      });
 
-      // Send welcome onboarding email
+      // Send welcome onboarding email (non-blocking)
       sendWelcomeEmail(email, name).catch(err => console.warn('Welcome email error:', err.message));
 
       return res.status(200).json({

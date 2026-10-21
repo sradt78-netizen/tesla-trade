@@ -1,0 +1,372 @@
+{
+  "investor_accounts": [
+    {
+      "email": "david.vance@teslawealths.org",
+      "name": "David Vance",
+      "phone": "+1 415-829-1002",
+      "age": 42,
+      "onboarding_status": "verified",
+      "deposit_match_eligible": 1,
+      "registered_at": "2026-09-28 14:22:10",
+      "activated_at": "2026-09-28 15:00:00",
+      "created_at": "2026-09-28 14:22:10"
+    },
+    {
+      "email": "elena.rostova@gmail.com",
+      "name": "Elena Rostova",
+      "phone": "+44 20 7946 0912",
+      "age": 35,
+      "onboarding_status": "active",
+      "deposit_match_eligible": 1,
+      "registered_at": "2026-09-30 09:15:44",
+      "activated_at": "2026-09-30 10:00:00",
+      "created_at": "2026-09-30 09:15:44"
+    },
+    {
+      "email": "m.sterling@sterlingcapital.com",
+      "name": "Marcus Sterling",
+      "phone": "+1 212-555-0198",
+      "age": 49,
+      "onboarding_status": "verified",
+      "deposit_match_eligible": 1,
+      "registered_at": "2026-10-02 18:40:02",
+      "activated_at": "2026-10-02 19:00:00",
+      "created_at": "2026-10-02 18:40:02"
+    },
+    {
+      "email": "chloe.dubois@outlook.com",
+      "name": "Chloe Dubois",
+      "phone": "+33 1 42 68 55 00",
+      "age": 29,
+      "onboarding_status": "active",
+      "deposit_match_eligible": 1,
+      "registered_at": "2026-10-05 11:20:30",
+      "activated_at": null,
+      "created_at": "2026-10-05 11:20:30"
+    }
+  ],
+  "investor_credentials": [
+    {
+      "email": "david.vance@teslawealths.org",
+      "password_hash": "$2a$10$w8gZz7k8bW2u6bW4xJjF.eE4mH9p6L8mQ1rS3t5v7x9y1z3a5b7c",
+      "updated_at": "2026-09-28 14:25:00"
+    }
+  ],
+  "investments": [
+    {
+      "id": "101",
+      "tx_id": "TX8928374920194827",
+      "user_id": "david.vance@teslawealths.org",
+      "user_name": "David Vance",
+      "user_email": "david.vance@teslawealths.org",
+      "portfolio": "Visionary Tier",
+      "plan_id": "elite_ai",
+      "plan_name": "Visionary",
+      "plan_label": "Visionary Tier",
+      "total": 15000,
+      "total_current_value": 21000,
+      "projected_roi": 140,
+      "method": "USDT (TRC-20)",
+      "status": "active",
+      "payment_confirmed": 1,
+      "payment_reference": "TX8928374920194827",
+      "payment_proof_path": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"200\" viewBox=\"0 0 400 200\"><rect width=\"400\" height=\"200\" fill=\"%23111\"/><text x=\"20\" y=\"50\" fill=\"%23fff\" font-family=\"sans-serif\" font-size=\"16\">Deposit Receipt: USDT Transfer</text><text x=\"20\" y=\"90\" fill=\"%2322c55e\" font-family=\"sans-serif\" font-size=\"20\">$15,000.00 confirmed</text><text x=\"20\" y=\"130\" fill=\"%23888\" font-family=\"sans-serif\" font-size=\"12\">TX: TX8928374920194827</text></svg>",
+      "payment_proof_name": "usdt-transfer.svg",
+      "created_at": "2026-09-28 15:00:00"
+    },
+    {
+      "id": "102",
+      "tx_id": "BTC-9928172635",
+      "user_id": "elena.rostova@gmail.com",
+      "user_name": "Elena Rostova",
+      "user_email": "elena.rostova@gmail.com",
+      "portfolio": "Pioneer Tier",
+      "plan_id": "growth_ai",
+      "plan_name": "Pioneer",
+      "plan_label": "Pioneer Tier",
+      "total": 5000,
+      "total_current_value": 5000,
+      "projected_roi": 100,
+      "method": "Bitcoin (BTC)",
+      "status": "pending_approval",
+      "payment_confirmed": 1,
+      "payment_reference": "BTC-9928172635",
+      "payment_proof_path": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"200\" viewBox=\"0 0 400 200\"><rect width=\"400\" height=\"200\" fill=\"%23111\"/><text x=\"20\" y=\"50\" fill=\"%23fff\" font-family=\"sans-serif\" font-size=\"16\">Deposit Receipt: BTC Transfer</text><text x=\"20\" y=\"90\" fill=\"%2322c55e\" font-family=\"sans-serif\" font-size=\"20\">$5,000.00 submitted</text><text x=\"20\" y=\"130\" fill=\"%23888\" font-family=\"sans-serif\" font-size=\"12\">Ref: BTC-9928172635</text></svg>",
+      "payment_proof_name": "btc-receipt.svg",
+      "created_at": "2026-09-30 09:30:00"
+    }
+  ],
+  "account_transactions": [
+    {
+      "id": 4,
+      "user_email": "investor.test.1792593428368@example.com",
+      "transaction_type": "25000",
+      "amount": null,
+      "status": "pending",
+      "description": "Transaction",
+      "created_at": "2026-10-21T14:37:08.384Z"
+    },
+    {
+      "id": 3,
+      "user_email": "investor.test.1792593389339@example.com",
+      "transaction_type": "25000",
+      "amount": null,
+      "status": "pending",
+      "description": "Transaction",
+      "created_at": "2026-10-21T14:36:29.355Z"
+    },
+    {
+      "id": 1,
+      "user_email": "david.vance@teslawealths.org",
+      "transaction_type": "deposit",
+      "amount": 15000,
+      "status": "processed",
+      "description": "Initial Visionary Tier Deposit (USDT TRC-20)",
+      "reference_id": "101",
+      "created_at": "2026-09-28 15:00:00"
+    },
+    {
+      "id": 2,
+      "user_email": "elena.rostova@gmail.com",
+      "transaction_type": "deposit",
+      "amount": 5000,
+      "status": "pending",
+      "description": "Initial Pioneer Tier Deposit (Bitcoin BTC)",
+      "reference_id": "102",
+      "created_at": "2026-09-30 09:30:00"
+    }
+  ],
+  "otps": [
+    {
+      "id": 1792593429012,
+      "email": "investor.test.1792593428368@example.com",
+      "code": "306727",
+      "name": "Warren Buffett",
+      "used": 1,
+      "expires_at": "2026-10-22T14:37:08.372Z",
+      "created_at": "2026-10-21T14:37:08.372Z"
+    },
+    {
+      "id": 1792593390211,
+      "email": "investor.test.1792593389339@example.com",
+      "code": "486735",
+      "name": "Warren Buffett",
+      "used": 1,
+      "expires_at": "2026-10-22T14:36:29.343Z",
+      "created_at": "2026-10-21T14:36:29.343Z"
+    }
+  ],
+  "app_settings": {
+    "wallet_usdt": "TQn9Y2khEsLJW1ChVWFMSMeSTow5KaxnSE",
+    "wallet_btc": "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+    "wallet_eth": "0x71C8F0dF42250c609c1B95B1d141e4B516e889F6",
+    "bank_name": "JPMorgan Chase Institutional",
+    "bank_account": "982187263541",
+    "bank_routing": "021000021",
+    "bank_swift": "CHASUS33",
+    "resend_api_key": "",
+    "resend_from_email": "onboarding@resend.dev",
+    "admin_email": "admin@teslawealths.org",
+    "autopilot_marketing_enabled": "true",
+    "autopilot_interval": "24h",
+    "marketing_last_run": "2026-10-19 12:00:00"
+  },
+  "user_action_logs": [
+    {
+      "id": "log_mvi7udoc_1ub98",
+      "timestamp": "2026-10-21T14:37:08.412Z",
+      "user_email": "admin@teslawealths.org",
+      "action_type": "email.simulated",
+      "description": "Email recorded (Sandbox Simulator): \"⚡ Action Required: New Deposit of $25,000.00 from investor.test.1792593428368@example.com\" to admin@teslawealths.org",
+      "status": "warning",
+      "ip_address": "127.0.0.1",
+      "user_agent": "Unknown Client",
+      "details": {
+        "subject": "⚡ Action Required: New Deposit of $25,000.00 from investor.test.1792593428368@example.com",
+        "recipient": "admin@teslawealths.org",
+        "category": "admin_alert",
+        "reason": "RESEND_API_KEY not configured"
+      }
+    },
+    {
+      "id": "log_mvi7tjkt_16ygf",
+      "timestamp": "2026-10-21T14:36:29.405Z",
+      "user_email": "system",
+      "action_type": "admin.deposit_approved",
+      "description": "Admin approved deposit receipt of $0.00 for",
+      "status": "success",
+      "ip_address": "127.0.0.1",
+      "user_agent": "Unknown Client",
+      "details": {
+        "amount": 0,
+        "plan": "Investment Portfolio",
+        "status": "active"
+      }
+    },
+    {
+      "id": "log_seed_1",
+      "timestamp": "2026-09-28T14:22:10.000Z",
+      "user_email": "david.vance@teslawealths.org",
+      "action_type": "user.signup",
+      "description": "Investor registered account",
+      "status": "success",
+      "ip_address": "172.56.21.9",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+      "details": {
+        "name": "David Vance",
+        "phone": "+1 415-829-1002"
+      }
+    },
+    {
+      "id": "log_seed_2",
+      "timestamp": "2026-09-28T14:55:00.000Z",
+      "user_email": "david.vance@teslawealths.org",
+      "action_type": "payment.submitted",
+      "description": "Deposit submitted: $15,000 USDT (TRC-20) - Visionary Tier",
+      "status": "success",
+      "ip_address": "172.56.21.9",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+      "details": {
+        "amount": 15000,
+        "method": "USDT (TRC-20)",
+        "plan": "Visionary Tier",
+        "ref": "TX8928374920194827"
+      }
+    },
+    {
+      "id": "log_seed_3",
+      "timestamp": "2026-09-28T15:00:00.000Z",
+      "user_email": "david.vance@teslawealths.org",
+      "action_type": "admin.deposit_approved",
+      "description": "Deposit approved by admin. Account activated with $15,000.",
+      "status": "success",
+      "ip_address": "127.0.0.1",
+      "user_agent": "Admin Portal",
+      "details": {
+        "amount": 15000,
+        "investment_id": "101"
+      }
+    },
+    {
+      "id": "log_seed_4",
+      "timestamp": "2026-09-30T09:15:44.000Z",
+      "user_email": "elena.rostova@gmail.com",
+      "action_type": "user.signup",
+      "description": "Investor registered account",
+      "status": "success",
+      "ip_address": "198.51.100.42",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      "details": {
+        "name": "Elena Rostova",
+        "phone": "+44 20 7946 0912"
+      }
+    },
+    {
+      "id": "log_seed_5",
+      "timestamp": "2026-09-30T09:30:00.000Z",
+      "user_email": "elena.rostova@gmail.com",
+      "action_type": "payment.submitted",
+      "description": "Deposit submitted: $5,000 Bitcoin (BTC) - Pioneer Tier (Pending Admin Review)",
+      "status": "warning",
+      "ip_address": "198.51.100.42",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      "details": {
+        "amount": 5000,
+        "method": "Bitcoin (BTC)",
+        "plan": "Pioneer Tier",
+        "ref": "BTC-9928172635"
+      }
+    }
+  ],
+  "kyc_submissions": [
+    {
+      "id": "201",
+      "user_email": "david.vance@teslawealths.org",
+      "full_name": "David Vance",
+      "id_type": "Passport",
+      "id_number": "P98217281",
+      "address": "742 Evergreen Terrace, San Francisco, CA",
+      "id_document_path": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"220\" viewBox=\"0 0 400 220\"><rect width=\"400\" height=\"220\" fill=\"%23181818\"/><text x=\"20\" y=\"50\" fill=\"%23fff\" font-family=\"sans-serif\" font-size=\"18\">Government Passport: David Vance</text><text x=\"20\" y=\"100\" fill=\"%2322c55e\" font-family=\"sans-serif\" font-size=\"14\">ID: P98217281 · Verified</text></svg>",
+      "selfie_path": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"220\" viewBox=\"0 0 400 220\"><rect width=\"400\" height=\"220\" fill=\"%23181818\"/><text x=\"20\" y=\"50\" fill=\"%23fff\" font-family=\"sans-serif\" font-size=\"18\">Investor Verification Selfie</text><text x=\"20\" y=\"100\" fill=\"%2322c55e\" font-family=\"sans-serif\" font-size=\"14\">Match Confidence: 99.4%</text></svg>",
+      "status": "approved",
+      "created_at": "2026-09-28 14:30:00"
+    }
+  ],
+  "ev_orders": [
+    {
+      "id": "301",
+      "customer_name": "Elena Rostova",
+      "customer_email": "elena.rostova@gmail.com",
+      "payment_method": "USDT (TRC-20)",
+      "payment_reference": "EV-ORD-8827",
+      "payment_proof_path": "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"400\" height=\"200\" viewBox=\"0 0 400 200\"><rect width=\"400\" height=\"200\" fill=\"%23111\"/><text x=\"20\" y=\"50\" fill=\"%23fff\" font-family=\"sans-serif\" font-size=\"16\">Order Payment: Tesla Wall Connector</text><text x=\"20\" y=\"90\" fill=\"%2322c55e\" font-family=\"sans-serif\" font-size=\"20\">$475.00 confirmed</text></svg>",
+      "status": "approved",
+      "created_at": "2026-10-01 11:00:00"
+    }
+  ],
+  "withdrawals": [],
+  "financing": [],
+  "invitation_codes": [
+    {
+      "id": 1,
+      "code": "TT-2026-VIP",
+      "status": "active",
+      "source": "admin",
+      "created_at": "2026-09-25 10:00:00"
+    },
+    {
+      "id": 2,
+      "code": "TESLA-TRADE-2026",
+      "status": "active",
+      "source": "admin",
+      "created_at": "2026-09-25 10:00:00"
+    },
+    {
+      "id": 3,
+      "code": "INVITATIONCODE",
+      "status": "active",
+      "source": "system",
+      "created_at": "2026-09-25 10:00:00"
+    }
+  ],
+  "marketing_emails_log": [
+    {
+      "id": 1,
+      "user_email": "chloe.dubois@outlook.com",
+      "campaign_type": "no_deposit",
+      "subject": "⚡ Activate Your 100% First Deposit Match — Tesla Trade Institutional Portfolios",
+      "status": "sent (sandbox)",
+      "resend_id": "sim_mk_101",
+      "created_at": "2026-10-18 10:14:22"
+    },
+    {
+      "id": 2,
+      "user_email": "david.vance@teslawealths.org",
+      "campaign_type": "referral_share",
+      "subject": "💰 Earn 10% Instant Cash Commissions + VIP Referral Bonuses",
+      "status": "delivered",
+      "resend_id": "sim_mk_102",
+      "created_at": "2026-10-17 14:02:11"
+    }
+  ],
+  "analytics_clicks": [
+    {
+      "id": 1,
+      "created_at": "2026-10-19 14:10:00",
+      "campaign_source": "twitter",
+      "landing_page": "/",
+      "device_type": "mobile",
+      "referrer": "https://t.co",
+      "ip_address": "172.56.21.9"
+    },
+    {
+      "id": 2,
+      "created_at": "2026-10-19 15:30:00",
+      "campaign_source": "telegram",
+      "landing_page": "/invest",
+      "device_type": "desktop",
+      "referrer": "https://t.me",
+      "ip_address": "198.51.100.42"
+    }
+  ]
+}

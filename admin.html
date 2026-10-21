@@ -293,6 +293,9 @@
       <button class="nav-btn" onclick="switchTab('settings')">
         <span>⚙️ Settings &amp; Envs</span>
       </button>
+      <button class="nav-btn" onclick="switchTab('audit-logs')">
+        <span>📋 User Action Logs</span> <span class="badge" style="background:#0284c7;color:#fff;" id="b-action-logs">0</span>
+      </button>
     </nav>
   </aside>
 
@@ -918,6 +921,79 @@
         </div>
         <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save API Credentials</button>
       </div>
+
+      <div class="card" style="margin-top: 20px;">
+        <h3 style="font-size: 15px; margin-bottom: 14px;">✉️ Test Live Resend Email Delivery</h3>
+        <p style="font-size: 12px; color: var(--muted); margin-bottom: 14px;">
+          Send a real-time verification email to confirm that your Resend API credentials and sender domain deliver correctly.
+        </p>
+        <div style="display: flex; gap: 10px; max-width: 500px;">
+          <input type="email" id="testEmailRecipient" placeholder="Enter recipient email (e.g. your own email)" style="flex: 1;" />
+          <button type="button" class="primary" onclick="triggerTestEmail()">Send Test Email</button>
+        </div>
+        <div id="testEmailStatus" style="margin-top: 10px; font-size: 12px; display: none;"></div>
+      </div>
+
+    </section>
+
+    <!-- TAB 11: USER ACTION LOGS & AUDIT TRAIL -->
+    <section id="tab-audit-logs" style="display: none;">
+      <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
+        <div class="stat-card">
+          <div class="stat-label">Total Actions Recorded</div>
+          <div class="stat-val" id="stat-log-total">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Investor Signups</div>
+          <div class="stat-val" style="color: #4ade80;" id="stat-log-signups">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Deposits Submitted</div>
+          <div class="stat-val" style="color: #facc15;" id="stat-log-deposits">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Emails Dispatched</div>
+          <div class="stat-val" style="color: #38bdf8;" id="stat-log-emails">0</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 16px; padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <input type="text" id="logSearchInput" placeholder="🔍 Search user email or description..." oninput="filterAuditLogs()" style="padding: 8px 12px; background: #0a0a0a; border: 1px solid #333; border-radius: 6px; color: #fff; width: 280px; font-size: 12px;" />
+          <select id="logTypeFilter" onchange="filterAuditLogs()" style="padding: 8px 12px; background: #0a0a0a; border: 1px solid #333; border-radius: 6px; color: #fff; font-size: 12px;">
+            <option value="ALL">All Action Categories</option>
+            <option value="user.signup">Investor Signups</option>
+            <option value="user.login">Investor Logins</option>
+            <option value="otp.">OTP Verifications</option>
+            <option value="payment.submitted">Deposit Submissions</option>
+            <option value="admin.">Admin Actions &amp; Approvals</option>
+            <option value="email.">Email Notifications</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" onclick="loadDashboardData()" style="padding: 6px 12px; font-size: 12px;">🔄 Refresh Logs</button>
+          <button type="button" onclick="clearLogsAction()" style="padding: 6px 12px; font-size: 12px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35);">🗑 Clear Logs</button>
+        </div>
+      </div>
+
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Investor / User</th>
+              <th>Action Type</th>
+              <th>Description</th>
+              <th>IP &amp; Device</th>
+              <th>Status</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="auditLogsTableBody">
+            <tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">Loading user action logs...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   </main>
 
@@ -977,13 +1053,25 @@
     </div>
   </div>
 
+
+  <!-- MODAL: ACTION LOG DETAILS -->
+  <div class="modal-overlay" id="logDetailsModal">
+    <div class="modal-content" style="max-width: 650px;">
+      <div class="modal-title">📋 Action Log Details</div>
+      <div id="logDetailsBody" style="font-family: monospace; font-size: 12px; background: #08090b; padding: 14px; border-radius: 8px; border: 1px solid #27272a; max-height: 60vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all;"></div>
+      <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
+        <button type="button" onclick="closeLogDetailsModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast">Notification</div>
 
   <script>
     var globalData = {};
 
     function switchTab(tabId) {
-      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'trading', 'settings'];
+      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'trading', 'settings', 'audit-logs'];
       tabs.forEach(function(t) {
         var el = document.getElementById('tab-' + t);
         if (el) el.style.display = (t === tabId) ? 'block' : 'none';
@@ -1343,6 +1431,8 @@
         });
         mkLogBody.innerHTML = mRows;
       }
+      // Render User Action Logs
+      renderAuditLogs(data.userActionLogs || []);
 
       // 9. Settings
       var s = data.settings || {};
@@ -1987,6 +2077,154 @@
     // Direct dashboard initialization - NO PASSWORD BARRIER
     loadDashboardData();
     loadTradingSettings();
+  
+    // ── AUDIT LOG SYSTEM ──────────────────────────────────────────
+    var rawActionLogs = [];
+
+    function renderAuditLogs(logs) {
+      rawActionLogs = logs || [];
+      var body = document.getElementById("auditLogsTableBody");
+      if (!body) return;
+
+      var total = rawActionLogs.length;
+      var signups = 0;
+      var deposits = 0;
+      var emails = 0;
+
+      rawActionLogs.forEach(function(l) {
+        var t = l.action_type || "";
+        if (t.indexOf("signup") !== -1) signups++;
+        if (t.indexOf("payment.submitted") !== -1) deposits++;
+        if (t.indexOf("email.") !== -1) emails++;
+      });
+
+      if (document.getElementById("stat-log-total")) document.getElementById("stat-log-total").textContent = total;
+      if (document.getElementById("stat-log-signups")) document.getElementById("stat-log-signups").textContent = signups;
+      if (document.getElementById("stat-log-deposits")) document.getElementById("stat-log-deposits").textContent = deposits;
+      if (document.getElementById("stat-log-emails")) document.getElementById("stat-log-emails").textContent = emails;
+      if (document.getElementById("b-action-logs")) document.getElementById("b-action-logs").textContent = total;
+
+      filterAuditLogs();
+    }
+
+    function filterAuditLogs() {
+      var body = document.getElementById("auditLogsTableBody");
+      if (!body) return;
+
+      var search = (document.getElementById("logSearchInput")?.value || "").toLowerCase().trim();
+      var typeFilter = document.getElementById("logTypeFilter")?.value || "ALL";
+
+      var filtered = rawActionLogs.filter(function(l) {
+        var t = l.action_type || "";
+        var em = (l.user_email || "").toLowerCase();
+        var desc = (l.description || "").toLowerCase();
+
+        var matchesType = (typeFilter === "ALL") || (t.indexOf(typeFilter) !== -1);
+        var matchesSearch = !search || em.indexOf(search) !== -1 || desc.indexOf(search) !== -1;
+        return matchesType && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        body.innerHTML = "<tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">No matching action logs found.</td></tr>";
+        return;
+      }
+
+      var rows = "";
+      filtered.forEach(function(l) {
+        var badgeColor = "#0284c7";
+        var t = l.action_type || "";
+        if (t.indexOf("signup") !== -1 || t.indexOf("approved") !== -1 || t.indexOf("verified") !== -1) {
+          badgeColor = "#16a34a";
+        } else if (t.indexOf("declined") !== -1 || t.indexOf("failed") !== -1 || l.status === "error") {
+          badgeColor = "#dc2626";
+        } else if (t.indexOf("payment") !== -1 || l.status === "warning") {
+          badgeColor = "#ca8a04";
+        }
+
+        var statusBadge = l.status === "error" 
+          ? "<span class="badge red">Error</span>"
+          : (l.status === "warning" ? "<span class="badge amber">Pending/Alert</span>" : "<span class="badge green">Success</span>");
+
+        var safeId = String(l.id || "");
+        var ts = (l.timestamp || "").replace("T", " ").substring(0, 19);
+
+        rows += "<tr>" +
+          "<td style="font-family: monospace; font-size: 11px; color: var(--muted); white-space: nowrap;">" + ts + "</td>" +
+          "<td style="font-family: monospace; font-size: 12px; font-weight: 600;">" + (l.user_email || "system") + "</td>" +
+          "<td><span class="badge" style="background:" + badgeColor + "22;color:" + badgeColor + ";border:1px solid " + badgeColor + "55;">" + t + "</span></td>" +
+          "<td style="font-size: 12px; max-width: 260px;">" + (l.description || "—") + "</td>" +
+          "<td style="font-size: 11px; color: var(--muted); font-family: monospace;">" + (l.ip_address || "—") + "</td>" +
+          "<td>" + statusBadge + "</td>" +
+          "<td><button type="button" style="padding: 3px 8px; font-size: 11px;" onclick="showLogDetailsModal('" + safeId + "')">🔍 Details</button></td>" +
+        "</tr>";
+      });
+
+      body.innerHTML = rows;
+    }
+
+    function showLogDetailsModal(id) {
+      var found = rawActionLogs.find(function(x) { return String(x.id) === String(id); });
+      var body = document.getElementById("logDetailsBody");
+      var modal = document.getElementById("logDetailsModal");
+      if (body) {
+        body.textContent = found ? JSON.stringify(found, null, 2) : "Log entry not found.";
+      }
+      if (modal) modal.style.display = "flex";
+    }
+
+    function closeLogDetailsModal() {
+      var modal = document.getElementById("logDetailsModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    function clearLogsAction() {
+      if (!confirm("Are you sure you want to clear all user action logs?")) return;
+      fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear_logs" })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function() {
+        showToast("User action logs cleared.");
+        loadDashboardData();
+      });
+    }
+
+    function triggerTestEmail() {
+      var recipient = (document.getElementById("testEmailRecipient")?.value || "").trim();
+      var statusEl = document.getElementById("testEmailStatus");
+      if (!recipient || recipient.indexOf("@") === -1) {
+        alert("Enter a valid recipient email address.");
+        return;
+      }
+      if (statusEl) {
+        statusEl.style.display = "block";
+        statusEl.style.color = "#38bdf8";
+        statusEl.textContent = "Dispatching test email via Resend pipeline...";
+      }
+      fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send_test_email", email: recipient })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (statusEl) {
+          statusEl.style.color = data.success ? "#4ade80" : "#f87171";
+          statusEl.textContent = data.message || (data.success ? "Test email dispatched successfully!" : "Delivery failed.");
+        }
+        showToast(data.message || "Test email triggered.");
+        loadDashboardData();
+      })
+      .catch(function(err) {
+        if (statusEl) {
+          statusEl.style.color = "#f87171";
+          statusEl.textContent = "Test email error: " + err.message;
+        }
+      });
+    }
+
   </script>
 </body>
 </html>

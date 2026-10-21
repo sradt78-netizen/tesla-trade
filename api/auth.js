@@ -1,7 +1,8 @@
 import bcryptjs from 'bcryptjs';
-import { getDbConnection } from './dbcheck.js';
+import { getDbConnection, loadDatabase } from './db.js';
 import { resolveSupabaseCredentials } from './supabase-config.js';
 import { sendWelcomeEmail } from './mailer.js';
+import { logUserAction } from './logger.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -18,9 +19,6 @@ function parseJsonBody(req) {
     });
   });
 }
-
-// In-memory fallback credentials store when DB is offline or in development
-const inMemoryCredentials = new Map();
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -48,21 +46,18 @@ export default async function handler(req, res) {
 
     try {
       const conn = await getDbConnection();
-
-      // Check credentials table
       const [rows] = await conn.query(
         'SELECT email, password_hash FROM investor_credentials WHERE LOWER(email)=? LIMIT 1',
         [email]
       );
-      if (rows.length > 0) credential = rows[0];
+      if (rows && rows.length > 0) credential = rows[0];
 
-      // If credentials not found, check if an investor account or investment exists
       if (!credential) {
         const [acc] = await conn.query('SELECT name FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
         const [inv] = await conn.query('SELECT user_name FROM investments WHERE LOWER(user_email)=? LIMIT 1', [email]);
         await conn.end();
 
-        if (acc.length > 0 || inv.length > 0) {
+        if ((acc && acc.length > 0) || (inv && inv.length > 0)) {
           return res.status(200).json({
             success: false,
             needsPasswordSetup: true,
@@ -72,27 +67,14 @@ export default async function handler(req, res) {
         return res.status(404).json({ success: false, message: 'No investor account was found for this email.' });
       }
 
-      // Fetch name
       const [acc] = await conn.query('SELECT name FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
-      if (acc.length > 0 && acc[0].name) investorName = acc[0].name;
+      if (acc && acc.length > 0 && acc[0].name) investorName = acc[0].name;
       await conn.end();
-
     } catch (e) {
-      // Memory fallback check
-      credential = inMemoryCredentials.get(email);
-      if (!credential) {
-        try {
-          const { mockStore } = await import('./admin.js');
-          const mockUser = mockStore.investors.find(u => u.email.toLowerCase() === email);
-          if (mockUser) {
-            credential = { email, password_hash: password }; // accept password for seeded mock investor
-            investorName = mockUser.name;
-          }
-        } catch (errM) {}
-      }
-      if (!credential) {
-        return res.status(401).json({ success: false, message: 'Invalid email or password. Please register or check credentials.' });
-      }
+      const db = loadDatabase();
+      credential = db.investor_credentials?.find(c => (c.email || '').toLowerCase() === email);
+      const acc = db.investor_accounts?.find(u => (u.email || '').toLowerCase() === email);
+      if (acc) investorName = acc.name;
     }
 
     // Verify password hash
@@ -101,14 +83,26 @@ export default async function handler(req, res) {
       try {
         passwordValid = bcryptjs.compareSync(password, credential.password_hash);
       } catch (err) {
-        // Fallback for plain text or legacy hashes
         passwordValid = password === credential.password_hash;
       }
     }
 
     if (!passwordValid) {
+      await logUserAction(req, {
+        user_email: email,
+        action_type: 'user.login_failed',
+        description: `Failed login attempt for ${email}`,
+        status: 'warning'
+      });
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
+
+    await logUserAction(req, {
+      user_email: email,
+      action_type: 'user.login',
+      description: `Investor signed in successfully: ${email}`,
+      status: 'success'
+    });
 
     return res.status(200).json({
       success: true,
@@ -130,41 +124,31 @@ export default async function handler(req, res) {
     }
 
     const hash = bcryptjs.hashSync(password, 10);
-    inMemoryCredentials.set(email, { email, password_hash: hash });
-
     let userName = 'Investor';
 
     try {
       const conn = await getDbConnection();
-
-      // Ensure investor_credentials table exists
-      await conn.query(`
-        CREATE TABLE IF NOT EXISTS investor_credentials (
-          email VARCHAR(255) PRIMARY KEY,
-          password_hash VARCHAR(255) NOT NULL,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-      `);
-
-      // Upsert password hash
       await conn.query(
         'INSERT INTO investor_credentials (email, password_hash, updated_at) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), updated_at=NOW()',
         [email, hash]
       );
-
-      // Upsert account
       await conn.query(
         'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, "Investor", "active", NOW()) ON DUPLICATE KEY UPDATE onboarding_status="active"',
         [email]
       );
-
       const [acc] = await conn.query('SELECT name FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
-      if (acc.length > 0 && acc[0].name) userName = acc[0].name;
-
+      if (acc && acc.length > 0 && acc[0].name) userName = acc[0].name;
       await conn.end();
     } catch (e) {
-      console.warn('Set-password DB warning, stored in memory:', e.message);
+      console.warn('Set-password DB warning:', e.message);
     }
+
+    await logUserAction(req, {
+      user_email: email,
+      action_type: 'user.password_setup',
+      description: `Password set successfully for ${email}`,
+      status: 'success'
+    });
 
     sendWelcomeEmail(email, userName).catch(err => console.warn('Welcome email error:', err.message));
 
@@ -184,7 +168,6 @@ export default async function handler(req, res) {
 
     // If Supabase credentials are configured, verify accessToken with Supabase API
     const { url: supabaseUrl, anonKey } = await resolveSupabaseCredentials();
-
     if (supabaseUrl && anonKey && accessToken) {
       try {
         const verifyRes = await fetch(`${supabaseUrl.replace(/\/$/, '')}/auth/v1/user`, {
@@ -211,7 +194,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, message: 'Social session token or email is required.' });
     }
 
-    // Upsert investor account in database
     try {
       const conn = await getDbConnection();
       await conn.query(
@@ -219,36 +201,22 @@ export default async function handler(req, res) {
         [email, name]
       );
       await conn.end();
-    } catch (e) {
-      try {
-        const { mockStore } = await import('./admin.js');
-        const found = mockStore.investors.find(u => u.email.toLowerCase() === email);
-        if (found) {
-          found.name = name;
-          found.onboarding_status = 'active';
-        } else {
-          mockStore.investors.unshift({
-            id: Date.now(),
-            name,
-            email,
-            phone: '—',
-            onboarding_status: 'active',
-            registered_at: new Date().toISOString()
-          });
-        }
-      } catch (e2) {}
-    }
+    } catch (e) {}
+
+    await logUserAction(req, {
+      user_email: email,
+      action_type: 'user.social_login',
+      description: `Social login verified (${provider}): ${email}`,
+      status: 'success',
+      details: { provider, name }
+    });
 
     return res.status(200).json({
       success: true,
       email,
-      name,
-      provider,
-      isNewAccount: false,
-      investmentStatus: 'none',
-      message: 'Social session verified successfully.'
+      name
     });
   }
 
-  return res.status(404).json({ success: false, error: 'Unknown auth endpoint.' });
+  return res.status(404).json({ success: false, message: 'Unknown auth action' });
 }

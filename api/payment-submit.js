@@ -1,5 +1,8 @@
-import { getDbConnection } from './dbcheck.js';
+import { getDbConnection, loadDatabase, saveDatabase } from './db.js';
 import { sendPaymentReceivedEmail, sendAdminPaymentAlert } from './mailer.js';
+import { logUserAction } from './logger.js';
+
+export const inMemoryDeposits = [];
 
 function cleanString(val) {
   if (!val) return '';
@@ -50,9 +53,9 @@ function parseMultipart(buffer, boundary) {
 
 function parseBody(req) {
   return new Promise((resolve) => {
-    const contentType = req.headers['content-type'] || '';
+    const contentType = req.headers ? (req.headers['content-type'] || '') : '';
 
-    // Only resolve immediately if req.body has actual parsed keys and is NOT multipart
+    // If Express already populated req.body and it's not multipart
     if (
       !contentType.includes('multipart/form-data') &&
       req.body &&
@@ -64,11 +67,26 @@ function parseBody(req) {
     }
 
     const chunks = [];
+    let streamClosed = false;
+
+    // Timeout safety net in case stream was already consumed
+    const timeout = setTimeout(() => {
+      if (!streamClosed) {
+        streamClosed = true;
+        if (req.body && typeof req.body === 'object') {
+          return resolve({ fields: req.body, files: {} });
+        }
+        return resolve({ fields: {}, files: {} });
+      }
+    }, 1500);
+
     req.on('data', chunk => chunks.push(chunk));
     req.on('end', () => {
-      const buffer = Buffer.concat(chunks);
-      const contentType = req.headers['content-type'] || '';
+      clearTimeout(timeout);
+      if (streamClosed) return;
+      streamClosed = true;
 
+      const buffer = Buffer.concat(chunks);
       if (contentType.includes('multipart/form-data')) {
         const boundaryMatch = contentType.match(/boundary=([^\s;]+)/i);
         if (boundaryMatch) {
@@ -87,7 +105,6 @@ function parseBody(req) {
         const json = JSON.parse(text || '{}');
         return resolve({ fields: json, files: {} });
       } catch (e) {
-        // Try urlencoded
         const urlParams = new URLSearchParams(text);
         const obj = {};
         for (const [k, v] of urlParams.entries()) {
@@ -96,11 +113,16 @@ function parseBody(req) {
         return resolve({ fields: obj, files: {} });
       }
     });
+
+    req.on('error', () => {
+      clearTimeout(timeout);
+      if (!streamClosed) {
+        streamClosed = true;
+        resolve({ fields: req.body || {}, files: {} });
+      }
+    });
   });
 }
-
-// In-memory fallback deposits when database is offline or in test environments
-export const inMemoryDeposits = [];
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -111,38 +133,23 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   const parsedUrl = new URL(req.url || '/', 'http://localhost');
+
+  // ── GET: Read investments ──────────────────────────────────────
   if (req.method === 'GET') {
     const qEmail = cleanString(req.query?.email || parsedUrl.searchParams.get('email')).toLowerCase();
     const idMatch = parsedUrl.pathname.match(/\/api\/investments\/([^/?]+)/);
     const qId = idMatch ? idMatch[1] : (req.params?.id || parsedUrl.searchParams.get('id'));
 
-    let dbRows = [];
+    let all = [];
     try {
       const conn = await getDbConnection();
-      if (qId) {
-        const [rows] = await conn.query('SELECT * FROM investments WHERE id=? LIMIT 1', [qId]);
-        dbRows = rows;
-      } else if (qEmail) {
-        const [rows] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC', [qEmail]);
-        dbRows = rows;
-      } else {
-        const [rows] = await conn.query('SELECT * FROM investments ORDER BY id DESC');
-        dbRows = rows;
-      }
+      const [rows] = await conn.query('SELECT * FROM investments ORDER BY id DESC');
       await conn.end();
-    } catch (e) {}
-
-    let all = [...dbRows];
-    try {
-      const { mockStore } = await import('./admin.js');
-      const storeInvs = mockStore.investments || [];
-      for (const m of inMemoryDeposits) {
-        if (!all.some(x => String(x.id) === String(m.id))) all.push(m);
-      }
-      for (const s of storeInvs) {
-        if (!all.some(x => String(x.id) === String(s.id))) all.push(s);
-      }
-    } catch (e) {}
+      all = rows || [];
+    } catch (e) {
+      const db = loadDatabase();
+      all = db.investments || [];
+    }
 
     if (qId) {
       const found = all.find(x => String(x.id) === String(qId));
@@ -160,21 +167,23 @@ export default async function handler(req, res) {
     if (qEmail) {
       all = all.filter(x => (x.user_email || '').toLowerCase() === qEmail);
     }
+
     return res.status(200).json(all);
   }
 
+  // ── POST: Submit deposit receipt ────────────────────────────────
   try {
     const { fields, files } = await parseBody(req);
 
     const email = cleanString(fields.email || fields.userEmail || fields.userId || fields.user_email).toLowerCase();
     const amount = parseFloat(fields.amount || fields.total || '0');
-    const method = fields.method || fields.paymentMethod || fields.payment_method || 'crypto';
+    const method = fields.method || fields.paymentMethod || fields.payment_method || 'USDT (TRC-20)';
     const ref = fields.paymentReference || fields.reference || fields.tx_id || '';
-    const planId = fields.planId || fields.plan_id || 'standard';
+    const planId = fields.planId || fields.plan_id || 'starter_ai';
     const planName = fields.planName || fields.plan_name || fields.portfolio || 'Investment Plan';
     const userName = fields.userName || fields.name || 'Investor';
 
-    // Extract receipt file or string
+    // Extract receipt file or data uri
     let proofDataUri = '';
     let proofFileName = '';
 
@@ -195,23 +204,17 @@ export default async function handler(req, res) {
     const generatedId = 'inv_' + Math.random().toString(36).substring(2, 10);
     const generatedTxId = 'tx_' + Math.random().toString(36).substring(2, 10);
     let investmentId = generatedId;
-    let dbSaved = false;
 
     try {
       const conn = await getDbConnection();
 
-      // Ensure payment_proof_path can store large Data URIs without truncation
-      try {
-        await conn.query('ALTER TABLE investments MODIFY COLUMN payment_proof_path LONGTEXT');
-      } catch (e) {}
-
-      // Check existing pending investments for this user
+      // Check existing pending investments for this user to update or create
       const [existingPending] = await conn.query(
         'SELECT id, total FROM investments WHERE LOWER(user_email)=? AND status="pending_approval" ORDER BY id DESC LIMIT 1',
         [email]
       );
 
-      if (existingPending.length > 0) {
+      if (existingPending && existingPending.length > 0) {
         investmentId = existingPending[0].id;
         const currentAmt = amount > 0 ? amount : parseFloat(existingPending[0].total || '0');
         await conn.query(
@@ -219,97 +222,104 @@ export default async function handler(req, res) {
           [currentAmt, currentAmt, proofDataUri || null, proofFileName || null, ref || null, investmentId]
         );
       } else {
-        try {
-          await conn.query(
-            `INSERT INTO investments (
-              id, tx_id, user_id, user_name, user_email, portfolio,
-              total, total_current_value, method, status,
-              plan_id, plan_name, projected_roi, payment_confirmed,
-              payment_reference, payment_proof_path, payment_proof_name,
-              payment_proof_uploaded_at, payment_submitted_at, pending_approval_at, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "pending_approval", ?, ?, ?, 1, ?, ?, ?, NOW(), NOW(), NOW(), NOW())`,
-            [
-              generatedId, generatedTxId, email, userName, email, planName,
-              amount, amount, method,
-              planId, planName, 50,
-              ref || null, proofDataUri || null, proofFileName || null
-            ]
-          );
-          investmentId = generatedId;
-        } catch (insertErr) {
-          // Fallback for older schemas with fewer columns
-          await conn.query(
-            'INSERT INTO investments (id, tx_id, user_id, user_name, user_email, portfolio, total, method, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "pending_approval")',
-            [generatedId, generatedTxId, email, userName, email, planName, amount, method]
-          );
-          investmentId = generatedId;
-        }
+        await conn.query(
+          `INSERT INTO investments (
+            id, tx_id, user_id, user_name, user_email, portfolio,
+            total, total_current_value, method, status,
+            plan_id, plan_name, projected_roi, payment_confirmed,
+            payment_reference, payment_proof_path, payment_proof_name,
+            payment_proof_uploaded_at, payment_submitted_at, pending_approval_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "pending_approval", ?, ?, ?, 1, ?, ?, ?, NOW(), NOW(), NOW(), NOW())`,
+          [
+            generatedId, generatedTxId, email, userName, email, planName,
+            amount, amount, method,
+            planId, planName, 50,
+            ref || null, proofDataUri || null, proofFileName || null
+          ]
+        );
+        investmentId = generatedId;
       }
 
       // Ensure investor account exists and reflects pending deposit
-      try {
-        await conn.query(
-          'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_approval", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name)), onboarding_status="pending_approval"',
-          [email, userName]
-        );
-      } catch (e) {}
+      await conn.query(
+        'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_approval", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name)), onboarding_status="pending_approval"',
+        [email, userName]
+      );
 
       // Record in account_transactions
-      try {
-        await conn.query(
-          'INSERT INTO account_transactions (user_email, transaction_type, amount, status, description, created_at) VALUES (?, "deposit", ?, "pending", ?, NOW())',
-          [email, amount, `Investment deposit (${planName}) pending approval`]
-        );
-      } catch (e) {}
+      await conn.query(
+        'INSERT INTO account_transactions (user_email, transaction_type, amount, status, description, created_at) VALUES (?, "deposit", ?, "pending", ?, NOW())',
+        [email, amount, `Investment deposit (${planName}) pending approval`]
+      );
 
       await conn.end();
-      dbSaved = true;
     } catch (dbErr) {
-      console.warn('DB payment submit warning, using memory fallback:', dbErr.message);
+      console.warn('DB payment submit warning:', dbErr.message);
     }
 
-    const newDepositRecord = {
-      id: investmentId,
-      tx_id: generatedTxId,
-      user_email: email,
-      user_name: userName,
-      portfolio: planName,
-      plan_id: planId,
-      plan_label: planName,
-      plan_name: planName,
-      total: amount,
-      total_current_value: amount,
-      method,
-      payment_reference: ref,
-      payment_proof_path: proofDataUri,
-      payment_proof_name: proofFileName,
-      status: 'pending_approval',
-      created_at: new Date().toISOString()
-    };
+    // Direct update to persistent store ensuring instant visibility across all processes
+    const db = loadDatabase();
+    if (db && db.investments) {
+      const existingIdx = db.investments.findIndex(i => String(i.id) === String(investmentId));
+      const depositObj = {
+        id: investmentId,
+        tx_id: generatedTxId,
+        user_email: email,
+        user_name: userName,
+        portfolio: planName,
+        plan_id: planId,
+        plan_label: planName,
+        plan_name: planName,
+        total: amount,
+        total_current_value: amount,
+        method,
+        payment_reference: ref,
+        payment_proof_path: proofDataUri,
+        payment_proof_name: proofFileName,
+        status: 'pending_approval',
+        created_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        payment_submitted_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
+      };
 
-    // Save in memory fallback
-    inMemoryDeposits.unshift(newDepositRecord);
-
-    try {
-      const { mockStore } = await import('./admin.js');
-      if (mockStore && Array.isArray(mockStore.investments)) {
-        mockStore.investments.unshift(newDepositRecord);
+      if (existingIdx >= 0) {
+        db.investments[existingIdx] = { ...db.investments[existingIdx], ...depositObj };
+      } else {
+        db.investments.unshift(depositObj);
       }
-      if (mockStore && Array.isArray(mockStore.investors)) {
-        const existingInv = mockStore.investors.find(u => (u.email || '').toLowerCase() === email);
-        if (existingInv) {
-          existingInv.onboarding_status = 'pending_approval';
+
+      // Update account status in store
+      if (db.investor_accounts) {
+        const u = db.investor_accounts.find(x => (x.email || '').toLowerCase() === email);
+        if (u) {
+          u.onboarding_status = 'pending_approval';
         } else {
-          mockStore.investors.unshift({
-            id: Date.now(),
+          db.investor_accounts.unshift({
             email,
             name: userName,
             onboarding_status: 'pending_approval',
-            registered_at: new Date().toISOString()
+            registered_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
           });
         }
       }
-    } catch (e) {}
+      saveDatabase();
+    }
+
+    // Record in Detailed User Action Audit Log
+    await logUserAction(req, {
+      user_email: email,
+      action_type: 'payment.submitted',
+      description: `Deposit payment submitted: $${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${method} (${planName})`,
+      status: 'warning',
+      details: {
+        investment_id: investmentId,
+        amount,
+        plan: planName,
+        method,
+        reference: ref,
+        has_receipt_file: !!proofDataUri,
+        receipt_filename: proofFileName
+      }
+    });
 
     // Dispatch notification emails (async, non-blocking)
     sendPaymentReceivedEmail(email, userName, {
@@ -336,7 +346,6 @@ export default async function handler(req, res) {
       dashboardInvestmentId: investmentId,
       message: 'Deposit receipt submitted successfully. Pending admin approval.'
     });
-
   } catch (err) {
     console.error('Payment submit error:', err);
     return res.status(500).json({ success: false, error: err.message });

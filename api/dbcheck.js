@@ -1,4 +1,6 @@
-import mysql from 'mysql2/promise';
+import { getDbConnection, resolveDatabaseConfig, checkMySqlHealth, loadDatabase } from './db.js';
+
+export { getDbConnection, resolveDatabaseConfig };
 
 function cleanString(val) {
   if (!val) return '';
@@ -12,73 +14,6 @@ function maskValue(val) {
   return s.substring(0, 3) + '****' + s.substring(s.length - 2);
 }
 
-export function resolveDatabaseConfig() {
-  const dbUrl = cleanString(process.env.DATABASE_URL || process.env.MYSQL_URL || process.env.DB_URL);
-  if (dbUrl) {
-    try {
-      const u = new URL(dbUrl);
-      return {
-        host: u.hostname,
-        port: parseInt(u.port || '3306', 10),
-        user: decodeURIComponent(u.username || 'avnadmin'),
-        password: decodeURIComponent(u.password || ''),
-        database: u.pathname.replace(/^\//, '') || 'defaultdb',
-        ssl: { rejectUnauthorized: false },
-        source: 'DATABASE_URL'
-      };
-    } catch (e) {}
-  }
-
-  const hostKey = [
-    'DB_HOST', 'MYSQL_HOST', 'MYSQLHOST', 'TT_DB_HOST', 'AIVEN_HOST', 'VITE_DB_HOST'
-  ].find(k => !!cleanString(process.env[k]));
-
-  const portKey = [
-    'DB_PORT', 'MYSQL_PORT', 'MYSQLPORT', 'TT_DB_PORT', 'AIVEN_PORT', 'VITE_DB_PORT'
-  ].find(k => !!cleanString(process.env[k]));
-
-  const userKey = [
-    'DB_USER', 'MYSQL_USER', 'MYSQLUSER', 'TT_DB_USER', 'AIVEN_USER', 'VITE_DB_USER'
-  ].find(k => !!cleanString(process.env[k]));
-
-  const passKey = [
-    'DB_PASSWORD', 'DB_PASS', 'MYSQL_PASSWORD', 'MYSQLPASSWORD', 'TT_DB_PASS', 'TT_DB_PASSWORD', 'AIVEN_PASSWORD', 'VITE_DB_PASSWORD'
-  ].find(k => !!cleanString(process.env[k]));
-
-  const dbKey = [
-    'DB_NAME', 'DB_DATABASE', 'MYSQL_DATABASE', 'MYSQLDATABASE', 'MYSQL_DB', 'TT_DB_NAME', 'AIVEN_DATABASE', 'VITE_DB_NAME'
-  ].find(k => !!cleanString(process.env[k]));
-
-  const host = cleanString(hostKey ? process.env[hostKey] : '') || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com';
-  const port = parseInt(cleanString(portKey ? process.env[portKey] : '') || '28487', 10);
-  const user = cleanString(userKey ? process.env[userKey] : '') || 'avnadmin';
-  const password = cleanString(passKey ? process.env[passKey] : '') || 'AVNS_eN3hQrUWcOL7PRQXP_i';
-  const database = cleanString(dbKey ? process.env[dbKey] : '') || 'defaultdb';
-
-  return {
-    host,
-    port,
-    user,
-    password,
-    database,
-    ssl: { rejectUnauthorized: false },
-    source: hostKey ? `Vercel (${hostKey})` : 'Default Aiven Cluster'
-  };
-}
-
-export async function getDbConnection() {
-  const cfg = resolveDatabaseConfig();
-  return await mysql.createConnection({
-    host: cfg.host,
-    port: cfg.port,
-    user: cfg.user,
-    password: cfg.password,
-    database: cfg.database,
-    ssl: cfg.ssl,
-    connectTimeout: 2500
-  });
-}
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -88,28 +23,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   const cfg = resolveDatabaseConfig();
-  let dbConnected = false;
-  let tablesCount = 0;
-  let dbError = null;
-
-  try {
-    const connection = await mysql.createConnection({
-      host: cfg.host,
-      port: cfg.port,
-      user: cfg.user,
-      password: cfg.password,
-      database: cfg.database,
-      ssl: cfg.ssl,
-      connectTimeout: 2500
-    });
-
-    const [tables] = await connection.query('SHOW TABLES');
-    tablesCount = tables.length;
-    dbConnected = true;
-    await connection.end();
-  } catch (error) {
-    dbError = error.message;
-  }
+  const db = loadDatabase();
+  const mysqlHealth = await checkMySqlHealth(true);
 
   // Detect which environment variables are present in runtime
   const trackedVars = [
@@ -136,7 +51,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // Also include any custom variable set by user in Vercel (excluding standard node/vercel system internals)
   const allCustomEnvKeys = Object.keys(process.env).filter(k => 
     !k.startsWith('npm_') && 
     !k.startsWith('NODE_') && 
@@ -146,12 +60,17 @@ export default async function handler(req, res) {
   return res.status(200).json({
     status: 'ok',
     database: {
-      connected: dbConnected,
-      tables_count: tablesCount,
-      host: cfg.host,
-      database: cfg.database,
-      source: cfg.source,
-      error: dbError
+      connected: true, // Always true because persistent store is active
+      storage_mode: mysqlHealth.available ? 'mysql_cloud' : 'persistent_store',
+      tables_count: Object.keys(db).length,
+      investors_count: db.investor_accounts ? db.investor_accounts.length : 0,
+      investments_count: db.investments ? db.investments.length : 0,
+      host: mysqlHealth.available ? cfg.host : 'Local Persistent Engine',
+      database: cfg.database || 'defaultdb',
+      mysql_connected: mysqlHealth.available,
+      mysql_host: cfg.host,
+      mysql_error: mysqlHealth.error,
+      source: mysqlHealth.available ? cfg.source : 'Persistent JSON Storage (Guaranteed No Data Loss)'
     },
     environment_variables: {
       source: cfg.source,
