@@ -627,6 +627,7 @@
           data.dashboardInvestmentId || data.id || ''
         );
         localStorage.setItem('ttinc_payment_status', 'pending_approval');
+        localStorage.setItem('ttinc_deposit_status', 'pending_approval');
       } catch (error) {}
       clearState();
       root.querySelector('.ttif-shell').innerHTML =

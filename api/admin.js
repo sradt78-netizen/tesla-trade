@@ -106,6 +106,12 @@ export const mockStore = {
     wallet_usdt: 'TQn9Y2khEsLJW1ChVWFMSMeSTow5KaxnSE',
     wallet_btc: 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq',
     wallet_eth: '0x71C8F0dF42250c609c1B95B1d141e4B516e889F6'
+  },
+  tradingSettings: {
+    profitIntervalSeconds: 3,
+    lossIntervalSeconds: 2,
+    profitRatePercent: 2,
+    lossRatePercent: 1
   }
 };
 
@@ -534,6 +540,7 @@ export default async function handler(req, res) {
           autopilotActive: settings.autopilot_marketing_enabled !== 'false',
           resendApiKeyConfigured: !!(process.env.RESEND_API_KEY || settings.resend_api_key)
         },
+        tradingSettings: mockStore.tradingSettings,
         settings
       });
     }
@@ -829,6 +836,55 @@ export default async function handler(req, res) {
         Object.assign(mockStore.settings, s);
       }
       return res.status(200).json({ success: true, message: 'Settings saved successfully.' });
+    }
+
+    // ── 11. DELETE INVESTOR ─────────────────────────────────────────
+    if (action === 'delete_investor') {
+      const email = cleanString(body.email).toLowerCase();
+      if (!email) {
+        return res.status(400).json({ success: false, error: 'Investor email is required to delete.' });
+      }
+      if (isDbConnected && conn) {
+        try {
+          await conn.query('DELETE FROM investments WHERE LOWER(user_email)=?', [email]);
+          await conn.query('DELETE FROM investor_accounts WHERE LOWER(email)=?', [email]);
+          await conn.query('DELETE FROM account_transactions WHERE LOWER(user_email)=?', [email]);
+          await conn.end();
+        } catch (e) {}
+      }
+      // Delete from mockStore & inMemoryDeposits
+      mockStore.investors = mockStore.investors.filter(u => (u.email || '').toLowerCase() !== email);
+      mockStore.investments = mockStore.investments.filter(i => (i.user_email || '').toLowerCase() !== email);
+      if (Array.isArray(inMemoryDeposits)) {
+        for (let i = inMemoryDeposits.length - 1; i >= 0; i--) {
+          if ((inMemoryDeposits[i].user_email || '').toLowerCase() === email) {
+            inMemoryDeposits.splice(i, 1);
+          }
+        }
+      }
+      return res.status(200).json({ success: true, message: `Investor ${email} deleted successfully.` });
+    }
+
+    // ── 12. GET / UPDATE TRADING GRAPH SETTINGS ─────────────────────
+    if (action === 'get_trading_settings') {
+      return res.status(200).json({ success: true, settings: mockStore.tradingSettings });
+    }
+
+    if (action === 'update_trading_settings') {
+      const p = body.settings || body;
+      mockStore.tradingSettings = {
+        profitIntervalSeconds: Math.max(1, Math.min(86400, Number(p.profitIntervalSeconds || mockStore.tradingSettings.profitIntervalSeconds || 3))),
+        lossIntervalSeconds: Math.max(1, Math.min(86400, Number(p.lossIntervalSeconds || mockStore.tradingSettings.lossIntervalSeconds || 2))),
+        profitRatePercent: Math.max(0, Math.min(100, Number(p.profitRatePercent != null ? p.profitRatePercent : mockStore.tradingSettings.profitRatePercent || 2))),
+        lossRatePercent: Math.max(0, Math.min(100, Number(p.lossRatePercent != null ? p.lossRatePercent : mockStore.tradingSettings.lossRatePercent || 1)))
+      };
+      if (isDbConnected && conn) {
+        try {
+          await conn.query('INSERT INTO app_settings (`key`, `value`) VALUES ("trading_settings", ?) ON DUPLICATE KEY UPDATE `value`=?', [JSON.stringify(mockStore.tradingSettings), JSON.stringify(mockStore.tradingSettings)]);
+          await conn.end();
+        } catch (e) {}
+      }
+      return res.status(200).json({ success: true, message: 'Trading graph settings saved.', settings: mockStore.tradingSettings });
     }
 
     if (conn) try { await conn.end(); } catch (e) {}

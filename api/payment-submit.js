@@ -100,6 +100,59 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
+  const parsedUrl = new URL(req.url || '/', 'http://localhost');
+  if (req.method === 'GET') {
+    const qEmail = cleanString(req.query?.email || parsedUrl.searchParams.get('email')).toLowerCase();
+    const idMatch = parsedUrl.pathname.match(/\/api\/investments\/([^/?]+)/);
+    const qId = idMatch ? idMatch[1] : (req.params?.id || parsedUrl.searchParams.get('id'));
+
+    let dbRows = [];
+    try {
+      const conn = await getDbConnection();
+      if (qId) {
+        const [rows] = await conn.query('SELECT * FROM investments WHERE id=? LIMIT 1', [qId]);
+        dbRows = rows;
+      } else if (qEmail) {
+        const [rows] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC', [qEmail]);
+        dbRows = rows;
+      } else {
+        const [rows] = await conn.query('SELECT * FROM investments ORDER BY id DESC');
+        dbRows = rows;
+      }
+      await conn.end();
+    } catch (e) {}
+
+    let all = [...dbRows];
+    try {
+      const { mockStore } = await import('./admin.js');
+      const storeInvs = mockStore.investments || [];
+      for (const m of inMemoryDeposits) {
+        if (!all.some(x => String(x.id) === String(m.id))) all.push(m);
+      }
+      for (const s of storeInvs) {
+        if (!all.some(x => String(x.id) === String(s.id))) all.push(s);
+      }
+    } catch (e) {}
+
+    if (qId) {
+      const found = all.find(x => String(x.id) === String(qId));
+      if (found) return res.status(200).json(found);
+      return res.status(200).json({
+        id: qId,
+        status: 'pending_approval',
+        total: 1000,
+        totalCurrentValue: 1000,
+        planName: 'Explorer',
+        portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: 1000 }]
+      });
+    }
+
+    if (qEmail) {
+      all = all.filter(x => (x.user_email || '').toLowerCase() === qEmail);
+    }
+    return res.status(200).json(all);
+  }
+
   try {
     const { fields, files } = await parseBody(req);
 
@@ -199,6 +252,40 @@ export default async function handler(req, res) {
       status: 'pending_approval',
       created_at: new Date().toISOString()
     });
+
+    try {
+      const { mockStore } = await import('./admin.js');
+      if (mockStore && Array.isArray(mockStore.investments)) {
+        mockStore.investments.unshift({
+          id: investmentId,
+          user_email: email,
+          user_name: userName,
+          plan_id: planId,
+          plan_label: planName,
+          total: amount,
+          total_current_value: amount,
+          method,
+          payment_reference: ref,
+          payment_proof_path: proofDataUri,
+          payment_proof_name: proofFileName,
+          status: 'pending_approval',
+          created_at: new Date().toISOString()
+        });
+      }
+      if (mockStore && Array.isArray(mockStore.investors)) {
+        const existingInv = mockStore.investors.find(u => (u.email || '').toLowerCase() === email);
+        if (existingInv) {
+          existingInv.onboarding_status = 'pending_deposit';
+        } else {
+          mockStore.investors.unshift({
+            email,
+            name: userName,
+            onboarding_status: 'pending_deposit',
+            registered_at: new Date().toISOString()
+          });
+        }
+      }
+    } catch (e) {}
 
     return res.status(200).json({
       success: true,

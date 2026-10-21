@@ -34,42 +34,124 @@ export default async function handler(req, res) {
 
   // ── 1. GET /api/my-status OR /api/account-status ────────────────
   if (pathname === '/my-status' || pathname === '/account-status') {
-    if (!email) return res.status(200).json({ status: 'none' });
+    if (!email) {
+      return res.status(200).json({
+        account: false,
+        name: '',
+        investmentStatus: 'none',
+        status: 'none',
+        hasActiveInvestment: false,
+        activeInvestmentId: null,
+        pendingDepositTotal: 0,
+        pendingPayments: [],
+        investments: []
+      });
+    }
 
+    let hasAccount = false;
+    let investorName = 'Investor';
+    let userInvestments = [];
+
+    // 1. Try MySQL Database
     try {
       const conn = await getDbConnection();
-      const [activeRows] = await conn.query(
-        "SELECT id, status FROM investments WHERE LOWER(user_email)=? AND status='active' LIMIT 1",
-        [email]
-      );
-      if (activeRows.length > 0) {
-        await conn.end();
-        return res.status(200).json({ status: 'active', id: activeRows[0].id });
+      const [accRows] = await conn.query('SELECT name, email FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
+      if (accRows.length > 0) {
+        hasAccount = true;
+        investorName = accRows[0].name || investorName;
       }
 
       const [invRows] = await conn.query(
-        'SELECT id, status FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC LIMIT 1',
+        'SELECT id, status, user_name, plan_id, plan_name, total, payment_submitted_at, payment_proof_path, payment_reference FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC',
         [email]
       );
-      await conn.end();
-
       if (invRows.length > 0) {
-        return res.status(200).json({ status: invRows[0].status, id: invRows[0].id });
+        hasAccount = true;
+        userInvestments = invRows;
+        if ((!investorName || investorName === 'Investor') && invRows[0].user_name) {
+          investorName = invRows[0].user_name;
+        }
       }
-      return res.status(200).json({ status: 'none' });
-    } catch (e) {
-      // Memory fallback for mock/dev environment
-      try {
-        const { inMemoryDeposits } = await import('./payment-submit.js');
-        const mem = inMemoryDeposits.find(d => d.user_email && d.user_email.toLowerCase() === email);
-        if (mem) return res.status(200).json({ status: mem.status || 'pending_approval', id: mem.id });
+      await conn.end();
+    } catch (dbErr) {}
 
-        const { mockStore } = await import('./admin.js');
-        const mInv = mockStore.investments.find(d => d.user_email && d.user_email.toLowerCase() === email);
-        if (mInv) return res.status(200).json({ status: mInv.status || 'active', id: mInv.id });
-      } catch (memErr) {}
-      return res.status(200).json({ status: 'none' });
+    // 2. Always check & merge in-memory deposits & mockStore
+    try {
+      const { inMemoryDeposits } = await import('./payment-submit.js');
+      const memDeposits = inMemoryDeposits.filter(d => d.user_email && d.user_email.toLowerCase() === email);
+      for (const md of memDeposits) {
+        hasAccount = true;
+        if (!userInvestments.some(inv => String(inv.id) === String(md.id))) {
+          userInvestments.unshift(md);
+        }
+      }
+
+      const { mockStore } = await import('./admin.js');
+      const mockUser = mockStore.investors.find(u => u.email.toLowerCase() === email);
+      if (mockUser) {
+        hasAccount = true;
+        if (mockUser.name) investorName = mockUser.name;
+      }
+      const mockInvs = mockStore.investments.filter(i => i.user_email && i.user_email.toLowerCase() === email);
+      for (const mi of mockInvs) {
+        hasAccount = true;
+        if (!userInvestments.some(inv => String(inv.id) === String(mi.id))) {
+          userInvestments.unshift(mi);
+        }
+      }
+    } catch (eMem) {}
+
+    // If an email was provided, treat as existing account session
+    if (!hasAccount && email.includes('@')) {
+      hasAccount = true;
     }
+
+    let status = 'none';
+    let activeInvestmentId = null;
+    let pendingDepositTotal = 0;
+    const pendingPayments = [];
+
+    // Check for active investment
+    const activeInv = userInvestments.find(inv => inv.status === 'active');
+    if (activeInv) {
+      status = 'active';
+      activeInvestmentId = activeInv.id;
+    }
+
+    // Check for pending or declined investments
+    for (const inv of userInvestments) {
+      if (inv.status === 'pending_approval' || inv.status === 'pending') {
+        const amt = parseFloat(inv.total || '0');
+        pendingDepositTotal += amt;
+        pendingPayments.push({
+          id: inv.id,
+          status: inv.status,
+          planId: inv.plan_id || 'starter_ai',
+          planName: inv.plan_name || inv.plan_label || 'Investment Plan',
+          amount: amt,
+          submittedAt: inv.payment_submitted_at || inv.created_at || new Date().toISOString()
+        });
+        if (status !== 'active') {
+          status = 'pending_approval';
+        }
+      } else if (['declined', 'rejected', 'cancelled'].includes(inv.status) && status === 'none') {
+        status = inv.status;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      account: hasAccount,
+      name: investorName,
+      investmentStatus: status,
+      status: status,
+      id: activeInvestmentId || (pendingPayments[0] ? pendingPayments[0].id : null),
+      hasActiveInvestment: status === 'active',
+      activeInvestmentId: activeInvestmentId,
+      pendingDepositTotal,
+      pendingPayments,
+      investments: userInvestments
+    });
   }
 
   // ── 2. GET /api/transactions ─────────────────────────────────────

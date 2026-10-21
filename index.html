@@ -4466,16 +4466,16 @@
         if (isApproved) return buildDepositScreen();
         if (!isPending && !isDeclined) return null;
 
-        var icon  = isPending ? '\u23f3' : '\u274c';
-        var badge = isPending ? 'Step 5 of 6 · Pending approval' : 'Not Approved';
+        var icon  = isPending ? '⏳' : '❌';
+        var badge = isPending ? 'Step 5 of 6 · Dashboard Locked' : 'Not Approved';
         var title = isPending
-          ? 'Your payment is under review'
-          : 'Account not approved';
+          ? 'Deposit Receipt Submitted — Dashboard Locked'
+          : 'Account Not Approved';
         var body  = isPending
-          ? 'Our team is reviewing your payment. You\'ll receive an activation email as soon as your payment is approved. Dashboard access stays locked until then.'
+          ? 'Your deposit receipt has been submitted and is currently being verified by an administrator. The investor dashboard will unlock automatically as soon as an administrator verifies and approves your deposit.'
           : 'Your account application was not approved. Please contact our support team for more information.';
         var note  = isPending
-          ? 'This screen will automatically update once an admin reviews your payment \u2014 no refresh needed.'
+          ? '✓ Status: Deposit Receipt Queued for Admin Approval<br>✓ This screen automatically refreshes and unlocks the full dashboard once verified — no manual refresh needed.'
           : 'If you believe this is an error, please reach out via the support chat.';
 
         var ac = isPending ? '#f59e0b' : '#ef4444';
@@ -4493,25 +4493,25 @@
 
         div.innerHTML =
           '<div style="background:#111;border:1px solid #252525;border-radius:22px;'
-          + 'padding:40px 28px 32px;max-width:460px;width:100%;'
+          + 'padding:40px 28px 32px;max-width:480px;width:100%;'
           + 'box-shadow:0 24px 64px rgba(0,0,0,.8);">'
 
-          + '<div style="font-size:58px;line-height:1;margin-bottom:18px;">'
+          + '<div style="font-size:54px;line-height:1;margin-bottom:18px;">'
           + icon + '</div>'
 
           + '<span style="display:inline-block;background:' + bg + ';color:' + ac + ';'
-          + 'border-radius:30px;padding:5px 18px;font-size:11px;font-weight:800;'
-          + 'text-transform:uppercase;letter-spacing:1px;margin-bottom:20px;">'
+          + 'border-radius:30px;padding:6px 18px;font-size:11px;font-weight:800;'
+          + 'text-transform:uppercase;letter-spacing:1px;margin-bottom:20px;border:1px solid #78350f;">'
           + badge + '</span>'
 
-          + '<h2 style="font-size:21px;font-weight:800;color:#fff;margin:0 0 14px;line-height:1.35;">'
+          + '<h2 style="font-size:22px;font-weight:800;color:#fff;margin:0 0 14px;line-height:1.35;">'
           + title + '</h2>'
 
-          + '<p style="font-size:14px;color:#888;line-height:1.75;margin:0 0 22px;">'
+          + '<p style="font-size:14px;color:#cbd5e1;line-height:1.75;margin:0 0 22px;">'
           + body + '</p>'
 
-          + '<div style="background:#0c0c0c;border:1px solid #1c1c1c;border-radius:12px;'
-          + 'padding:14px 16px;font-size:12px;color:#555;line-height:1.65;">'
+          + '<div style="background:#14120b;border:1px solid #3d2f0d;border-radius:12px;'
+          + 'padding:14px 16px;font-size:12px;color:#fde68a;line-height:1.65;text-align:left;">'
           + note + '</div>'
 
           + (isPending
@@ -4519,8 +4519,8 @@
               + 'justify-content:center;gap:10px;">'
               + '<span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;'
               + 'display:inline-block;animation:ttinc-pulse 2s infinite;flex-shrink:0;"></span>'
-              + '<span style="font-size:12px;color:#555;">'
-              + 'Checking for admin approval every 10 seconds\u2026</span>'
+              + '<span style="font-size:12px;color:#94a3b8;">'
+              + 'Checking for admin approval every 10 seconds…</span>'
               + '</div>'
               : '')
 
@@ -4561,6 +4561,36 @@
         // the deposit that creates its pending investment.
         if (!isInvestorDashboardRoute()) { removeOverlay(); stopPoll(); return; }
 
+      function getEffectiveStatus(d) {
+        var s = (d && (d.investmentStatus || d.status)) ? (d.investmentStatus || d.status) : 'none';
+        var hasActive = (d && d.hasActiveInvestment) || s === 'active';
+        if (hasActive) {
+          try {
+            localStorage.removeItem('ttinc_deposit_status');
+            localStorage.removeItem('ttinc_payment_status');
+          } catch (e) {}
+          return 'active';
+        }
+
+        var isDepPending = false;
+        try {
+          isDepPending = localStorage.getItem('ttinc_deposit_status') === 'pending_approval' ||
+                         localStorage.getItem('ttinc_payment_status') === 'pending_approval' ||
+                         Boolean(localStorage.getItem('ttinc_investment_id')) ||
+                         (location.search && location.search.indexOf('payment=pending') !== -1);
+        } catch (e) {}
+
+        if (isDepPending && (s === 'none' || s === 'created' || !s)) {
+          return 'pending_approval';
+        }
+        return s;
+      }
+
+      function checkStatus() {
+        var auth = getAuth();
+        if (!auth || !auth.email) return;
+        if (!isInvestorDashboardRoute()) { removeOverlay(); stopPoll(); return; }
+
         fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin' })
           .then(function (r) {
             return r.json().then(function (d) {
@@ -4569,14 +4599,23 @@
             });
           })
           .then(function (d) {
-            var s = d && d.investmentStatus ? d.investmentStatus : 'none';
-            if (!d || !d.account) {
+            var s = getEffectiveStatus(d);
+            var isPendingState = (s === 'pending_approval' || s === 'pending');
+
+            if (s === 'active' || (d && d.hasActiveInvestment)) {
+              _lastStatus = 'active';
+              removeOverlay();
+              stopPoll();
+              return;
+            }
+
+            if (!d || (!d.account && !isPendingState && !isDepPending)) {
               _lastStatus = 'create';
               showOverlay('create');
               stopPoll();
               return;
             }
-            if (s === 'none') {
+            if (s === 'none' && !isPendingState && !isDepPending) {
               _lastStatus = 'created';
               showOverlay('created');
               stopPoll();
@@ -4586,34 +4625,43 @@
             if (s === _lastStatus) return; // no change
             _lastStatus = s;
 
-            if (s === 'pending_approval' || s === 'pending') {
+            if (isPendingState) {
               showOverlay('pending_approval');
+              if (!_pollTimer) _pollTimer = setInterval(checkStatus, POLL_MS);
             } else if (s === 'approved' || s === 'verified') {
-              // Admin approved — show deposit plan selection
               showOverlay('approved');
               stopPoll();
             } else if (s === 'declined' || s === 'rejected' || s === 'cancelled') {
               showOverlay('declined');
-              stopPoll(); // won't change back
+              stopPoll();
             } else {
-              // active or anything else — unlock
               removeOverlay();
               stopPoll();
             }
           })
           .catch(function (error) {
-            showOverlay('status_error');
-            var detail = document.getElementById('ttinc-status-error-message');
-            if (detail) detail.textContent = (error && error.message)
-              ? error.message + ' Retrying automatically…'
-              : 'Secure status check failed. Retrying automatically…';
+            var isDepPending = false;
+            try {
+              isDepPending = localStorage.getItem('ttinc_deposit_status') === 'pending_approval' ||
+                             localStorage.getItem('ttinc_payment_status') === 'pending_approval' ||
+                             Boolean(localStorage.getItem('ttinc_investment_id')) ||
+                             (location.search && location.search.indexOf('payment=pending') !== -1);
+            } catch (e) {}
+
+            if (isDepPending) {
+              showOverlay('pending_approval');
+            } else {
+              showOverlay('status_error');
+              var detail = document.getElementById('ttinc-status-error-message');
+              if (detail) detail.textContent = (error && error.message)
+                ? error.message + ' Retrying automatically…'
+                : 'Secure status check failed. Retrying automatically…';
+            }
             if (!_pollTimer) _pollTimer = setInterval(checkStatus, POLL_MS);
           });
       }
 
       // ── register account with backend ─────────────────────────
-      // Called once per login session.  Creates an "Account Registration"
-      // record in the DB so the admin can approve the user.  Idempotent.
       function registerAccount(email, name) {
         fetch('/api/accounts', {
           method:  'POST',
@@ -4629,16 +4677,14 @@
               removeOverlay();
               stopPoll();
             } else if (s === 'approved' || s === 'verified') {
-              // Already approved — show deposit screen
               showOverlay('approved');
               stopPoll();
             } else if (s === 'declined' || s === 'rejected') {
               showOverlay('declined');
               stopPoll();
             }
-            // else: already showing pending — keep it
           })
-          .catch(function () { /* non-fatal — overlay already showing */ });
+          .catch(function () {});
       }
 
       // ── start monitoring a logged-in user ──────────────────────
@@ -4652,8 +4698,21 @@
           return;
         }
 
-        // Verification creates login access only. An investment record is
-        // created after the investor confirms payment on the payment page.
+        var isDepPending = false;
+        try {
+          isDepPending = localStorage.getItem('ttinc_deposit_status') === 'pending_approval' ||
+                         localStorage.getItem('ttinc_payment_status') === 'pending_approval' ||
+                         Boolean(localStorage.getItem('ttinc_investment_id')) ||
+                         (location.search && location.search.indexOf('payment=pending') !== -1);
+        } catch (e) {}
+
+        if (isDepPending) {
+          _lastStatus = 'pending_approval';
+          showOverlay('pending_approval');
+          stopPoll();
+          _pollTimer = setInterval(checkStatus, POLL_MS);
+        }
+
         fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin' })
           .then(function (r) {
             return r.json().then(function (d) {
@@ -4662,15 +4721,23 @@
             });
           })
           .then(function (d) {
-            var s = d && d.investmentStatus ? d.investmentStatus : 'none';
+            var s = getEffectiveStatus(d);
+            var isPendingState = (s === 'pending_approval' || s === 'pending');
             _lastStatus = s;
-            if (!d || !d.account) {
+
+            if (s === 'active' || (d && d.hasActiveInvestment)) {
+              removeOverlay();
+              stopPoll();
+              return;
+            }
+
+            if (!d || (!d.account && !isPendingState)) {
               showOverlay('create');
               stopPoll();
-            } else if (s === 'none') {
+            } else if (s === 'none' && !isPendingState) {
               showOverlay('created');
               stopPoll();
-            } else if (s === 'pending_approval' || s === 'pending') {
+            } else if (isPendingState) {
               showOverlay('pending_approval');
               stopPoll();
               _pollTimer = setInterval(checkStatus, POLL_MS);
@@ -4683,11 +4750,15 @@
             }
           })
           .catch(function (error) {
-            showOverlay('status_error');
-            var detail = document.getElementById('ttinc-status-error-message');
-            if (detail) detail.textContent = (error && error.message)
-              ? error.message + ' Retrying automatically…'
-              : 'Secure status check failed. Retrying automatically…';
+            if (isDepPending) {
+              showOverlay('pending_approval');
+            } else {
+              showOverlay('status_error');
+              var detail = document.getElementById('ttinc-status-error-message');
+              if (detail) detail.textContent = (error && error.message)
+                ? error.message + ' Retrying automatically…'
+                : 'Secure status check failed. Retrying automatically…';
+            }
             stopPoll();
             _pollTimer = setInterval(checkStatus, POLL_MS);
           });
@@ -4705,62 +4776,95 @@
         stopPoll();
 
         if (cur) {
-          // User just logged in / registered → start monitoring
           startMonitor();
         } else {
-          // User logged out
           removeOverlay();
         }
       }, 500);
 
       // ── on page load: handle already-logged-in users ───────────
-      // (also handles page reloads mid-session)
       function onReady() {
-          if (getRawAuth() && isInvestorDashboardRoute()) {
-          // Already have auth — check status but DON'T show overlay yet
-          // (returning approved users should NOT see the pending screen)
+        if (getRawAuth() && isInvestorDashboardRoute()) {
           var auth = getAuth();
           if (!auth || !auth.email) return;
+
+          var isDepPending = false;
+          try {
+            isDepPending = localStorage.getItem('ttinc_deposit_status') === 'pending_approval' ||
+                           localStorage.getItem('ttinc_payment_status') === 'pending_approval' ||
+                           Boolean(localStorage.getItem('ttinc_investment_id')) ||
+                           (location.search && location.search.indexOf('payment=pending') !== -1);
+          } catch (e) {}
+
+          // If a pending deposit is already on file, show the pending lock screen immediately
+          if (isDepPending) {
+            _lastStatus = 'pending_approval';
+            showOverlay('pending_approval');
+            stopPoll();
+            _pollTimer = setInterval(checkStatus, POLL_MS);
+          }
+
           if (isSocialOnboardingRequested()) {
             showOverlay('create');
             stopPoll();
             return;
           }
-            fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin' })
-             .then(function (r) {
-               return r.json().then(function (d) {
-                 if (!r.ok) throw new Error((d && (d.error || d.message)) || 'Secure account status check failed.');
-                 return d;
-               });
-             })
+
+          fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin' })
+            .then(function (r) {
+              return r.json().then(function (d) {
+                if (!r.ok) throw new Error((d && (d.error || d.message)) || 'Secure account status check failed.');
+                return d;
+              });
+            })
             .then(function (d) {
-              var s = d && d.investmentStatus ? d.investmentStatus : 'none';
+              var s = getEffectiveStatus(d);
+              var isPendingState = (s === 'pending_approval' || s === 'pending');
               _lastStatus = s;
-              if (!d || !d.account) {
+
+              if (s === 'active' || (d && d.hasActiveInvestment)) {
+                try {
+                  localStorage.removeItem('ttinc_deposit_status');
+                  localStorage.removeItem('ttinc_payment_status');
+                } catch (e) {}
+                removeOverlay();
+                stopPoll();
+                return;
+              }
+
+              if (!d || (!d.account && !isPendingState)) {
                 showOverlay('create');
                 stopPoll();
-              } else if (s === 'none') {
+              } else if (s === 'none' && !isPendingState) {
                 showOverlay('created');
                 stopPoll();
-            } else if (s === 'pending_approval' || s === 'pending') {
-              showOverlay('pending_approval');
-                _regDone = true; // record already exists
+              } else if (isPendingState) {
+                showOverlay('pending_approval');
+                _regDone = true;
                 stopPoll();
                 _pollTimer = setInterval(checkStatus, POLL_MS);
               } else if (s === 'declined' || s === 'rejected') {
                 showOverlay('declined');
+              } else {
+                removeOverlay();
+                stopPoll();
               }
-              // active → do nothing, dashboard shows normally
             })
-             .catch(function (error) {
-               showOverlay('status_error');
-               var detail = document.getElementById('ttinc-status-error-message');
-               if (detail) detail.textContent = (error && error.message)
-                 ? error.message + ' Retrying automatically…'
-                 : 'Secure status check failed. Retrying automatically…';
-               stopPoll();
-               _pollTimer = setInterval(checkStatus, POLL_MS);
-             });
+            .catch(function (error) {
+              if (isDepPending) {
+                showOverlay('pending_approval');
+                stopPoll();
+                _pollTimer = setInterval(checkStatus, POLL_MS);
+              } else {
+                showOverlay('status_error');
+                var detail = document.getElementById('ttinc-status-error-message');
+                if (detail) detail.textContent = (error && error.message)
+                  ? error.message + ' Retrying automatically…'
+                  : 'Secure status check failed. Retrying automatically…';
+                stopPoll();
+                _pollTimer = setInterval(checkStatus, POLL_MS);
+              }
+            });
         }
       }
 
@@ -9667,13 +9771,15 @@
                   sessionStorage.removeItem('ttinc_selected_plan');
                   sessionStorage.removeItem('ttinc_pending_portfolio');
                   localStorage.removeItem('ttinc_pending_portfolio');
+                  localStorage.setItem('ttinc_deposit_status', 'pending_approval');
+                  localStorage.setItem('ttinc_payment_status', 'pending_approval');
                 } catch (e) {}
                 // The payment bundle normally routes to /waiting. Send the
                 // investor to the gated dashboard so the user sees the
                 // explicit pending-approval state immediately.
                 setTimeout(function () {
                   if (paymentRoute() || location.pathname === '/waiting') {
-                    window.location.href = '/overview';
+                    window.location.href = '/overview?payment=pending';
                   }
                 }, 250);
               }
@@ -9787,11 +9893,13 @@
         }).then(function (data) {
           try {
             localStorage.setItem('ttinc_investment_id', data.id || '');
+            localStorage.setItem('ttinc_deposit_status', 'pending_approval');
+            localStorage.setItem('ttinc_payment_status', 'pending_approval');
             localStorage.removeItem('ttinc_pending_portfolio');
             sessionStorage.removeItem('ttinc_pending_portfolio');
             sessionStorage.removeItem('ttinc_selected_plan');
           } catch (ignore) {}
-          window.location.href = '/overview';
+          window.location.href = '/overview?payment=pending';
         }).catch(function (submitError) {
           showError(submitError.message || 'Payment confirmation could not be submitted. Please try again.');
         });
@@ -10031,7 +10139,7 @@
         routePendingPlanAfterLogin();
         renderPortfolioPlans();
         ensureHomeInvestmentPlans();
-      }, 700);
+      }, 2500);
       installPaymentPayloadBridge();
       installInvestmentPaymentMethods();
       installDepositConfirmationAction();

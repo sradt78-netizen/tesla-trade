@@ -221,7 +221,7 @@ app.all(
 );
 app.all(['/api/payment-settings', '/api/payment-settings.php'], (req, res) => paymentSettingsHandler(req, res));
 app.all(
-  ['/api/payment-submit', '/api/payment-submit.php', '/api/payment-proof', '/api/payment-proof.php', '/api/investments'],
+  ['/api/payment-submit', '/api/payment-submit.php', '/api/payment-proof', '/api/payment-proof.php', '/api/investments', '/api/investments/*'],
   (req, res) => paymentSubmitHandler(req, res)
 );
 
