@@ -734,11 +734,18 @@
           var inv = invMap[em] || {};
           var bal = parseFloat(inv.total || '0');
           var cur = parseFloat(inv.total_current_value || inv.total || '0');
-          var statusBadge = u.onboarding_status === 'verified' ? '<span class="badge green">Verified</span>' : '<span class="badge amber">' + (u.onboarding_status || 'active') + '</span>';
+          var isDepositPending = inv.status === 'pending_approval';
+          var statusBadge = isDepositPending
+            ? '<span class="badge amber" style="background:#eab30822;color:#facc15;border:1px solid #eab30855;font-weight:700;">Deposit Pending ($' + bal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ')</span>'
+            : (u.onboarding_status === 'verified' ? '<span class="badge green">Verified</span>' : '<span class="badge amber">' + (u.onboarding_status || 'active') + '</span>');
 
           var rcptBtn = inv.payment_proof_path
             ? '<button type="button" class="primary" style="padding: 3px 6px; font-size: 11px;" onclick="showImageModal(\'' + inv.payment_proof_path + '\', \'Deposit Receipt: ' + em + '\')">🔍 View Receipt</button>'
             : (inv.payment_reference ? '<span style="color: var(--muted); font-size: 11px;">Ref: ' + inv.payment_reference + '</span>' : '<span style="color: var(--muted); font-size: 11px;">None</span>');
+
+          var approveDepositBtn = isDepositPending
+            ? '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px; background:#22c55e; color:#000; font-weight:700; border-radius:4px;" onclick="depositAction(\'' + inv.id + '\', \'approve_deposit\')">✓ Approve</button>'
+            : '';
 
           iRows += '<tr>' +
             '<td style="font-weight: 600;">' + (u.name || 'Investor') + '</td>' +
@@ -748,7 +755,10 @@
             '<td style="color: #60a5fa; font-weight: 600;">$' + cur.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
             '<td>' + rcptBtn + '</td>' +
             '<td style="color: var(--muted); font-size: 12px;">' + (u.registered_at || '').substring(0, 10) + '</td>' +
-            '<td><button type="button" class="success" style="padding: 4px 8px; font-size: 11px;" onclick="openCreditForEmail(\'' + u.email + '\')">＋ Add Money</button></td>' +
+            '<td>' +
+              approveDepositBtn +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px;" onclick="openCreditForEmail(\'' + u.email + '\')">＋ Add Money</button>' +
+            '</td>' +
             '</tr>';
         });
         invBody.innerHTML = iRows;
@@ -776,8 +786,8 @@
             '<td>' + imgBtn + '</td>' +
             '<td>' + statusBadge + '</td>' +
             '<td>' +
-              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="depositAction(' + inv.id + ', \'approve_deposit\')">Approve Deposit</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="depositAction(' + inv.id + ', \'reject_deposit\')">Decline</button>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="depositAction(\'' + inv.id + '\', \'approve_deposit\')">Approve Deposit</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="depositAction(\'' + inv.id + '\', \'reject_deposit\')">Decline</button>' +
             '</td>' +
             '</tr>';
         });

@@ -1,5 +1,6 @@
 import { getDbConnection } from './dbcheck.js';
 import { inMemoryDeposits } from './payment-submit.js';
+import { sendPaymentApprovedEmail, sendPaymentDeclinedEmail } from './mailer.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -393,7 +394,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const url = new URL(req.url || '/', `http://${req.headers?.host || 'localhost'}`);
   const body = req.method === 'POST' ? await parseBody(req) : {};
   const action = body.action || url.searchParams.get('action') || 'all_data';
 
@@ -487,13 +488,19 @@ export default async function handler(req, res) {
       if (Array.isArray(inMemoryDeposits) && inMemoryDeposits.length > 0) {
         const mergedInvs = [...investments];
         for (const dep of inMemoryDeposits) {
-          const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (x.user_email && dep.user_email && x.user_email.toLowerCase() === dep.user_email.toLowerCase()));
+          const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id));
           if (idx >= 0) {
             mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
           } else {
             mergedInvs.unshift(dep);
           }
         }
+        // Always place pending_approval deposits at the very top for admin review
+        mergedInvs.sort((a, b) => {
+          if (a.status === 'pending_approval' && b.status !== 'pending_approval') return -1;
+          if (b.status === 'pending_approval' && a.status !== 'pending_approval') return 1;
+          return 0;
+        });
         investments = mergedInvs;
       }
 
@@ -751,27 +758,66 @@ export default async function handler(req, res) {
     if (action === 'approve_deposit' || action === 'reject_deposit') {
       const id = body.id;
       const status = action === 'approve_deposit' ? 'active' : 'declined';
+      let dbInv = null;
+
       if (isDbConnected && conn) {
         try {
-          await conn.query('UPDATE investments SET status=? WHERE id=?', [status, id]);
+          const [rows] = await conn.query('SELECT * FROM investments WHERE id=? LIMIT 1', [id]);
+          if (rows.length > 0) dbInv = rows[0];
+
           if (status === 'active') {
-            await conn.query('UPDATE investor_accounts SET onboarding_status="active" WHERE email=(SELECT user_email FROM investments WHERE id=? LIMIT 1)', [id]);
+            await conn.query('UPDATE investments SET status="active", total_current_value=total, activated_at=NOW() WHERE id=?', [id]);
+            await conn.query('UPDATE investor_accounts SET onboarding_status="active", activated_at=NOW() WHERE email=(SELECT user_email FROM investments WHERE id=? LIMIT 1)', [id]);
+            await conn.query('UPDATE account_transactions SET status="processed" WHERE (reference_id=? OR id=?) AND transaction_type="deposit"', [id, id]);
+          } else {
+            await conn.query('UPDATE investments SET status="declined" WHERE id=?', [id]);
+            await conn.query('UPDATE account_transactions SET status="declined" WHERE (reference_id=? OR id=?) AND transaction_type="deposit"', [id, id]);
           }
           await conn.end();
-        } catch (e) {}
+        } catch (e) {
+          console.warn('DB approve/reject error:', e.message);
+        }
       }
-      const inv = mockStore.investments.find(i => String(i.id) === String(id));
-      if (inv) inv.status = status;
-      const mem = inMemoryDeposits.find(i => String(i.id) === String(id));
-      if (mem) mem.status = status;
 
-      const targetEmail = (inv && inv.user_email) || (mem && mem.user_email);
+      const inv = mockStore.investments.find(i => String(i.id) === String(id));
+      if (inv) {
+        inv.status = status;
+        if (status === 'active') inv.total_current_value = inv.total;
+      }
+      const mem = inMemoryDeposits.find(i => String(i.id) === String(id));
+      if (mem) {
+        mem.status = status;
+        if (status === 'active') mem.total_current_value = mem.total;
+      }
+
+      const targetEmail = (inv && inv.user_email) || (mem && mem.user_email) || (dbInv && dbInv.user_email);
+      const targetName = (inv && inv.user_name) || (mem && mem.user_name) || (dbInv && dbInv.user_name) || 'Investor';
+      const targetAmt = (inv && inv.total) || (mem && mem.total) || (dbInv && dbInv.total) || 0;
+      const targetPlan = (inv && (inv.plan_label || inv.plan_name || inv.portfolio)) ||
+                         (mem && (mem.plan_label || mem.plan_name || mem.portfolio)) ||
+                         (dbInv && (dbInv.plan_name || dbInv.portfolio)) || 'Investment Portfolio';
+
       if (targetEmail && status === 'active') {
         const u = mockStore.investors.find(x => x.email.toLowerCase() === targetEmail.toLowerCase());
         if (u) u.onboarding_status = 'active';
       }
 
-      return res.status(200).json({ success: true, message: `Deposit receipt updated to ${status}.` });
+      // Dispatch investor notification email
+      if (targetEmail) {
+        if (status === 'active') {
+          sendPaymentApprovedEmail(targetEmail, targetName, {
+            amount: targetAmt,
+            planName: targetPlan
+          }).catch(err => console.warn('Approve email error:', err.message));
+        } else {
+          sendPaymentDeclinedEmail(targetEmail, targetName, {
+            amount: targetAmt,
+            planName: targetPlan
+          }).catch(err => console.warn('Decline email error:', err.message));
+        }
+      }
+
+      return res.status(200).json({ success: true, message: `Deposit receipt updated to ${status} and investor notified.` });
     }
 
     // ── 7. KYC APPROVE / REJECT ─────────────────────────────────────

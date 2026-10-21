@@ -1,6 +1,7 @@
 import bcryptjs from 'bcryptjs';
 import { getDbConnection } from './dbcheck.js';
 import { resolveSupabaseCredentials } from './supabase-config.js';
+import { sendWelcomeEmail } from './mailer.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -164,6 +165,8 @@ export default async function handler(req, res) {
     } catch (e) {
       console.warn('Set-password DB warning, stored in memory:', e.message);
     }
+
+    sendWelcomeEmail(email, userName).catch(err => console.warn('Welcome email error:', err.message));
 
     return res.status(200).json({
       success: true,

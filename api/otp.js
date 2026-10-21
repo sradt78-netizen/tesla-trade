@@ -64,7 +64,32 @@ async function sendViaResend(apiKey, fromEmail, toEmail, toName, code) {
       })
     });
 
-    const data = await res.json().catch(() => ({}));
+    let data = await res.json().catch(() => ({}));
+
+    // If custom domain is not verified, retry with onboarding@resend.dev
+    if (!res.ok && sender !== 'onboarding@resend.dev') {
+      const msg = (data.message || '').toLowerCase();
+      if (res.status === 403 || msg.includes('domain') || msg.includes('verify') || msg.includes('from')) {
+        const fallbackRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: 'Tesla Trade Inc <onboarding@resend.dev>',
+            to: [toEmail],
+            subject: `${code} is your Tesla Trade Inc verification code`,
+            html: htmlBody
+          })
+        });
+        const fallbackData = await fallbackRes.json().catch(() => ({}));
+        if (fallbackRes.ok && fallbackData.id) {
+          return { ok: true, id: fallbackData.id };
+        }
+      }
+    }
+
     if (res.ok && data.id) {
       return { ok: true, id: data.id };
     }

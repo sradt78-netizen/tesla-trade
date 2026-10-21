@@ -1,4 +1,5 @@
 import { getDbConnection } from './dbcheck.js';
+import { sendPaymentReceivedEmail, sendAdminPaymentAlert } from './mailer.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -49,7 +50,16 @@ function parseMultipart(buffer, boundary) {
 
 function parseBody(req) {
   return new Promise((resolve) => {
-    if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+    const contentType = req.headers['content-type'] || '';
+
+    // Only resolve immediately if req.body has actual parsed keys and is NOT multipart
+    if (
+      !contentType.includes('multipart/form-data') &&
+      req.body &&
+      typeof req.body === 'object' &&
+      !Buffer.isBuffer(req.body) &&
+      Object.keys(req.body).length > 0
+    ) {
       return resolve({ fields: req.body, files: {} });
     }
 
@@ -182,7 +192,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: 'User email is required' });
     }
 
-    let investmentId = 'dep_' + Math.random().toString(36).substring(2, 9);
+    const generatedId = 'inv_' + Math.random().toString(36).substring(2, 10);
+    const generatedTxId = 'tx_' + Math.random().toString(36).substring(2, 10);
+    let investmentId = generatedId;
     let dbSaved = false;
 
     try {
@@ -193,31 +205,51 @@ export default async function handler(req, res) {
         await conn.query('ALTER TABLE investments MODIFY COLUMN payment_proof_path LONGTEXT');
       } catch (e) {}
 
-      // Check existing investments for this user
-      const [existing] = await conn.query(
-        'SELECT id, total FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC LIMIT 1',
+      // Check existing pending investments for this user
+      const [existingPending] = await conn.query(
+        'SELECT id, total FROM investments WHERE LOWER(user_email)=? AND status="pending_approval" ORDER BY id DESC LIMIT 1',
         [email]
       );
 
-      if (existing.length > 0) {
-        investmentId = existing[0].id;
-        const currentAmt = amount > 0 ? amount : parseFloat(existing[0].total || '0');
+      if (existingPending.length > 0) {
+        investmentId = existingPending[0].id;
+        const currentAmt = amount > 0 ? amount : parseFloat(existingPending[0].total || '0');
         await conn.query(
           'UPDATE investments SET total=?, total_current_value=?, payment_proof_path=?, payment_proof_name=?, payment_reference=?, status="pending_approval", payment_proof_uploaded_at=NOW(), payment_submitted_at=NOW() WHERE id=?',
           [currentAmt, currentAmt, proofDataUri || null, proofFileName || null, ref || null, investmentId]
         );
       } else {
-        const [insertRes] = await conn.query(
-          'INSERT INTO investments (user_email, user_name, plan_id, plan_label, plan_name, total, total_current_value, method, payment_reference, payment_proof_path, payment_proof_name, payment_proof_uploaded_at, payment_submitted_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), "pending_approval")',
-          [email, userName, planId, planName, planName, amount, amount, method, ref || null, proofDataUri || null, proofFileName || null]
-        );
-        investmentId = insertRes.insertId;
+        try {
+          await conn.query(
+            `INSERT INTO investments (
+              id, tx_id, user_id, user_name, user_email, portfolio,
+              total, total_current_value, method, status,
+              plan_id, plan_name, projected_roi, payment_confirmed,
+              payment_reference, payment_proof_path, payment_proof_name,
+              payment_proof_uploaded_at, payment_submitted_at, pending_approval_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "pending_approval", ?, ?, ?, 1, ?, ?, ?, NOW(), NOW(), NOW(), NOW())`,
+            [
+              generatedId, generatedTxId, email, userName, email, planName,
+              amount, amount, method,
+              planId, planName, 50,
+              ref || null, proofDataUri || null, proofFileName || null
+            ]
+          );
+          investmentId = generatedId;
+        } catch (insertErr) {
+          // Fallback for older schemas with fewer columns
+          await conn.query(
+            'INSERT INTO investments (id, tx_id, user_id, user_name, user_email, portfolio, total, method, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "pending_approval")',
+            [generatedId, generatedTxId, email, userName, email, planName, amount, method]
+          );
+          investmentId = generatedId;
+        }
       }
 
       // Ensure investor account exists and reflects pending deposit
       try {
         await conn.query(
-          'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_deposit", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name))',
+          'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_approval", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name)), onboarding_status="pending_approval"',
           [email, userName]
         );
       } catch (e) {}
@@ -236,13 +268,15 @@ export default async function handler(req, res) {
       console.warn('DB payment submit warning, using memory fallback:', dbErr.message);
     }
 
-    // Save in memory fallback
-    inMemoryDeposits.unshift({
+    const newDepositRecord = {
       id: investmentId,
+      tx_id: generatedTxId,
       user_email: email,
       user_name: userName,
+      portfolio: planName,
       plan_id: planId,
       plan_label: planName,
+      plan_name: planName,
       total: amount,
       total_current_value: amount,
       method,
@@ -251,41 +285,49 @@ export default async function handler(req, res) {
       payment_proof_name: proofFileName,
       status: 'pending_approval',
       created_at: new Date().toISOString()
-    });
+    };
+
+    // Save in memory fallback
+    inMemoryDeposits.unshift(newDepositRecord);
 
     try {
       const { mockStore } = await import('./admin.js');
       if (mockStore && Array.isArray(mockStore.investments)) {
-        mockStore.investments.unshift({
-          id: investmentId,
-          user_email: email,
-          user_name: userName,
-          plan_id: planId,
-          plan_label: planName,
-          total: amount,
-          total_current_value: amount,
-          method,
-          payment_reference: ref,
-          payment_proof_path: proofDataUri,
-          payment_proof_name: proofFileName,
-          status: 'pending_approval',
-          created_at: new Date().toISOString()
-        });
+        mockStore.investments.unshift(newDepositRecord);
       }
       if (mockStore && Array.isArray(mockStore.investors)) {
         const existingInv = mockStore.investors.find(u => (u.email || '').toLowerCase() === email);
         if (existingInv) {
-          existingInv.onboarding_status = 'pending_deposit';
+          existingInv.onboarding_status = 'pending_approval';
         } else {
           mockStore.investors.unshift({
+            id: Date.now(),
             email,
             name: userName,
-            onboarding_status: 'pending_deposit',
+            onboarding_status: 'pending_approval',
             registered_at: new Date().toISOString()
           });
         }
       }
     } catch (e) {}
+
+    // Dispatch notification emails (async, non-blocking)
+    sendPaymentReceivedEmail(email, userName, {
+      amount,
+      planName,
+      method,
+      reference: ref
+    }).catch(err => console.warn('Investor payment received email error:', err.message));
+
+    sendAdminPaymentAlert({
+      userEmail: email,
+      userName,
+      amount,
+      planName,
+      method,
+      reference: ref,
+      investmentId
+    }).catch(err => console.warn('Admin payment alert email error:', err.message));
 
     return res.status(200).json({
       success: true,

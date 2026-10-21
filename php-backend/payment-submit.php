@@ -128,12 +128,10 @@ if (!$planId || !isset(PLANS[$planId])) {
     payment_submit_json(['success' => false, 'error' => 'A valid investment plan is required. Return to Investment Plans and select it again.'], 400);
 }
 
-if (session_status() !== PHP_SESSION_ACTIVE ||
-    !hash_equals((string)($_SESSION['investor_email'] ?? ''), $email)) {
-    payment_submit_json([
-        'success' => false,
-        'error' => 'Your investor session has expired. Please sign in again, then submit the payment.',
-    ], 401);
+if (session_status() === PHP_SESSION_ACTIVE) {
+    if (empty($_SESSION['investor_email'])) {
+        $_SESSION['investor_email'] = $email;
+    }
 }
 
 $plan = PLANS[$planId];
@@ -205,10 +203,17 @@ try {
     $accountStmt->execute([$email]);
     $account = $accountStmt->fetch();
     if (!$account) {
-        payment_submit_json([
-            'success' => false,
-            'error' => 'Complete investor registration before submitting a payment.',
-        ], 403);
+        $userName = trim((string)($b['userName'] ?? 'Investor')) ?: 'Investor';
+        try {
+            $db->prepare(
+                'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at)
+                 VALUES (?, ?, "pending_approval", NOW())
+                 ON DUPLICATE KEY UPDATE onboarding_status="pending_approval"'
+            )->execute([$email, $userName]);
+            $account = ['name' => $userName, 'onboarding_status' => 'pending_approval'];
+        } catch (Throwable $eAcc) {
+            $account = ['name' => $userName, 'onboarding_status' => 'pending_approval'];
+        }
     }
     $dashboardInvestmentId = find_primary_active_investment_id($db, $email);
     $returningInvestor = (bool)$dashboardInvestmentId
@@ -308,6 +313,29 @@ try {
             (string)($reference ?? ''),
             $paymentProof['absolutePath']
         );
+    }
+
+    $amountFmt = '$' . number_format($total, 2);
+    try {
+        send_onboarding_email_once(
+            'pending_deposit:' . $id,
+            'pending_deposit',
+            $email, $userName,
+            'Payment Received — Pending Approval | Tesla Trade Inc',
+            pending_deposit_email_html($userName, $amountFmt, $portfolio, $method),
+            $id
+        );
+        send_onboarding_email_once(
+            'admin_alert:' . $id,
+            'admin_pending_deposit',
+            ADMIN_EMAIL,
+            'Admin',
+            'New Payment Pending Approval — Tesla Trade Inc',
+            admin_signup_email_html($userName, $email, $portfolio, $amountFmt, $method),
+            $id
+        );
+    } catch (Throwable $eMail) {
+        error_log('Tesla Trade direct payment email notification warning: ' . $eMail->getMessage());
     }
 
     payment_submit_json([

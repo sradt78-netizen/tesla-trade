@@ -389,62 +389,95 @@ function send_via_resend(string $fromName,  string $fromEmail,
                          string $htmlBody): array {
     $apiKey = defined('RESEND_API_KEY') ? trim((string)RESEND_API_KEY) : '';
     if ($apiKey === '') {
-        return ['ok' => false, 'error' => 'Email delivery is not configured on the server. Set RESEND_API_KEY in cPanel.'];
+        $apiKey = trim((string)getenv('RESEND_API_KEY'));
     }
+    if ($apiKey === '' && function_exists('get_setting')) {
+        $apiKey = trim((string)get_setting('resend_api_key', ''));
+    }
+
+    if ($apiKey === '') {
+        return ['ok' => false, 'error' => 'Email delivery is not configured on the server. Set RESEND_API_KEY in cPanel or Admin Settings.'];
+    }
+
     if (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
-        return ['ok' => false, 'error' => 'The configured Resend sender email is invalid.'];
+        if (function_exists('get_setting')) {
+            $fromEmail = trim((string)get_setting('resend_from_email', ''));
+        }
+        if (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+            $fromEmail = 'onboarding@resend.dev';
+        }
     }
     if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
         return ['ok' => false, 'error' => 'The recipient email is invalid.'];
     }
 
-    $payload = [
-        'from'    => $fromName . ' <' . $fromEmail . '>',
-        'to'      => [$toEmail],
-        'subject' => $subject,
-        'html'    => $htmlBody,
-    ];
-    if ($replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
-        $payload['reply_to'] = [$replyTo];
+    $executeCurl = function (string $sender) use ($fromName, $replyTo, $toEmail, $subject, $htmlBody, $apiKey) {
+        $payload = [
+            'from'    => $fromName . ' <' . $sender . '>',
+            'to'      => [$toEmail],
+            'subject' => $subject,
+            'html'    => $htmlBody,
+        ];
+        if ($replyTo !== '' && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+            $payload['reply_to'] = [$replyTo];
+        }
+
+        $ch = curl_init('https://api.resend.com/emails');
+        if ($ch === false) {
+            return ['ok' => false, 'httpCode' => 0, 'error' => 'Unable to initialize the server HTTP client.'];
+        }
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => [
+                'Authorization: Bearer ' . $apiKey,
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT        => 20,
+        ]);
+        $response = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($response === false || $curlError !== '') {
+            return ['ok' => false, 'httpCode' => $httpCode, 'error' => 'Resend request failed: ' . ($curlError ?: 'empty response')];
+        }
+
+        $decoded = json_decode($response, true);
+        if ($httpCode >= 200 && $httpCode < 300 && !empty($decoded['id'])) {
+            return ['ok' => true, 'id' => $decoded['id'], 'error' => null];
+        }
+
+        $message = is_array($decoded)
+            ? ($decoded['message'] ?? $decoded['name'] ?? null)
+            : null;
+
+        return [
+            'ok' => false,
+            'httpCode' => $httpCode,
+            'message' => $message,
+            'error' => 'Resend rejected the email' . ($httpCode ? ' (HTTP ' . $httpCode . ')' : '') . ': ' . ($message ?: 'unknown error'),
+        ];
+    };
+
+    $res = $executeCurl($fromEmail);
+
+    // If custom sender domain failed (e.g. unverified domain or 403), retry with onboarding@resend.dev
+    if (empty($res['ok']) && $fromEmail !== 'onboarding@resend.dev') {
+        $msg = strtolower((string)($res['message'] ?? ''));
+        if (($res['httpCode'] ?? 0) === 403 || strpos($msg, 'domain') !== false || strpos($msg, 'verify') !== false || strpos($msg, 'from') !== false) {
+            $fallbackRes = $executeCurl('onboarding@resend.dev');
+            if (!empty($fallbackRes['ok'])) {
+                return $fallbackRes;
+            }
+        }
     }
 
-    $ch = curl_init('https://api.resend.com/emails');
-    if ($ch === false) {
-        return ['ok' => false, 'error' => 'Unable to initialize the server HTTP client.'];
-    }
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode($payload),
-        CURLOPT_HTTPHEADER     => [
-            'Authorization: Bearer ' . $apiKey,
-            'Content-Type: application/json',
-            'Accept: application/json',
-        ],
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_TIMEOUT        => 20,
-    ]);
-    $response = curl_exec($ch);
-    $curlError = curl_error($ch);
-    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($response === false || $curlError !== '') {
-        return ['ok' => false, 'error' => 'Resend request failed: ' . ($curlError ?: 'empty response')];
-    }
-
-    $decoded = json_decode($response, true);
-    if ($httpCode >= 200 && $httpCode < 300 && !empty($decoded['id'])) {
-        return ['ok' => true, 'id' => $decoded['id'], 'error' => null];
-    }
-
-    $message = is_array($decoded)
-        ? ($decoded['message'] ?? $decoded['name'] ?? null)
-        : null;
-    return [
-        'ok' => false,
-        'error' => 'Resend rejected the email' . ($httpCode ? ' (HTTP ' . $httpCode . ')' : '') . ': ' . ($message ?: 'unknown error'),
-    ];
+    return $res;
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -1073,11 +1073,19 @@
           var inv = invMap[em] || {};
           var bal = parseFloat(inv.total || '0');
           var cur = parseFloat(inv.total_current_value || inv.total || '0');
-          var statusBadge = u.onboarding_status === 'verified' ? '<span class="badge green">Verified</span>' : '<span class="badge amber">' + (u.onboarding_status || 'active') + '</span>';
+          var isDepositPending = inv.status === 'pending_approval';
+          var statusBadge = isDepositPending
+            ? '<span class="badge amber" style="background:#eab30822;color:#facc15;border:1px solid #eab30855;font-weight:700;">Deposit Pending ($' + bal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ')</span>'
+            : (u.onboarding_status === 'verified' ? '<span class="badge green">Verified</span>' : '<span class="badge amber">' + (u.onboarding_status || 'active') + '</span>');
 
           var rcptBtn = inv.payment_proof_path
             ? '<button type="button" class="primary" style="padding: 3px 6px; font-size: 11px;" onclick="showImageModal(\'' + inv.payment_proof_path + '\', \'Deposit Receipt: ' + em + '\')">🔍 View Receipt</button>'
             : (inv.payment_reference ? '<span style="color: var(--muted); font-size: 11px;">Ref: ' + inv.payment_reference + '</span>' : '<span style="color: var(--muted); font-size: 11px;">None</span>');
+
+          var approveDepositBtn = isDepositPending
+            ? '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px; background:#22c55e; color:#000; font-weight:700; border-radius:4px;" onclick="depositAction(\'' + inv.id + '\', \'approve_deposit\')">✓ Approve Deposit</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; margin-right: 4px; color:#fca5a5; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:4px;" onclick="depositAction(\'' + inv.id + '\', \'reject_deposit\')">Decline</button>'
+            : '';
 
           iRows += '<tr>' +
             '<td style="font-weight: 600;">' + (u.name || 'Investor') + '</td>' +
@@ -1087,6 +1095,7 @@
             '<td style="color: #60a5fa; font-weight: 600;">$' + cur.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
             '<td>' + rcptBtn + '</td>' +
             '<td>' +
+              approveDepositBtn +
               '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="openCreditForEmail(\'' + u.email + '\')">＋ Add Money</button>' +
               '<button type="button" style="padding: 4px 8px; font-size: 11px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 6px; cursor: pointer;" onclick="deleteInvestor(\'' + u.email + '\')">🗑 Delete</button>' +
             '</td>' +
@@ -1117,8 +1126,8 @@
             '<td>' + imgBtn + '</td>' +
             '<td>' + statusBadge + '</td>' +
             '<td>' +
-              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="depositAction(' + inv.id + ', \'approve_deposit\')">Approve Deposit</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="depositAction(' + inv.id + ', \'reject_deposit\')">Decline</button>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="depositAction(\'' + inv.id + '\', \'approve_deposit\')">Approve Deposit</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="depositAction(\'' + inv.id + '\', \'reject_deposit\')">Decline</button>' +
             '</td>' +
             '</tr>';
         });
@@ -1149,8 +1158,8 @@
             '<td>' + imgBtn + '</td>' +
             '<td>' + statusBadge + '</td>' +
             '<td>' +
-              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="orderAction(' + o.id + ', \'approve_receipt\')">Approve</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="orderAction(' + o.id + ', \'reject_receipt\')">Reject</button>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="orderAction(\'' + o.id + '\', \'approve_receipt\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="orderAction(\'' + o.id + '\', \'reject_receipt\')">Reject</button>' +
             '</td>' +
             '</tr>';
         });
@@ -1183,8 +1192,8 @@
             '<td>' + selfieImg + '</td>' +
             '<td>' + statusBadge + '</td>' +
             '<td>' +
-              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="kycAction(' + k.id + ', \'approve_kyc\')">Approve</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="kycAction(' + k.id + ', \'reject_kyc\')">Reject</button>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="kycAction(\'' + k.id + '\', \'approve_kyc\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="kycAction(\'' + k.id + '\', \'reject_kyc\')">Reject</button>' +
             '</td>' +
             '</tr>';
         });
@@ -1209,8 +1218,8 @@
             '<td style="font-family: monospace; font-size: 12px;">' + (w.destination || '—') + '</td>' +
             '<td>' + statusBadge + '</td>' +
             '<td>' +
-              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="wdAction(' + w.id + ', \'approve_withdrawal\')">Approve</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="wdAction(' + w.id + ', \'reject_withdrawal\')">Reject</button>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="wdAction(\'' + w.id + '\', \'approve_withdrawal\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="wdAction(\'' + w.id + '\', \'reject_withdrawal\')">Reject</button>' +
             '</td>' +
             '</tr>';
         });
@@ -1234,8 +1243,8 @@
             '<td>$' + Number(f.down_payment || 0).toLocaleString() + '</td>' +
             '<td><span class="badge amber">' + (f.status || 'pending') + '</span></td>' +
             '<td>' +
-              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="finAction(' + f.id + ', \'approve_financing\')">Approve</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="finAction(' + f.id + ', \'reject_financing\')">Decline</button>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="finAction(\'' + f.id + '\', \'approve_financing\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="finAction(\'' + f.id + '\', \'reject_financing\')">Decline</button>' +
             '</td>' +
             '</tr>';
         });
