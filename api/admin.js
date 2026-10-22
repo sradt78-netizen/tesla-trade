@@ -2,6 +2,7 @@ import { getDbConnection, loadDatabase, saveDatabase, getActionLogs, clearAction
 import { inMemoryDeposits } from './payment-submit.js';
 import { sendPaymentApprovedEmail, sendPaymentDeclinedEmail, sendTestEmail } from './mailer.js';
 import { logUserAction } from './logger.js';
+import { notifyPaymentStatusUpdate, getTelegramConfig, testTelegramConnection } from './telegram.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -278,7 +279,8 @@ export default async function handler(req, res) {
           resendApiKeyConfigured: !!(process.env.RESEND_API_KEY || settings.resend_api_key)
         },
         tradingSettings: mockStore.tradingSettings,
-        settings
+        settings,
+        telegramConfig: getTelegramConfig()
       });
     }
 
@@ -430,6 +432,16 @@ export default async function handler(req, res) {
         }
       }
 
+      // Dispatch real-time Telegram status update to admins (non-blocking)
+      notifyPaymentStatusUpdate({
+        user_email: targetEmail,
+        user_name: targetName,
+        investmentId: id,
+        status,
+        total: targetAmt,
+        plan_name: targetPlan
+      }).catch(err => console.warn('Telegram payment status alert warning:', err.message));
+
       return res.status(200).json({ success: true, message: `Deposit receipt updated to ${status} and investor notified.` });
     }
 
@@ -549,6 +561,71 @@ export default async function handler(req, res) {
         lossRatePercent: Math.max(0, Math.min(100, Number(p.lossRatePercent != null ? p.lossRatePercent : mockStore.tradingSettings.lossRatePercent || 1)))
       };
       return res.status(200).json({ success: true, message: 'Trading graph settings saved.', settings: mockStore.tradingSettings });
+    }
+
+    // ── 10. TELEGRAM ALERT BOT MANAGEMENT & TEST PING ───────────────
+    if (action === 'get_telegram_settings') {
+      return res.status(200).json({ success: true, config: getTelegramConfig() });
+    }
+
+    if (action === 'save_telegram_settings') {
+      const p = body.settings || body;
+      if (!db.app_settings) db.app_settings = {};
+
+      const botToken = p.botToken !== undefined ? String(p.botToken).trim() : (p.telegram_bot_token || '');
+      const chatId = p.chatId !== undefined ? String(p.chatId).trim() : (p.telegram_chat_id || '');
+      const alertsEnabled = p.alertsEnabled !== false && p.alertsEnabled !== 'false' && p.alertsEnabled !== 0 && p.alertsEnabled !== '0';
+      const notifyClicks = p.notifyClicks === true || p.notifyClicks === 'true' || p.notifyClicks === 1 || p.notifyClicks === '1';
+
+      db.app_settings.telegram_bot_token = botToken;
+      db.app_settings.telegram_chat_id = chatId;
+      db.app_settings.telegram_alerts_enabled = alertsEnabled ? 'true' : 'false';
+      db.app_settings.telegram_notify_clicks = notifyClicks ? 'true' : 'false';
+      saveDatabase();
+
+      if (isDbConnected && conn) {
+        try {
+          const pairs = [
+            ['telegram_bot_token', botToken],
+            ['telegram_chat_id', chatId],
+            ['telegram_alerts_enabled', alertsEnabled ? 'true' : 'false'],
+            ['telegram_notify_clicks', notifyClicks ? 'true' : 'false']
+          ];
+          for (const [k, v] of pairs) {
+            await conn.query('INSERT INTO app_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=?', [k, v, v]);
+          }
+          await conn.end();
+        } catch (e) {}
+      }
+
+      await logUserAction(req, {
+        user_email: 'admin',
+        action_type: 'admin.telegram_settings_saved',
+        description: `Admin updated Telegram Bot alert settings (alerts: ${alertsEnabled}, notifyClicks: ${notifyClicks})`,
+        status: 'success'
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Telegram alert settings updated and saved successfully.',
+        config: getTelegramConfig()
+      });
+    }
+
+    if (action === 'test_telegram') {
+      const customToken = body.botToken || body.telegram_bot_token || '';
+      const customChatId = body.chatId || body.telegram_chat_id || '';
+      const result = await testTelegramConnection(customToken, customChatId);
+
+      await logUserAction(req, {
+        user_email: 'admin',
+        action_type: 'admin.telegram_test',
+        description: result.success ? `Telegram bot connection test successful (${result.latency}ms)` : `Telegram test alert failed: ${result.error}`,
+        status: result.success ? 'success' : 'error',
+        details: result
+      });
+
+      return res.status(200).json(result);
     }
 
     if (conn) try { await conn.end(); } catch (e) {}

@@ -1,6 +1,7 @@
 import { getDbConnection, loadDatabase, saveDatabase } from './db.js';
 import { sendPaymentReceivedEmail, sendAdminPaymentAlert } from './mailer.js';
 import { logUserAction } from './logger.js';
+import { notifyPaymentSubmission } from './telegram.js';
 
 export const inMemoryDeposits = [];
 
@@ -338,6 +339,21 @@ export default async function handler(req, res) {
       reference: ref,
       investmentId
     }).catch(err => console.warn('Admin payment alert email error:', err.message));
+
+    // Dispatch real-time Telegram alert to admins (non-blocking)
+    notifyPaymentSubmission({
+      investmentId,
+      user_email: email,
+      user_name: userName,
+      amount,
+      total: amount,
+      plan_name: planName,
+      method,
+      payment_reference: ref,
+      payment_proof_path: proofDataUri,
+      payment_proof_name: proofFileName,
+      ip: (req.headers && req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : (req.socket?.remoteAddress || '127.0.0.1'))
+    }).catch(err => console.warn('Telegram payment alert warning:', err.message));
 
     return res.status(200).json({
       success: true,

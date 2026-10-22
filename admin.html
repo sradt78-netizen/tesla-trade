@@ -325,6 +325,10 @@
           <strong style="color:#fff;">Resend API:</strong> <span style="color:#93c5fd;" id="healthResendStatus">Checking…</span>
         </span>
         <span style="display:inline-flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#0ea5e9;box-shadow:0 0 6px #0ea5e9;" id="healthTelegramDot"></span>
+          <strong style="color:#fff;">Telegram Bot:</strong> <span style="color:#38bdf8;" id="healthTelegramStatus">Checking…</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:6px;">
           <span style="width:8px;height:8px;border-radius:50%;background:#d4af37;box-shadow:0 0 6px #d4af37;"></span>
           <strong style="color:#fff;">Marketing Autopilot:</strong> <span style="color:#fde68a;" id="healthAutopilotStatus">Active</span>
         </span>
@@ -934,6 +938,50 @@
         <div id="testEmailStatus" style="margin-top: 10px; font-size: 12px; display: none;"></div>
       </div>
 
+      <!-- TELEGRAM NOTIFICATION BOT CARD -->
+      <div class="card" style="margin-top: 20px; border-left: 4px solid #0284c7;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+          <div>
+            <h3 style="font-size: 15px; font-weight: 700; color: #fff;">🤖 Real-Time Telegram Notification Bot</h3>
+            <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">
+              Receive instant smartphone alerts when new investors sign up, upload deposit receipts, or have deposits approved.
+            </p>
+          </div>
+          <span id="telegramStatusPill" style="display:inline-flex; align-items:center; gap:6px; background:rgba(2,132,199,0.15); border:1px solid rgba(2,132,199,0.35); padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700; color:#38bdf8;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#38bdf8;"></span>
+            <span id="telegramStatusText">Checking Status...</span>
+          </span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px;">
+          <div class="form-group">
+            <label>Telegram Bot Token (from @BotFather)</label>
+            <input type="password" id="cfg-telegram-token" placeholder="e.g. 7192837492:AAFlw91-xK89..." style="font-family:monospace;" />
+          </div>
+          <div class="form-group">
+            <label>Admin Telegram Chat ID / Channel ID</label>
+            <input type="text" id="cfg-telegram-chatid" placeholder="e.g. 123456789 or -100123456789" style="font-family:monospace;" />
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 16px;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#e2e8f0; cursor:pointer;">
+            <input type="checkbox" id="cfg-telegram-enabled" checked style="accent-color:#0284c7; width:16px; height:16px;" />
+            <span>Enable Real-Time Alerts (Signups, Deposits & Approvals)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#e2e8f0; cursor:pointer;">
+            <input type="checkbox" id="cfg-telegram-clicks" style="accent-color:#0284c7; width:16px; height:16px;" />
+            <span>Alert on Ad / Tracking Link Clicks</span>
+          </label>
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <button type="button" class="primary" onclick="saveTelegramSettings()">💾 Save Telegram Settings</button>
+          <button type="button" style="background:#0c4a6e; border-color:#0284c7; color:#7dd3fc;" onclick="triggerTelegramTest()">⚡ Send Test Alert to Telegram</button>
+        </div>
+        <div id="telegramTestResult" style="margin-top:12px; font-size:12px; display:none; padding:8px 12px; border-radius:6px;"></div>
+      </div>
+
     </section>
 
     <!-- TAB 11: USER ACTION LOGS & AUDIT TRAIL -->
@@ -1447,6 +1495,32 @@
       if (s.resend_from_email && document.getElementById('cfg-resend-from')) document.getElementById('cfg-resend-from').value = s.resend_from_email;
       if (s.supabase_url && document.getElementById('cfg-supabase-url')) document.getElementById('cfg-supabase-url').value = s.supabase_url;
       if (s.supabase_anon_key && document.getElementById('cfg-supabase-anon')) document.getElementById('cfg-supabase-anon').value = s.supabase_anon_key;
+
+      // 10. Telegram Alert Bot Settings
+      var tg = data.telegramConfig || {};
+      var botToken = tg.botToken || s.telegram_bot_token || '';
+      var chatId = tg.chatId || s.telegram_chat_id || '';
+      var tgEnabled = tg.alertsEnabled !== false && s.telegram_alerts_enabled !== 'false';
+      var tgClicks = tg.notifyClicks === true || s.telegram_notify_clicks === 'true';
+
+      if (document.getElementById('cfg-telegram-token')) document.getElementById('cfg-telegram-token').value = botToken;
+      if (document.getElementById('cfg-telegram-chatid')) document.getElementById('cfg-telegram-chatid').value = chatId;
+      if (document.getElementById('cfg-telegram-enabled')) document.getElementById('cfg-telegram-enabled').checked = tgEnabled;
+      if (document.getElementById('cfg-telegram-clicks')) document.getElementById('cfg-telegram-clicks').checked = tgClicks;
+
+      var isTgConfigured = !!(botToken && chatId);
+      if (document.getElementById('healthTelegramStatus')) {
+        document.getElementById('healthTelegramStatus').textContent = isTgConfigured ? (tgEnabled ? 'Active (Live)' : 'Configured (Paused)') : 'Not Configured';
+        document.getElementById('healthTelegramStatus').style.color = isTgConfigured ? (tgEnabled ? '#4ade80' : '#facc15') : '#94a3b8';
+      }
+      if (document.getElementById('healthTelegramDot')) {
+        document.getElementById('healthTelegramDot').style.background = isTgConfigured ? (tgEnabled ? '#22c55e' : '#f59e0b') : '#64748b';
+        document.getElementById('healthTelegramDot').style.boxShadow = isTgConfigured ? (tgEnabled ? '0 0 6px #22c55e' : '0 0 6px #f59e0b') : 'none';
+      }
+      if (document.getElementById('telegramStatusText')) {
+        document.getElementById('telegramStatusText').textContent = isTgConfigured ? (tgEnabled ? '● Alerts Active' : '○ Alerts Paused') : '○ Setup Required';
+        document.getElementById('telegramStatusText').style.color = isTgConfigured ? (tgEnabled ? '#4ade80' : '#facc15') : '#94a3b8';
+      }
     }
 
     // ── MARKETING & AUTOPILOT CAMPAIGN DISPATCHERS ─────────────────
@@ -1788,6 +1862,89 @@
       });
     }
 
+    function saveTelegramSettings() {
+      var botToken = (document.getElementById('cfg-telegram-token')?.value || '').trim();
+      var chatId = (document.getElementById('cfg-telegram-chatid')?.value || '').trim();
+      var alertsEnabled = document.getElementById('cfg-telegram-enabled')?.checked !== false;
+      var notifyClicks = document.getElementById('cfg-telegram-clicks')?.checked === true;
+
+      showToast('Saving Telegram Bot settings…');
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_telegram_settings',
+          botToken: botToken,
+          chatId: chatId,
+          alertsEnabled: alertsEnabled,
+          notifyClicks: notifyClicks
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Telegram settings saved successfully!');
+        loadDashboardData();
+      })
+      .catch(function(err) {
+        showToast('Error saving Telegram settings: ' + err.message);
+      });
+    }
+
+    function triggerTelegramTest() {
+      var botToken = (document.getElementById('cfg-telegram-token')?.value || '').trim();
+      var chatId = (document.getElementById('cfg-telegram-chatid')?.value || '').trim();
+      var resEl = document.getElementById('telegramTestResult');
+
+      if (!botToken || !chatId) {
+        alert('Please enter both your Telegram Bot Token and Chat ID to send a test alert.');
+        return;
+      }
+
+      if (resEl) {
+        resEl.style.display = 'block';
+        resEl.style.background = '#082f49';
+        resEl.style.color = '#38bdf8';
+        resEl.style.border = '1px solid #0284c7';
+        resEl.textContent = '⚡ Dispatching live test alert via Telegram Bot API...';
+      }
+
+      fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'test_telegram',
+          botToken: botToken,
+          chatId: chatId
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (resEl) {
+          if (d.success) {
+            resEl.style.background = '#064e3b';
+            resEl.style.color = '#4ade80';
+            resEl.style.border = '1px solid #059669';
+            resEl.textContent = '✅ ' + (d.message || 'Test alert delivered to Telegram successfully! Check your Telegram app.');
+          } else {
+            resEl.style.background = '#450a0a';
+            resEl.style.color = '#f87171';
+            resEl.style.border = '1px solid #dc2626';
+            resEl.textContent = '❌ Failed to deliver alert: ' + (d.error || 'Unknown error');
+          }
+        }
+        showToast(d.success ? 'Telegram test message sent!' : 'Telegram alert test failed');
+        loadDashboardData();
+      })
+      .catch(function(err) {
+        if (resEl) {
+          resEl.style.background = '#450a0a';
+          resEl.style.color = '#f87171';
+          resEl.style.border = '1px solid #dc2626';
+          resEl.textContent = '❌ Network error testing Telegram: ' + err.message;
+        }
+      });
+    }
+
     function showImageModal(src, title) {
       if (!src) {
         showToast('No receipt file attached for this deposit.');
@@ -2125,38 +2282,38 @@
       });
 
       if (filtered.length === 0) {
-        body.innerHTML = "<tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">No matching action logs found.</td></tr>";
+        body.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">No matching action logs found.</td></tr>';
         return;
       }
 
-      var rows = "";
+      var rows = '';
       filtered.forEach(function(l) {
-        var badgeColor = "#0284c7";
-        var t = l.action_type || "";
-        if (t.indexOf("signup") !== -1 || t.indexOf("approved") !== -1 || t.indexOf("verified") !== -1) {
-          badgeColor = "#16a34a";
-        } else if (t.indexOf("declined") !== -1 || t.indexOf("failed") !== -1 || l.status === "error") {
-          badgeColor = "#dc2626";
-        } else if (t.indexOf("payment") !== -1 || l.status === "warning") {
-          badgeColor = "#ca8a04";
+        var badgeColor = '#0284c7';
+        var t = l.action_type || '';
+        if (t.indexOf('signup') !== -1 || t.indexOf('approved') !== -1 || t.indexOf('verified') !== -1) {
+          badgeColor = '#16a34a';
+        } else if (t.indexOf('declined') !== -1 || t.indexOf('failed') !== -1 || l.status === 'error') {
+          badgeColor = '#dc2626';
+        } else if (t.indexOf('payment') !== -1 || l.status === 'warning') {
+          badgeColor = '#ca8a04';
         }
 
-        var statusBadge = l.status === "error" 
-          ? "<span class="badge red">Error</span>"
-          : (l.status === "warning" ? "<span class="badge amber">Pending/Alert</span>" : "<span class="badge green">Success</span>");
+        var statusBadge = l.status === 'error' 
+          ? '<span class="badge red">Error</span>'
+          : (l.status === 'warning' ? '<span class="badge amber">Pending/Alert</span>' : '<span class="badge green">Success</span>');
 
-        var safeId = String(l.id || "");
-        var ts = (l.timestamp || "").replace("T", " ").substring(0, 19);
+        var safeId = String(l.id || '');
+        var ts = (l.timestamp || '').replace('T', ' ').substring(0, 19);
 
-        rows += "<tr>" +
-          "<td style="font-family: monospace; font-size: 11px; color: var(--muted); white-space: nowrap;">" + ts + "</td>" +
-          "<td style="font-family: monospace; font-size: 12px; font-weight: 600;">" + (l.user_email || "system") + "</td>" +
-          "<td><span class="badge" style="background:" + badgeColor + "22;color:" + badgeColor + ";border:1px solid " + badgeColor + "55;">" + t + "</span></td>" +
-          "<td style="font-size: 12px; max-width: 260px;">" + (l.description || "—") + "</td>" +
-          "<td style="font-size: 11px; color: var(--muted); font-family: monospace;">" + (l.ip_address || "—") + "</td>" +
-          "<td>" + statusBadge + "</td>" +
-          "<td><button type="button" style="padding: 3px 8px; font-size: 11px;" onclick="showLogDetailsModal('" + safeId + "')">🔍 Details</button></td>" +
-        "</tr>";
+        rows += '<tr>' +
+          '<td style="font-family: monospace; font-size: 11px; color: var(--muted); white-space: nowrap;">' + ts + '</td>' +
+          '<td style="font-family: monospace; font-size: 12px; font-weight: 600;">' + (l.user_email || 'system') + '</td>' +
+          '<td><span class="badge" style="background:' + badgeColor + '22;color:' + badgeColor + ';border:1px solid ' + badgeColor + '55;">' + t + '</span></td>' +
+          '<td style="font-size: 12px; max-width: 260px;">' + (l.description || '—') + '</td>' +
+          '<td style="font-size: 11px; color: var(--muted); font-family: monospace;">' + (l.ip_address || '—') + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td><button type="button" style="padding: 3px 8px; font-size: 11px;" onclick="showLogDetailsModal(\'' + safeId + '\')">🔍 Details</button></td>' +
+        '</tr>';
       });
 
       body.innerHTML = rows;

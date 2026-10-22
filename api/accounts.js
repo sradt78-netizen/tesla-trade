@@ -1,6 +1,7 @@
 import { getDbConnection, loadDatabase } from './db.js';
 import { sendWelcomeEmail } from './mailer.js';
 import { logUserAction } from './logger.js';
+import { notifySignup } from './telegram.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -218,6 +219,14 @@ export default async function handler(req, res) {
         status: 'success',
         details: { name, phone, age }
       });
+
+      // Dispatch real-time Telegram alert to admins (non-blocking)
+      notifySignup({
+        name,
+        email,
+        phone,
+        ip: (req.headers && req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : (req.socket?.remoteAddress || '127.0.0.1'))
+      }).catch(err => console.warn('Telegram signup notification warning:', err.message));
 
       // Send welcome onboarding email (non-blocking)
       sendWelcomeEmail(email, name).catch(err => console.warn('Welcome email error:', err.message));
