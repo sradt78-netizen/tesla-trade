@@ -4562,15 +4562,6 @@
         if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
       }
 
-      // ── poll /api/my-status ────────────────────────────────────
-      function checkStatus() {
-        var auth = getAuth();
-        if (!auth || !auth.email) { removeOverlay(); stopPoll(); return; }
-        // The onboarding gate belongs to the investor dashboard. Never
-        // cover the payment page, otherwise a new account cannot submit
-        // the deposit that creates its pending investment.
-        if (!isInvestorDashboardRoute()) { removeOverlay(); stopPoll(); return; }
-
       function getEffectiveStatus(d) {
         var s = (d && (d.investmentStatus || d.status)) ? (d.investmentStatus || d.status) : 'none';
         var hasActive = (d && d.hasActiveInvestment) || s === 'active';
