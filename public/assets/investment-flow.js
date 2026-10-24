@@ -569,8 +569,10 @@
     form.append('userId', account.email);
     form.append('userName', account.name || account.email);
     form.append('userEmail', account.email);
+    form.append('email', account.email);
     form.append('portfolio', selectedStock.name + ' · ' + plan.name);
     form.append('total', amount.toFixed(2));
+    form.append('amount', amount.toFixed(2));
     form.append('method', state.method || 'usdt');
     form.append('planId', plan.id);
     form.append('planName', plan.name);
@@ -611,8 +613,11 @@
       });
     }
 
-    sendPayment('/api/payment-submit.php').catch(function (firstError) {
+    sendPayment('/api/payment-submit').catch(function (firstError) {
       if (!firstError.retryable) throw firstError;
+      return sendPayment('/api/payment-submit.php');
+    }).catch(function (secondError) {
+      if (!secondError.retryable) throw secondError;
       return sendPayment('/api/investments');
     }).then(function (data) {
       /*
@@ -622,12 +627,29 @@
        * trigger the onboarding lock.
        */
       try {
-        localStorage.setItem(
-          'ttinc_investment_id',
-          data.dashboardInvestmentId || data.id || ''
-        );
+        var invId = data.dashboardInvestmentId || data.id || ('dep_' + Date.now());
+        var chosenPlan = findPlan(state.planId) || PLANS[0];
+        localStorage.setItem('ttinc_investment_id', invId);
         localStorage.setItem('ttinc_payment_status', 'pending_approval');
         localStorage.setItem('ttinc_deposit_status', 'pending_approval');
+        localStorage.setItem('ttinc_deposit_amount', String(state.amount || ''));
+        localStorage.setItem('ttinc_deposit_plan', chosenPlan.name || 'Explorer');
+        localStorage.setItem('ttinc_deposit_method', String(state.method || 'USDT (TRC-20)'));
+        localStorage.setItem(
+          'ttinc_inv_meta',
+          JSON.stringify({
+            id: invId,
+            txId: data.id || invId,
+            total: Number(state.amount || 0),
+            totalCurrentValue: Number(state.amount || 0),
+            status: 'pending_approval',
+            planName: chosenPlan.name || 'Explorer',
+            method: state.method
+          })
+        );
+        sessionStorage.removeItem('ttinc_email_onboarding');
+        sessionStorage.removeItem('ttinc_social_onboarding');
+        sessionStorage.removeItem('ttinc_registration_pending');
       } catch (error) {}
       clearState();
       root.querySelector('.ttif-shell').innerHTML =

@@ -145,5 +145,5 @@
 
   holdDashboardRedirect();
   sync();
-  setInterval(sync, 1500);
+  setInterval(sync, 12000);
 }());

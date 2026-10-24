@@ -1,6 +1,4 @@
 import { getDbConnection } from './dbcheck.js';
-import { loadDatabase, saveDatabase } from './db.js';
-import { notifyLinkClick } from './telegram.js';
 
 function parseJsonBody(req) {
   return new Promise((resolve) => {
@@ -39,7 +37,6 @@ export default async function handler(req, res) {
 
   const device = body.device_type || (/Mobi|Android|iPhone/i.test(req.headers['user-agent'] || '') ? 'mobile' : 'desktop');
 
-  // 1. MySQL database insertion if online
   try {
     const conn = await getDbConnection();
     await conn.query(
@@ -48,32 +45,6 @@ export default async function handler(req, res) {
     );
     await conn.end();
   } catch (e) {}
-
-  // 2. Persistent file JSON store
-  try {
-    const db = loadDatabase();
-    if (!db.clicks) db.clicks = [];
-    db.clicks.unshift({
-      id: Date.now(),
-      ip_address: ip,
-      referrer: ref,
-      landing_page: landing,
-      campaign_source: source,
-      device_type: device,
-      created_at: new Date().toISOString()
-    });
-    if (db.clicks.length > 500) db.clicks = db.clicks.slice(0, 500);
-    saveDatabase();
-  } catch (e) {}
-
-  // 3. Dispatch optional Telegram alert for marketing traffic
-  notifyLinkClick({
-    campaign_source: source,
-    landing_page: landing,
-    device_type: device,
-    referrer: ref,
-    ip_address: ip
-  }).catch(() => {});
 
   return res.status(200).json({ success: true });
 }

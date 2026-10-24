@@ -517,3 +517,90 @@ html[data-trace-fund-dashboard="true"] #root {
     width: 100%;
   }
 }
+
+/* ── ULTRA-POLISHED INVESTOR DASHBOARD & TRADING GRAPH ENHANCEMENTS ── */
+
+@keyframes ttinc-subtle-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(227, 25, 55, 0.12), inset 0 0 12px rgba(227, 25, 55, 0.05);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(227, 25, 55, 0.25), inset 0 0 18px rgba(227, 25, 55, 0.1);
+  }
+}
+
+@keyframes ttinc-gold-pulse {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(212, 175, 55, 0.15);
+    border-color: rgba(212, 175, 55, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(212, 175, 55, 0.35);
+    border-color: rgba(212, 175, 55, 0.65);
+  }
+}
+
+@keyframes ttinc-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Dashboard Cards & Containers */
+.ttinc-trading-panel,
+.ttinc-modal-card,
+#ttinc-portfolio-focus,
+[class*="bg-gradient-to-br"][class*="border-[#e31937]"] {
+  border: 1px solid rgba(227, 25, 55, 0.22) !important;
+  border-radius: 20px !important;
+  background: linear-gradient(145deg, #120e0e 0%, #0d0d10 60%, #08080a 100%) !important;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.75), 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: transform, box-shadow;
+}
+
+.ttinc-trading-panel:hover,
+#ttinc-portfolio-focus:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85), 0 0 24px rgba(227, 25, 55, 0.18) !important;
+}
+
+/* Live Trading Graph Card */
+.ttinc-chart-wrap,
+canvas#tradingSimCanvas {
+  border-radius: 14px;
+  background: radial-gradient(circle at 50% 0%, rgba(227, 25, 55, 0.06), #060709 80%);
+}
+
+/* Plan Cards with Gold Highlights */
+.ttif-plan,
+.ttinc-static-home-card {
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.ttif-plan:hover,
+.ttinc-static-home-card:hover {
+  transform: translateY(-3px) scale(1.008) !important;
+  border-color: #d4af37 !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(212, 175, 55, 0.2) !important;
+}
+
+/* Live Status Badges */
+.ttinc-live-badge,
+[class*="animate-pulse"] {
+  will-change: opacity, transform;
+}
+
+/* Buttons with tactile feedback */
+button:active,
+.ttif-button:active,
+.ttinc-confirm:active {
+  transform: scale(0.97) !important;
+}
+
+/* Ultra-smooth scroll & page rendering performance */
+main, section, article, .table-box {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 500px;
+}

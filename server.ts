@@ -4,16 +4,15 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mysql from 'mysql2/promise';
-import adminHandler from './api/admin.js';
-import dbcheckHandler from './api/dbcheck.js';
-import paymentSettingsHandler from './api/payment-settings.js';
-import paymentSubmitHandler from './api/payment-submit.js';
-import otpHandler from './api/otp.js';
-import authHandler from './api/auth.js';
-import supabaseConfigHandler from './api/supabase-config.js';
-import accountsHandler from './api/accounts.js';
-import activityLogsHandler from './api/activity-logs.js';
-import trackHandler from './api/track.js';
+import multer from 'multer';
+import adminHandler from './api/_handlers/admin.js';
+import dbcheckHandler from './api/_handlers/dbcheck.js';
+import paymentSettingsHandler from './api/_handlers/payment-settings.js';
+import paymentSubmitHandler from './api/_handlers/payment-submit.js';
+import otpHandler from './api/_handlers/otp.js';
+import authHandler from './api/_handlers/auth.js';
+import supabaseConfigHandler from './api/_handlers/supabase-config.js';
+import accountsHandler from './api/_handlers/accounts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,7 +47,36 @@ function getAdminPassword() {
 }
 
 // ── 1. GET /api/dbcheck or /api/healthz (Case-insensitive) ────────
-app.all(['/api/dbcheck', '/API/dbcheck', '/api/healthz', '/api/dbcheck.php'], (req, res) => dbcheckHandler(req, res));
+app.get(['/api/dbcheck', '/API/dbcheck', '/api/healthz'], async (req, res) => {
+  try {
+    const conn = await getDbConnection();
+    const [tables] = await conn.query('SHOW TABLES');
+    await conn.end();
+
+    const host = process.env.DB_HOST || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com (fallback)';
+    return res.json({
+      status: 'ok',
+      message: 'Successfully connected to Aiven MySQL database!',
+      database: {
+        connected: true,
+        tables_count: (tables as any[]).length,
+        host: host,
+        database: process.env.DB_NAME || 'defaultdb'
+      },
+      environment: {
+        has_DB_HOST: !!process.env.DB_HOST,
+        has_DB_PASSWORD: !!process.env.DB_PASSWORD,
+        has_ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD
+      }
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      status: 'error',
+      message: 'Database connection failed',
+      error: error.message
+    });
+  }
+});
 
 // ── 2. GET /api/invitation/verify ──────────────────────────────
 app.get('/api/invitation/verify', async (req, res) => {
@@ -193,12 +221,16 @@ app.all(
   (req, res) => accountsHandler(req, res)
 );
 app.all(['/api/payment-settings', '/api/payment-settings.php'], (req, res) => paymentSettingsHandler(req, res));
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }
+});
+
 app.all(
   ['/api/payment-submit', '/api/payment-submit.php', '/api/payment-proof', '/api/payment-proof.php', '/api/investments', '/api/investments/*'],
+  upload.any(),
   (req, res) => paymentSubmitHandler(req, res)
 );
-app.all(['/api/activity-logs', '/api/activity-logs.php'], (req, res) => activityLogsHandler(req, res));
-app.all(['/api/track', '/api/track.php'], (req, res) => trackHandler(req, res));
 
 // ── In-Memory Trading Store & Handlers for Mock / Live Support ──
 const mockTradingInvestments: Record<string, any> = {
@@ -339,6 +371,8 @@ app.get(['/analytics', '/analytics.html', '/analytics.php'], (req, res) => {
 
 // ── 7. Mount Vite in Dev ─────────────────────────────────────────
 async function startServer() {
+  app.use('/assets', express.static(path.resolve(__dirname, 'assets')));
+
   const vite = await createViteServer({
     server: { middlewareMode: true },
     appType: 'spa',

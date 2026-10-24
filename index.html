@@ -2098,12 +2098,7 @@
                 if (registerResend) registerResend.style.display = 'block';
                 registerSubmit.disabled = false;
                 registerSubmit.textContent = 'Verify code & create account';
-                if (data && data.code && !data.email_delivered) {
-                  showRegisterMessage('Verification code: ' + data.code + ' (Check your email or enter code above to verify)', true);
-                  if (registerOtp && !registerOtp.value) registerOtp.value = data.code;
-                } else {
-                  showRegisterMessage('Verification code sent. Check your email and enter it above.', true);
-                }
+                showRegisterMessage('Verification code sent. Check your email and enter it above.', true);
               }).catch(function (error) {
                 registerSubmit.disabled = false;
                 registerSubmit.textContent = 'Send verification code';
@@ -2232,12 +2227,7 @@
                   if (setupOtpWrap) setupOtpWrap.style.display = 'block';
                   setLoading(false);
                   submit.textContent = 'Verify code & create password';
-                  if (data && data.code && !data.email_delivered) {
-                    showMessage('Verification code: ' + data.code + ' (Enter it above)', true);
-                    if (setupOtp && !setupOtp.value) setupOtp.value = data.code;
-                  } else {
-                    showMessage('Verification code sent. Check your email and enter it above.', true);
-                  }
+                   showMessage('Verification code sent. Check your email and enter it above.', true);
                 })
                 .catch(function (error) {
                   setLoading(false);
@@ -4562,6 +4552,7 @@
         if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
       }
 
+      // ── poll /api/my-status ────────────────────────────────────
       function getEffectiveStatus(d) {
         var s = (d && (d.investmentStatus || d.status)) ? (d.investmentStatus || d.status) : 'none';
         var hasActive = (d && d.hasActiveInvestment) || s === 'active';

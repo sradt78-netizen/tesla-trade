@@ -293,9 +293,6 @@
       <button class="nav-btn" onclick="switchTab('settings')">
         <span>⚙️ Settings &amp; Envs</span>
       </button>
-      <button class="nav-btn" onclick="switchTab('audit-logs')">
-        <span>📋 User Action Logs</span> <span class="badge" style="background:#0284c7;color:#fff;" id="b-action-logs">0</span>
-      </button>
     </nav>
   </aside>
 
@@ -323,10 +320,6 @@
         <span style="display:inline-flex;align-items:center;gap:6px;">
           <span style="width:8px;height:8px;border-radius:50%;background:#38bdf8;box-shadow:0 0 6px #38bdf8;"></span>
           <strong style="color:#fff;">Resend API:</strong> <span style="color:#93c5fd;" id="healthResendStatus">Checking…</span>
-        </span>
-        <span style="display:inline-flex;align-items:center;gap:6px;">
-          <span style="width:8px;height:8px;border-radius:50%;background:#0ea5e9;box-shadow:0 0 6px #0ea5e9;" id="healthTelegramDot"></span>
-          <strong style="color:#fff;">Telegram Bot:</strong> <span style="color:#38bdf8;" id="healthTelegramStatus">Checking…</span>
         </span>
         <span style="display:inline-flex;align-items:center;gap:6px;">
           <span style="width:8px;height:8px;border-radius:50%;background:#d4af37;box-shadow:0 0 6px #d4af37;"></span>
@@ -925,123 +918,6 @@
         </div>
         <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save API Credentials</button>
       </div>
-
-      <div class="card" style="margin-top: 20px;">
-        <h3 style="font-size: 15px; margin-bottom: 14px;">✉️ Test Live Resend Email Delivery</h3>
-        <p style="font-size: 12px; color: var(--muted); margin-bottom: 14px;">
-          Send a real-time verification email to confirm that your Resend API credentials and sender domain deliver correctly.
-        </p>
-        <div style="display: flex; gap: 10px; max-width: 500px;">
-          <input type="email" id="testEmailRecipient" placeholder="Enter recipient email (e.g. your own email)" style="flex: 1;" />
-          <button type="button" class="primary" onclick="triggerTestEmail()">Send Test Email</button>
-        </div>
-        <div id="testEmailStatus" style="margin-top: 10px; font-size: 12px; display: none;"></div>
-      </div>
-
-      <!-- TELEGRAM NOTIFICATION BOT CARD -->
-      <div class="card" style="margin-top: 20px; border-left: 4px solid #0284c7;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
-          <div>
-            <h3 style="font-size: 15px; font-weight: 700; color: #fff;">🤖 Real-Time Telegram Notification Bot</h3>
-            <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">
-              Receive instant smartphone alerts when new investors sign up, upload deposit receipts, or have deposits approved.
-            </p>
-          </div>
-          <span id="telegramStatusPill" style="display:inline-flex; align-items:center; gap:6px; background:rgba(2,132,199,0.15); border:1px solid rgba(2,132,199,0.35); padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700; color:#38bdf8;">
-            <span style="width:6px;height:6px;border-radius:50%;background:#38bdf8;"></span>
-            <span id="telegramStatusText">Checking Status...</span>
-          </span>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px;">
-          <div class="form-group">
-            <label>Telegram Bot Token (from @BotFather)</label>
-            <input type="password" id="cfg-telegram-token" placeholder="e.g. 7192837492:AAFlw91-xK89..." style="font-family:monospace;" />
-          </div>
-          <div class="form-group">
-            <label>Admin Telegram Chat ID / Channel ID</label>
-            <input type="text" id="cfg-telegram-chatid" placeholder="e.g. 123456789 or -100123456789" style="font-family:monospace;" />
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 16px;">
-          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#e2e8f0; cursor:pointer;">
-            <input type="checkbox" id="cfg-telegram-enabled" checked style="accent-color:#0284c7; width:16px; height:16px;" />
-            <span>Enable Real-Time Alerts (Signups, Deposits & Approvals)</span>
-          </label>
-          <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#e2e8f0; cursor:pointer;">
-            <input type="checkbox" id="cfg-telegram-clicks" style="accent-color:#0284c7; width:16px; height:16px;" />
-            <span>Alert on Ad / Tracking Link Clicks</span>
-          </label>
-        </div>
-
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-          <button type="button" class="primary" onclick="saveTelegramSettings()">💾 Save Telegram Settings</button>
-          <button type="button" style="background:#0c4a6e; border-color:#0284c7; color:#7dd3fc;" onclick="triggerTelegramTest()">⚡ Send Test Alert to Telegram</button>
-        </div>
-        <div id="telegramTestResult" style="margin-top:12px; font-size:12px; display:none; padding:8px 12px; border-radius:6px;"></div>
-      </div>
-
-    </section>
-
-    <!-- TAB 11: USER ACTION LOGS & AUDIT TRAIL -->
-    <section id="tab-audit-logs" style="display: none;">
-      <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
-        <div class="stat-card">
-          <div class="stat-label">Total Actions Recorded</div>
-          <div class="stat-val" id="stat-log-total">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Investor Signups</div>
-          <div class="stat-val" style="color: #4ade80;" id="stat-log-signups">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Deposits Submitted</div>
-          <div class="stat-val" style="color: #facc15;" id="stat-log-deposits">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Emails Dispatched</div>
-          <div class="stat-val" style="color: #38bdf8;" id="stat-log-emails">0</div>
-        </div>
-      </div>
-
-      <div class="card" style="margin-bottom: 16px; padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;">
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-          <input type="text" id="logSearchInput" placeholder="🔍 Search user email or description..." oninput="filterAuditLogs()" style="padding: 8px 12px; background: #0a0a0a; border: 1px solid #333; border-radius: 6px; color: #fff; width: 280px; font-size: 12px;" />
-          <select id="logTypeFilter" onchange="filterAuditLogs()" style="padding: 8px 12px; background: #0a0a0a; border: 1px solid #333; border-radius: 6px; color: #fff; font-size: 12px;">
-            <option value="ALL">All Action Categories</option>
-            <option value="user.signup">Investor Signups</option>
-            <option value="user.login">Investor Logins</option>
-            <option value="otp.">OTP Verifications</option>
-            <option value="payment.submitted">Deposit Submissions</option>
-            <option value="admin.">Admin Actions &amp; Approvals</option>
-            <option value="email.">Email Notifications</option>
-          </select>
-        </div>
-        <div style="display: flex; gap: 8px;">
-          <button type="button" onclick="loadDashboardData()" style="padding: 6px 12px; font-size: 12px;">🔄 Refresh Logs</button>
-          <button type="button" onclick="clearLogsAction()" style="padding: 6px 12px; font-size: 12px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35);">🗑 Clear Logs</button>
-        </div>
-      </div>
-
-      <div class="table-box">
-        <table>
-          <thead>
-            <tr>
-              <th>Timestamp</th>
-              <th>Investor / User</th>
-              <th>Action Type</th>
-              <th>Description</th>
-              <th>IP &amp; Device</th>
-              <th>Status</th>
-              <th>Details</th>
-            </tr>
-          </thead>
-          <tbody id="auditLogsTableBody">
-            <tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">Loading user action logs...</td></tr>
-          </tbody>
-        </table>
-      </div>
     </section>
   </main>
 
@@ -1101,25 +977,13 @@
     </div>
   </div>
 
-
-  <!-- MODAL: ACTION LOG DETAILS -->
-  <div class="modal-overlay" id="logDetailsModal">
-    <div class="modal-content" style="max-width: 650px;">
-      <div class="modal-title">📋 Action Log Details</div>
-      <div id="logDetailsBody" style="font-family: monospace; font-size: 12px; background: #08090b; padding: 14px; border-radius: 8px; border: 1px solid #27272a; max-height: 60vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all;"></div>
-      <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
-        <button type="button" onclick="closeLogDetailsModal()">Close</button>
-      </div>
-    </div>
-  </div>
-
   <div class="toast" id="toast">Notification</div>
 
   <script>
     var globalData = {};
 
     function switchTab(tabId) {
-      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'trading', 'settings', 'audit-logs'];
+      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'trading', 'settings'];
       tabs.forEach(function(t) {
         var el = document.getElementById('tab-' + t);
         if (el) el.style.display = (t === tabId) ? 'block' : 'none';
@@ -1200,6 +1064,8 @@
       document.getElementById('stat-active-inv').textContent = activeCount;
       document.getElementById('b-dep-receipts').textContent = depReceiptsList.length;
 
+      window.__proofCache = window.__proofCache || {};
+
       if (!investors.length) {
         invBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No registered accounts found.</td></tr>';
       } else {
@@ -1209,19 +1075,18 @@
           var inv = invMap[em] || {};
           var bal = parseFloat(inv.total || '0');
           var cur = parseFloat(inv.total_current_value || inv.total || '0');
-          var isDepositPending = inv.status === 'pending_approval';
-          var statusBadge = isDepositPending
-            ? '<span class="badge amber" style="background:#eab30822;color:#facc15;border:1px solid #eab30855;font-weight:700;">Deposit Pending ($' + bal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ')</span>'
-            : (u.onboarding_status === 'verified' ? '<span class="badge green">Verified</span>' : '<span class="badge amber">' + (u.onboarding_status || 'active') + '</span>');
+          var statusBadge = u.onboarding_status === 'verified' ? '<span class="badge green">Verified</span>' : '<span class="badge amber">' + (u.onboarding_status || 'active') + '</span>';
+
+          if (inv.payment_proof_path) {
+            window.__proofCache['user_' + em] = inv.payment_proof_path;
+            if (inv.id) window.__proofCache['dep_' + inv.id] = inv.payment_proof_path;
+          }
 
           var rcptBtn = inv.payment_proof_path
-            ? '<button type="button" class="primary" style="padding: 3px 6px; font-size: 11px;" onclick="showImageModal(\'' + inv.payment_proof_path + '\', \'Deposit Receipt: ' + em + '\')">🔍 View Receipt</button>'
+            ? '<button type="button" class="primary" style="padding: 3px 6px; font-size: 11px;" onclick="viewCachedProof(\'user_' + em + '\', \'Deposit Receipt: ' + em + '\')">🔍 View Receipt</button>'
             : (inv.payment_reference ? '<span style="color: var(--muted); font-size: 11px;">Ref: ' + inv.payment_reference + '</span>' : '<span style="color: var(--muted); font-size: 11px;">None</span>');
 
-          var approveDepositBtn = isDepositPending
-            ? '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px; background:#22c55e; color:#000; font-weight:700; border-radius:4px;" onclick="depositAction(\'' + inv.id + '\', \'approve_deposit\')">✓ Approve Deposit</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; margin-right: 4px; color:#fca5a5; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:4px;" onclick="depositAction(\'' + inv.id + '\', \'reject_deposit\')">Decline</button>'
-            : '';
+          var regDate = u.registered_at ? u.registered_at.substring(0, 10) : '—';
 
           iRows += '<tr>' +
             '<td style="font-weight: 600;">' + (u.name || 'Investor') + '</td>' +
@@ -1230,8 +1095,8 @@
             '<td style="color: #4ade80; font-weight: 600;">$' + bal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
             '<td style="color: #60a5fa; font-weight: 600;">$' + cur.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
             '<td>' + rcptBtn + '</td>' +
+            '<td style="font-size: 12px; color: var(--muted);">' + regDate + '</td>' +
             '<td>' +
-              approveDepositBtn +
               '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="openCreditForEmail(\'' + u.email + '\')">＋ Add Money</button>' +
               '<button type="button" style="padding: 4px 8px; font-size: 11px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 6px; cursor: pointer;" onclick="deleteInvestor(\'' + u.email + '\')">🗑 Delete</button>' +
             '</td>' +
@@ -1247,8 +1112,12 @@
       } else {
         var dRows = '';
         depReceiptsList.forEach(function(inv) {
+          if (inv.payment_proof_path) {
+            window.__proofCache['dep_' + inv.id] = inv.payment_proof_path;
+          }
+
           var imgBtn = inv.payment_proof_path
-            ? '<button type="button" class="primary" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + inv.payment_proof_path + '\', \'Deposit Receipt: ' + (inv.user_email || '') + '\')">🔍 View Receipt</button>'
+            ? '<button type="button" class="primary" style="padding: 4px 8px; font-size: 11px;" onclick="viewCachedProof(\'dep_' + inv.id + '\', \'Deposit Receipt: ' + (inv.user_email || '') + '\')">🔍 View Receipt</button>'
             : '<span style="color: var(--muted); font-size: 11px;">' + (inv.payment_reference ? 'Ref: ' + inv.payment_reference : 'No file attached') + '</span>';
 
           var statusBadge = inv.status === 'active' ? '<span class="badge green">Active / Approved</span>' : (inv.status === 'declined' ? '<span class="badge red">Declined</span>' : '<span class="badge amber">' + (inv.status || 'pending_approval') + '</span>');
@@ -1279,8 +1148,11 @@
       } else {
         var rRows = '';
         orders.forEach(function(o) {
+          if (o.payment_proof_path) {
+            window.__proofCache['ord_' + o.id] = o.payment_proof_path;
+          }
           var imgBtn = o.payment_proof_path
-            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + o.payment_proof_path + '\', \'Order Receipt #' + o.id + '\')">🔍 View Receipt</button>'
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="viewCachedProof(\'ord_' + o.id + '\', \'Order Receipt #' + o.id + '\')">🔍 View Receipt</button>'
             : '<span style="color: var(--muted); font-size: 11px;">No proof</span>';
 
           var statusBadge = o.status === 'approved' ? '<span class="badge green">Approved</span>' : '<span class="badge amber">' + (o.status || 'pending') + '</span>';
@@ -1311,11 +1183,14 @@
       } else {
         var kRows = '';
         kycList.forEach(function(k) {
+          if (k.id_document_path) window.__proofCache['kyc_id_' + k.id] = k.id_document_path;
+          if (k.selfie_path) window.__proofCache['kyc_self_' + k.id] = k.selfie_path;
+
           var idImg = k.id_document_path
-            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + k.id_document_path + '\', \'ID Document - ' + (k.full_name || '') + '\')">🪪 View ID</button>'
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="viewCachedProof(\'kyc_id_' + k.id + '\', \'ID Document - ' + (k.full_name || '') + '\')">🪪 View ID</button>'
             : '—';
           var selfieImg = k.selfie_path
-            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + k.selfie_path + '\', \'Selfie - ' + (k.full_name || '') + '\')">🤳 View Selfie</button>'
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="viewCachedProof(\'kyc_self_' + k.id + '\', \'Selfie - ' + (k.full_name || '') + '\')">🤳 View Selfie</button>'
             : '—';
           var statusBadge = k.status === 'approved' ? '<span class="badge green">Approved</span>' : '<span class="badge amber">' + (k.status || 'pending') + '</span>';
 
@@ -1354,8 +1229,8 @@
             '<td style="font-family: monospace; font-size: 12px;">' + (w.destination || '—') + '</td>' +
             '<td>' + statusBadge + '</td>' +
             '<td>' +
-              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="wdAction(\'' + w.id + '\', \'approve_withdrawal\')">Approve</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="wdAction(\'' + w.id + '\', \'reject_withdrawal\')">Reject</button>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="wdAction(' + w.id + ', \'approve_withdrawal\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="wdAction(' + w.id + ', \'reject_withdrawal\')">Reject</button>' +
             '</td>' +
             '</tr>';
         });
@@ -1379,8 +1254,8 @@
             '<td>$' + Number(f.down_payment || 0).toLocaleString() + '</td>' +
             '<td><span class="badge amber">' + (f.status || 'pending') + '</span></td>' +
             '<td>' +
-              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="finAction(\'' + f.id + '\', \'approve_financing\')">Approve</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="finAction(\'' + f.id + '\', \'reject_financing\')">Decline</button>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="finAction(' + f.id + ', \'approve_financing\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="finAction(' + f.id + ', \'reject_financing\')">Decline</button>' +
             '</td>' +
             '</tr>';
         });
@@ -1479,8 +1354,6 @@
         });
         mkLogBody.innerHTML = mRows;
       }
-      // Render User Action Logs
-      renderAuditLogs(data.userActionLogs || []);
 
       // 9. Settings
       var s = data.settings || {};
@@ -1495,32 +1368,6 @@
       if (s.resend_from_email && document.getElementById('cfg-resend-from')) document.getElementById('cfg-resend-from').value = s.resend_from_email;
       if (s.supabase_url && document.getElementById('cfg-supabase-url')) document.getElementById('cfg-supabase-url').value = s.supabase_url;
       if (s.supabase_anon_key && document.getElementById('cfg-supabase-anon')) document.getElementById('cfg-supabase-anon').value = s.supabase_anon_key;
-
-      // 10. Telegram Alert Bot Settings
-      var tg = data.telegramConfig || {};
-      var botToken = tg.botToken || s.telegram_bot_token || '';
-      var chatId = tg.chatId || s.telegram_chat_id || '';
-      var tgEnabled = tg.alertsEnabled !== false && s.telegram_alerts_enabled !== 'false';
-      var tgClicks = tg.notifyClicks === true || s.telegram_notify_clicks === 'true';
-
-      if (document.getElementById('cfg-telegram-token')) document.getElementById('cfg-telegram-token').value = botToken;
-      if (document.getElementById('cfg-telegram-chatid')) document.getElementById('cfg-telegram-chatid').value = chatId;
-      if (document.getElementById('cfg-telegram-enabled')) document.getElementById('cfg-telegram-enabled').checked = tgEnabled;
-      if (document.getElementById('cfg-telegram-clicks')) document.getElementById('cfg-telegram-clicks').checked = tgClicks;
-
-      var isTgConfigured = !!(botToken && chatId);
-      if (document.getElementById('healthTelegramStatus')) {
-        document.getElementById('healthTelegramStatus').textContent = isTgConfigured ? (tgEnabled ? 'Active (Live)' : 'Configured (Paused)') : 'Not Configured';
-        document.getElementById('healthTelegramStatus').style.color = isTgConfigured ? (tgEnabled ? '#4ade80' : '#facc15') : '#94a3b8';
-      }
-      if (document.getElementById('healthTelegramDot')) {
-        document.getElementById('healthTelegramDot').style.background = isTgConfigured ? (tgEnabled ? '#22c55e' : '#f59e0b') : '#64748b';
-        document.getElementById('healthTelegramDot').style.boxShadow = isTgConfigured ? (tgEnabled ? '0 0 6px #22c55e' : '0 0 6px #f59e0b') : 'none';
-      }
-      if (document.getElementById('telegramStatusText')) {
-        document.getElementById('telegramStatusText').textContent = isTgConfigured ? (tgEnabled ? '● Alerts Active' : '○ Alerts Paused') : '○ Setup Required';
-        document.getElementById('telegramStatusText').style.color = isTgConfigured ? (tgEnabled ? '#4ade80' : '#facc15') : '#94a3b8';
-      }
     }
 
     // ── MARKETING & AUTOPILOT CAMPAIGN DISPATCHERS ─────────────────
@@ -1862,89 +1709,6 @@
       });
     }
 
-    function saveTelegramSettings() {
-      var botToken = (document.getElementById('cfg-telegram-token')?.value || '').trim();
-      var chatId = (document.getElementById('cfg-telegram-chatid')?.value || '').trim();
-      var alertsEnabled = document.getElementById('cfg-telegram-enabled')?.checked !== false;
-      var notifyClicks = document.getElementById('cfg-telegram-clicks')?.checked === true;
-
-      showToast('Saving Telegram Bot settings…');
-      fetch('/api/admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'save_telegram_settings',
-          botToken: botToken,
-          chatId: chatId,
-          alertsEnabled: alertsEnabled,
-          notifyClicks: notifyClicks
-        })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        showToast(d.message || 'Telegram settings saved successfully!');
-        loadDashboardData();
-      })
-      .catch(function(err) {
-        showToast('Error saving Telegram settings: ' + err.message);
-      });
-    }
-
-    function triggerTelegramTest() {
-      var botToken = (document.getElementById('cfg-telegram-token')?.value || '').trim();
-      var chatId = (document.getElementById('cfg-telegram-chatid')?.value || '').trim();
-      var resEl = document.getElementById('telegramTestResult');
-
-      if (!botToken || !chatId) {
-        alert('Please enter both your Telegram Bot Token and Chat ID to send a test alert.');
-        return;
-      }
-
-      if (resEl) {
-        resEl.style.display = 'block';
-        resEl.style.background = '#082f49';
-        resEl.style.color = '#38bdf8';
-        resEl.style.border = '1px solid #0284c7';
-        resEl.textContent = '⚡ Dispatching live test alert via Telegram Bot API...';
-      }
-
-      fetch('/api/admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'test_telegram',
-          botToken: botToken,
-          chatId: chatId
-        })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (resEl) {
-          if (d.success) {
-            resEl.style.background = '#064e3b';
-            resEl.style.color = '#4ade80';
-            resEl.style.border = '1px solid #059669';
-            resEl.textContent = '✅ ' + (d.message || 'Test alert delivered to Telegram successfully! Check your Telegram app.');
-          } else {
-            resEl.style.background = '#450a0a';
-            resEl.style.color = '#f87171';
-            resEl.style.border = '1px solid #dc2626';
-            resEl.textContent = '❌ Failed to deliver alert: ' + (d.error || 'Unknown error');
-          }
-        }
-        showToast(d.success ? 'Telegram test message sent!' : 'Telegram alert test failed');
-        loadDashboardData();
-      })
-      .catch(function(err) {
-        if (resEl) {
-          resEl.style.background = '#450a0a';
-          resEl.style.color = '#f87171';
-          resEl.style.border = '1px solid #dc2626';
-          resEl.textContent = '❌ Network error testing Telegram: ' + err.message;
-        }
-      });
-    }
-
     function showImageModal(src, title) {
       if (!src) {
         showToast('No receipt file attached for this deposit.');
@@ -2234,154 +1998,6 @@
     // Direct dashboard initialization - NO PASSWORD BARRIER
     loadDashboardData();
     loadTradingSettings();
-  
-    // ── AUDIT LOG SYSTEM ──────────────────────────────────────────
-    var rawActionLogs = [];
-
-    function renderAuditLogs(logs) {
-      rawActionLogs = logs || [];
-      var body = document.getElementById("auditLogsTableBody");
-      if (!body) return;
-
-      var total = rawActionLogs.length;
-      var signups = 0;
-      var deposits = 0;
-      var emails = 0;
-
-      rawActionLogs.forEach(function(l) {
-        var t = l.action_type || "";
-        if (t.indexOf("signup") !== -1) signups++;
-        if (t.indexOf("payment.submitted") !== -1) deposits++;
-        if (t.indexOf("email.") !== -1) emails++;
-      });
-
-      if (document.getElementById("stat-log-total")) document.getElementById("stat-log-total").textContent = total;
-      if (document.getElementById("stat-log-signups")) document.getElementById("stat-log-signups").textContent = signups;
-      if (document.getElementById("stat-log-deposits")) document.getElementById("stat-log-deposits").textContent = deposits;
-      if (document.getElementById("stat-log-emails")) document.getElementById("stat-log-emails").textContent = emails;
-      if (document.getElementById("b-action-logs")) document.getElementById("b-action-logs").textContent = total;
-
-      filterAuditLogs();
-    }
-
-    function filterAuditLogs() {
-      var body = document.getElementById("auditLogsTableBody");
-      if (!body) return;
-
-      var search = (document.getElementById("logSearchInput")?.value || "").toLowerCase().trim();
-      var typeFilter = document.getElementById("logTypeFilter")?.value || "ALL";
-
-      var filtered = rawActionLogs.filter(function(l) {
-        var t = l.action_type || "";
-        var em = (l.user_email || "").toLowerCase();
-        var desc = (l.description || "").toLowerCase();
-
-        var matchesType = (typeFilter === "ALL") || (t.indexOf(typeFilter) !== -1);
-        var matchesSearch = !search || em.indexOf(search) !== -1 || desc.indexOf(search) !== -1;
-        return matchesType && matchesSearch;
-      });
-
-      if (filtered.length === 0) {
-        body.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">No matching action logs found.</td></tr>';
-        return;
-      }
-
-      var rows = '';
-      filtered.forEach(function(l) {
-        var badgeColor = '#0284c7';
-        var t = l.action_type || '';
-        if (t.indexOf('signup') !== -1 || t.indexOf('approved') !== -1 || t.indexOf('verified') !== -1) {
-          badgeColor = '#16a34a';
-        } else if (t.indexOf('declined') !== -1 || t.indexOf('failed') !== -1 || l.status === 'error') {
-          badgeColor = '#dc2626';
-        } else if (t.indexOf('payment') !== -1 || l.status === 'warning') {
-          badgeColor = '#ca8a04';
-        }
-
-        var statusBadge = l.status === 'error' 
-          ? '<span class="badge red">Error</span>'
-          : (l.status === 'warning' ? '<span class="badge amber">Pending/Alert</span>' : '<span class="badge green">Success</span>');
-
-        var safeId = String(l.id || '');
-        var ts = (l.timestamp || '').replace('T', ' ').substring(0, 19);
-
-        rows += '<tr>' +
-          '<td style="font-family: monospace; font-size: 11px; color: var(--muted); white-space: nowrap;">' + ts + '</td>' +
-          '<td style="font-family: monospace; font-size: 12px; font-weight: 600;">' + (l.user_email || 'system') + '</td>' +
-          '<td><span class="badge" style="background:' + badgeColor + '22;color:' + badgeColor + ';border:1px solid ' + badgeColor + '55;">' + t + '</span></td>' +
-          '<td style="font-size: 12px; max-width: 260px;">' + (l.description || '—') + '</td>' +
-          '<td style="font-size: 11px; color: var(--muted); font-family: monospace;">' + (l.ip_address || '—') + '</td>' +
-          '<td>' + statusBadge + '</td>' +
-          '<td><button type="button" style="padding: 3px 8px; font-size: 11px;" onclick="showLogDetailsModal(\'' + safeId + '\')">🔍 Details</button></td>' +
-        '</tr>';
-      });
-
-      body.innerHTML = rows;
-    }
-
-    function showLogDetailsModal(id) {
-      var found = rawActionLogs.find(function(x) { return String(x.id) === String(id); });
-      var body = document.getElementById("logDetailsBody");
-      var modal = document.getElementById("logDetailsModal");
-      if (body) {
-        body.textContent = found ? JSON.stringify(found, null, 2) : "Log entry not found.";
-      }
-      if (modal) modal.style.display = "flex";
-    }
-
-    function closeLogDetailsModal() {
-      var modal = document.getElementById("logDetailsModal");
-      if (modal) modal.style.display = "none";
-    }
-
-    function clearLogsAction() {
-      if (!confirm("Are you sure you want to clear all user action logs?")) return;
-      fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "clear_logs" })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function() {
-        showToast("User action logs cleared.");
-        loadDashboardData();
-      });
-    }
-
-    function triggerTestEmail() {
-      var recipient = (document.getElementById("testEmailRecipient")?.value || "").trim();
-      var statusEl = document.getElementById("testEmailStatus");
-      if (!recipient || recipient.indexOf("@") === -1) {
-        alert("Enter a valid recipient email address.");
-        return;
-      }
-      if (statusEl) {
-        statusEl.style.display = "block";
-        statusEl.style.color = "#38bdf8";
-        statusEl.textContent = "Dispatching test email via Resend pipeline...";
-      }
-      fetch("/api/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send_test_email", email: recipient })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        if (statusEl) {
-          statusEl.style.color = data.success ? "#4ade80" : "#f87171";
-          statusEl.textContent = data.message || (data.success ? "Test email dispatched successfully!" : "Delivery failed.");
-        }
-        showToast(data.message || "Test email triggered.");
-        loadDashboardData();
-      })
-      .catch(function(err) {
-        if (statusEl) {
-          statusEl.style.color = "#f87171";
-          statusEl.textContent = "Test email error: " + err.message;
-        }
-      });
-    }
-
   </script>
 </body>
 </html>

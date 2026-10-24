@@ -1,13 +1,13 @@
-import adminHandler from './admin.js';
-import dbcheckHandler from './dbcheck.js';
-import paymentSettingsHandler from './payment-settings.js';
-import paymentSubmitHandler from './payment-submit.js';
-import trackHandler from './track.js';
-import analyticsDataHandler from './analytics-data.js';
-import otpHandler from './otp.js';
-import authHandler from './auth.js';
-import supabaseConfigHandler from './supabase-config.js';
-import accountsHandler from './accounts.js';
+import adminHandler from './_handlers/admin.js';
+import dbcheckHandler from './_handlers/dbcheck.js';
+import paymentSettingsHandler from './_handlers/payment-settings.js';
+import paymentSubmitHandler from './_handlers/payment-submit.js';
+import trackHandler from './_handlers/track.js';
+import analyticsDataHandler from './_handlers/analytics-data.js';
+import otpHandler from './_handlers/otp.js';
+import authHandler from './_handlers/auth.js';
+import supabaseConfigHandler from './_handlers/supabase-config.js';
+import accountsHandler from './_handlers/accounts.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

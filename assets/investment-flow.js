@@ -569,8 +569,10 @@
     form.append('userId', account.email);
     form.append('userName', account.name || account.email);
     form.append('userEmail', account.email);
+    form.append('email', account.email);
     form.append('portfolio', selectedStock.name + ' · ' + plan.name);
     form.append('total', amount.toFixed(2));
+    form.append('amount', amount.toFixed(2));
     form.append('method', state.method || 'usdt');
     form.append('planId', plan.id);
     form.append('planName', plan.name);
@@ -613,8 +615,11 @@
       });
     }
 
-    sendPayment('/api/payment-submit.php').catch(function (firstError) {
+    sendPayment('/api/payment-submit').catch(function (firstError) {
       if (!firstError.retryable) throw firstError;
+      return sendPayment('/api/payment-submit.php');
+    }).catch(function (secondError) {
+      if (!secondError.retryable) throw secondError;
       return sendPayment('/api/investments');
     }).then(function (data) {
       /*
