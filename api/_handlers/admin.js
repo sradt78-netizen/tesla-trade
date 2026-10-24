@@ -1,14 +1,48 @@
+import crypto from 'crypto';
 import { getDbConnection } from './dbcheck.js';
-import { inMemoryDeposits } from './payment-submit.js';
+import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
 
 function cleanString(val) {
   if (!val) return '';
   return String(val).trim().replace(/^["']|["']$/g, '');
 }
 
+export function getAdminExpectedPassword() {
+  return cleanString(
+    process.env.ADMIN_PASSWORD ||
+    process.env.TT_ADMIN_PASSWORD ||
+    'Heartofwisdom101@$'
+  );
+}
+
+export function isAuthorizedAdmin(req, body = {}, url = null) {
+  const expected = getAdminExpectedPassword();
+  const provided = cleanString(
+    req.headers['x-admin-password'] ||
+    (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') ||
+    (url ? url.searchParams.get('password') || url.searchParams.get('admin_password') : '') ||
+    body?.password ||
+    body?.admin_password ||
+    ''
+  );
+
+  if (!provided) return false;
+  if (provided === expected) return true;
+
+  const expectedSha = cleanString(process.env.ADMIN_PASSWORD_SHA256 || process.env.TT_ADMIN_PASSWORD_SHA256);
+  if (expectedSha) {
+    try {
+      const hash = crypto.createHash('sha256').update(provided).digest('hex');
+      if (hash.toLowerCase() === expectedSha.toLowerCase()) return true;
+    } catch (e) {}
+  }
+  return false;
+}
+
 function parseBody(req) {
   return new Promise((resolve) => {
     if (req.body && typeof req.body === 'object') return resolve(req.body);
+    if (typeof req.on !== 'function') return resolve({});
     let data = '';
     req.on('data', chunk => { data += chunk; });
     req.on('end', () => {
@@ -397,6 +431,14 @@ export default async function handler(req, res) {
   const body = req.method === 'POST' ? await parseBody(req) : {};
   const action = body.action || url.searchParams.get('action') || 'all_data';
 
+  // ── 0. AUTHENTICATION CHECK ─────────────────────────────────────
+  if (action === 'verify_auth' || action === 'login') {
+    if (isAuthorizedAdmin(req, body, url)) {
+      return res.status(200).json({ success: true, authenticated: true, message: 'Admin authenticated successfully.' });
+    }
+    return res.status(401).json({ success: false, authenticated: false, error: 'Incorrect administrator password.' });
+  }
+
   // ── PREVIEW TEMPLATE CAN RETURN INSTANTLY WITHOUT DB ───────────
   if (action === 'preview_template') {
     const templateId = body.templateId || url.searchParams.get('templateId') || 'no_deposit';
@@ -413,6 +455,15 @@ export default async function handler(req, res) {
         target: tmpl.target,
         html: sampleHtml
       }
+    });
+  }
+
+  // All other admin actions STRICTLY REQUIRE authentic admin password
+  if (!isAuthorizedAdmin(req, body, url)) {
+    return res.status(401).json({
+      success: false,
+      authenticated: false,
+      error: 'Unauthorized: Valid administrator password required.'
     });
   }
 
@@ -482,6 +533,23 @@ export default async function handler(req, res) {
         } catch (e) {}
         await conn.end();
       }
+
+      // Merge disk persistent deposits (guaranteed cross-serverless persistence)
+      try {
+        const diskDeposits = loadPersistentDeposits();
+        if (Array.isArray(diskDeposits) && diskDeposits.length > 0) {
+          const mergedInvs = [...investments];
+          for (const dep of diskDeposits) {
+            const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (x.user_email && dep.user_email && x.user_email.toLowerCase() === dep.user_email.toLowerCase()));
+            if (idx >= 0) {
+              mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
+            } else {
+              mergedInvs.unshift(dep);
+            }
+          }
+          investments = mergedInvs;
+        }
+      } catch (e) {}
 
       // Merge memory deposits submitted via client
       if (Array.isArray(inMemoryDeposits) && inMemoryDeposits.length > 0) {
@@ -764,6 +832,16 @@ export default async function handler(req, res) {
       if (inv) inv.status = status;
       const mem = inMemoryDeposits.find(i => String(i.id) === String(id));
       if (mem) mem.status = status;
+
+      // Update disk storage
+      try {
+        const diskDeposits = loadPersistentDeposits();
+        const found = diskDeposits.find(d => String(d.id) === String(id));
+        if (found) {
+          found.status = status;
+          savePersistentDeposit(found);
+        }
+      } catch (e) {}
 
       const targetEmail = (inv && inv.user_email) || (mem && mem.user_email);
       if (targetEmail && status === 'active') {

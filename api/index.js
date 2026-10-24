@@ -8,6 +8,7 @@ import otpHandler from './_handlers/otp.js';
 import authHandler from './_handlers/auth.js';
 import supabaseConfigHandler from './_handlers/supabase-config.js';
 import accountsHandler from './_handlers/accounts.js';
+import stocksHandler from './_handlers/stocks.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -87,7 +88,12 @@ export default async function handler(req, res) {
     return await analyticsDataHandler(req, res);
   }
 
-  // 10. Invitation verification fallback
+  // 10. Stock quotes & Live Market Desk
+  if (normalizedPath === '/stocks' || normalizedPath.startsWith('/stocks/')) {
+    return await stocksHandler(req, res);
+  }
+
+  // 11. Invitation verification fallback
   if (normalizedPath === '/invitation/verify') {
     return res.status(200).json({ valid: true });
   }

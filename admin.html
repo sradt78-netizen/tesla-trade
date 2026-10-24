@@ -256,59 +256,91 @@
 </head>
 <body>
 
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <div class="sidebar-logo">T</div>
-      <div class="sidebar-brand">Tesla <span>Trade</span> Admin</div>
-    </div>
-    <nav class="sidebar-nav">
-      <button class="nav-btn active" onclick="switchTab('investors')">
-        <span>👥 Investors</span> <span class="badge" id="b-investors">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('investment-receipts')">
-        <span>💰 Deposit Receipts</span> <span class="badge amber" id="b-dep-receipts">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('receipts')">
-        <span>🧾 Shop Receipts</span> <span class="badge amber" id="b-receipts">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('kyc')">
-        <span>🪪 KYC Submissions</span> <span class="badge amber" id="b-kyc">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('withdrawals')">
-        <span>💸 Withdrawals</span> <span class="badge red" id="b-withdrawals">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('financing')">
-        <span>🚘 Financing</span> <span class="badge" id="b-financing">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('access')">
-        <span>🔐 Invitation Codes</span> <span class="badge green" id="b-codes">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('marketing')">
-        <span>📣 Marketing &amp; Emails</span> <span class="badge green" id="b-marketing">Autopilot</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('trading')">
-        <span>📈 Trading Graph Engine</span> <span class="badge green" id="b-trading">Live</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('settings')">
-        <span>⚙️ Settings &amp; Envs</span>
-      </button>
-    </nav>
-  </aside>
+  <!-- ADMIN AUTHENTICATION SECURITY GATE -->
+  <div id="adminLoginGate" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#08090b;display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px;">
+    <div style="background:#12141a;border:1px solid #232732;border-radius:16px;width:100%;max-width:440px;padding:36px 32px;box-shadow:0 20px 40px rgba(0,0,0,0.8);text-align:center;">
+      <div style="width:48px;height:48px;background:#e31937;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:#fff;">T</div>
+      <h2 style="font-size:22px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-0.5px;">Tesla Trade Inc Admin</h2>
+      <p style="font-size:13px;color:#94a3b8;margin-bottom:24px;line-height:1.5;">Enter your Administrator Master Password to unlock the administrative dashboard, customer deposit receipts, and trading engine.</p>
 
-  <!-- Main Content Area -->
-  <main class="main">
-    <header>
-      <div class="header-title">
-        <h1 id="panelTitle">Investor Management</h1>
-        <p id="panelDesc">View all registered accounts, credit money/balance, and manage investments</p>
+      <div id="adminLoginError" style="display:none;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:18px;text-align:left;"></div>
+
+      <form onsubmit="handleAdminLoginSubmit(event)" style="display:flex;flex-direction:column;gap:14px;text-align:left;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Administrator Password</label>
+          <div style="position:relative;">
+            <input type="password" id="adminGatePassword" required placeholder="Enter admin password..." autocomplete="current-password" style="width:100%;background:#090a0d;border:1px solid #2a303d;border-radius:8px;padding:12px 42px 12px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;" />
+            <button type="button" onclick="toggleGatePasswordVisibility()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#94a3b8;cursor:pointer;padding:6px;font-size:16px;">👁️</button>
+          </div>
+        </div>
+        <button type="submit" id="adminGateSubmitBtn" class="primary" style="width:100%;padding:12px;font-size:14px;font-weight:700;justify-content:center;margin-top:4px;border-radius:8px;">
+          🔓 Sign In to Dashboard
+        </button>
+      </form>
+      <div style="margin-top:20px;font-size:11px;color:#64748b;line-height:1.4;">
+        Secured by environment variable <code style="color:#e2e8f0;background:#1a1e27;padding:2px 6px;border-radius:4px;">ADMIN_PASSWORD</code>. Changing the variable immediately requires the new password.
       </div>
-      <div class="header-actions">
-        <button type="button" class="success" onclick="openCreditModal()">💰 Add Money to Investor</button>
-        <button type="button" onclick="loadDashboardData()">🔄 Refresh</button>
-        <a href="/" style="text-decoration: none;"><button type="button">🌐 Public Site</button></a>
+    </div>
+  </div>
+
+  <div id="adminApp" style="display:none;width:100%;min-height:100vh;">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">T</div>
+        <div class="sidebar-brand">Tesla <span>Trade</span> Admin</div>
       </div>
-    </header>
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" onclick="switchTab('investors')">
+          <span>👥 Investors</span> <span class="badge" id="b-investors">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('investment-receipts')">
+          <span>💰 Deposit Receipts</span> <span class="badge amber" id="b-dep-receipts">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('receipts')">
+          <span>🧾 Shop Receipts</span> <span class="badge amber" id="b-receipts">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('kyc')">
+          <span>🪪 KYC Submissions</span> <span class="badge amber" id="b-kyc">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('withdrawals')">
+          <span>💸 Withdrawals</span> <span class="badge red" id="b-withdrawals">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('financing')">
+          <span>🚘 Financing</span> <span class="badge" id="b-financing">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('access')">
+          <span>🔐 Invitation Codes</span> <span class="badge green" id="b-codes">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('marketing')">
+          <span>📣 Marketing &amp; Emails</span> <span class="badge green" id="b-marketing">Autopilot</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('trading')">
+          <span>📈 Trading Graph Engine</span> <span class="badge green" id="b-trading">Live</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('settings')">
+          <span>⚙️ Settings &amp; Envs</span>
+        </button>
+        <button class="nav-btn" onclick="logoutAdmin()" style="margin-top:auto;color:#f87171;border-top:1px solid var(--card-border);padding-top:12px;">
+          <span>🚪 Log Out</span>
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main">
+      <header>
+        <div class="header-title">
+          <h1 id="panelTitle">Investor Management</h1>
+          <p id="panelDesc">View all registered accounts, credit money/balance, and manage investments</p>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="success" onclick="openCreditModal()">💰 Add Money to Investor</button>
+          <button type="button" onclick="loadDashboardData()">🔄 Refresh</button>
+          <button type="button" onclick="logoutAdmin()" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.35);color:#f87171;font-weight:600;">🚪 Log Out</button>
+          <a href="/" style="text-decoration: none;"><button type="button">🌐 Public Site</button></a>
+        </div>
+      </header>
 
     <!-- LIVE SYSTEM HEALTH STRIP -->
     <div style="background:#11141a;border:1px solid #232a36;border-radius:10px;padding:10px 16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:12px;">
@@ -920,6 +952,7 @@
       </div>
     </section>
   </main>
+  </div><!-- /adminApp -->
 
   <!-- MODAL: ADD MONEY / CREDIT BALANCE -->
   <div class="modal-overlay" id="creditModal">
@@ -1020,8 +1053,109 @@
       }
     }
 
+    function toggleGatePasswordVisibility() {
+      var inp = document.getElementById('adminGatePassword');
+      if (inp) {
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+      }
+    }
+
+    function getAdminPassword() {
+      return sessionStorage.getItem('ttinc_admin_password') || '';
+    }
+
+    function showLoginGate(msg) {
+      var gate = document.getElementById('adminLoginGate');
+      var app = document.getElementById('adminApp');
+      if (app) app.style.display = 'none';
+      if (gate) gate.style.display = 'flex';
+      var err = document.getElementById('adminLoginError');
+      if (err) {
+        if (msg) {
+          err.textContent = msg;
+          err.style.display = 'block';
+        } else {
+          err.style.display = 'none';
+        }
+      }
+    }
+
+    function logoutAdmin() {
+      sessionStorage.removeItem('ttinc_admin_password');
+      window.__proofCache = {};
+      showLoginGate('You have been logged out securely.');
+    }
+
+    function handleAdminLoginSubmit(e) {
+      if (e) e.preventDefault();
+      var input = document.getElementById('adminGatePassword');
+      var pass = input ? input.value.trim() : '';
+      if (!pass) return;
+
+      var btn = document.getElementById('adminGateSubmitBtn');
+      var err = document.getElementById('adminLoginError');
+      if (err) err.style.display = 'none';
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Verifying password…';
+      }
+
+      fetch('/api/admin?action=verify_auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': pass
+        },
+        body: JSON.stringify({ action: 'verify_auth', password: pass })
+      }).then(function(r) {
+        if (r.status === 401) throw new Error('Incorrect admin password. Please try again.');
+        if (!r.ok) throw new Error('Verification failed. Server responded with status ' + r.status);
+        return r.json();
+      }).then(function(data) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '🔓 Sign In to Dashboard';
+        }
+        if (data.authenticated || data.success) {
+          sessionStorage.setItem('ttinc_admin_password', pass);
+          document.getElementById('adminLoginGate').style.display = 'none';
+          document.getElementById('adminApp').style.display = 'flex';
+          loadDashboardData();
+          loadTradingSettings();
+        } else {
+          throw new Error(data.error || 'Incorrect admin password.');
+        }
+      }).catch(function(error) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '🔓 Sign In to Dashboard';
+        }
+        if (err) {
+          err.textContent = error.message || 'Incorrect admin password.';
+          err.style.display = 'block';
+        }
+      });
+    }
+
+    function adminFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      var pass = getAdminPassword();
+      if (pass) {
+        options.headers['x-admin-password'] = pass;
+      }
+      return fetch(url, options).then(function(res) {
+        if (res.status === 401) {
+          sessionStorage.removeItem('ttinc_admin_password');
+          showLoginGate('Administrator password has changed in environment variables or session expired. Please sign in with your updated password.');
+          throw new Error('Admin unauthorized');
+        }
+        return res;
+      });
+    }
+
     function loadDashboardData() {
-      fetch('/api/admin?action=all_data')
+      adminFetch('/api/admin?action=all_data')
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (!data || !data.success) return;
@@ -1378,7 +1512,7 @@
       if (!confirm(confirmMsg)) return;
 
       showToast('Dispatching campaign emails…');
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1422,7 +1556,7 @@
       if (!confirm('Broadcast this custom message to ALL registered investors?')) return;
 
       showToast('Sending broadcast…');
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1444,7 +1578,7 @@
 
     function triggerAutopilotRunNow() {
       showToast('⚡ Running Autopilot marketing cycle…');
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1463,7 +1597,7 @@
     function toggleAutopilotState() {
       var current = document.getElementById('btnToggleAutopilot').textContent.indexOf('ON') !== -1;
       var nextState = !current;
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1481,7 +1615,7 @@
 
     function clearMarketingThrottleLog() {
       if (!confirm('Clear all marketing email throttle records? This allows immediate re-sending to all recipients.')) return;
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'clear_marketing_log' })
@@ -1497,7 +1631,7 @@
       document.getElementById('emailPreviewModal').style.display = 'flex';
       document.getElementById('emailPreviewContainer').innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);">Loading template preview…</div>';
 
-      fetch('/api/admin?action=preview_template&templateId=' + encodeURIComponent(templateId))
+      adminFetch('/api/admin?action=preview_template&templateId=' + encodeURIComponent(templateId))
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (!data || !data.template) return;
@@ -1566,7 +1700,7 @@
       var note = document.getElementById('creditNoteInput').value.trim();
       if (!em || !amt) { alert('Enter investor email and amount'); return; }
 
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'credit_balance', email: em, amount: amt, note: note })
@@ -1584,7 +1718,7 @@
     }
 
     function depositAction(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1597,7 +1731,7 @@
     }
 
     function kycAction(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1610,7 +1744,7 @@
     }
 
     function orderAction(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1623,7 +1757,7 @@
     }
 
     function wdAction(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1636,7 +1770,7 @@
     }
 
     function finAction(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1650,7 +1784,7 @@
 
     function generateInvitationCode() {
       var c = document.getElementById('newCodeInput').value.trim();
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'generate_code', code: c })
@@ -1664,7 +1798,7 @@
     }
 
     function codeStatus(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1697,7 +1831,7 @@
         supabase_url: (document.getElementById('cfg-supabase-url')?.value || '').trim(),
         supabase_anon_key: (document.getElementById('cfg-supabase-anon')?.value || '').trim()
       };
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save_settings', settings: s })
@@ -1756,7 +1890,7 @@
       if (!confirm('Are you sure you want to permanently delete investor: ' + clean + '?\n\nThis will remove their profile and all associated deposits and transactions from the system.')) {
         return;
       }
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete_investor', email: clean })
@@ -1801,7 +1935,7 @@
         lossRatePercent: lRate
       };
 
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_trading_settings', settings: settings })
@@ -1810,7 +1944,7 @@
       .then(function(d) {
         if (d && d.success) {
           showToast('Trading graph settings saved! Live investor dashboard updated.');
-          fetch('/api/admin/trading-settings', {
+          adminFetch('/api/admin/trading-settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settings)
@@ -1825,7 +1959,7 @@
     }
 
     function loadTradingSettings() {
-      fetch('/api/admin/trading-settings')
+      adminFetch('/api/admin/trading-settings')
         .then(function(r) { return r.json(); })
         .then(function(d) {
           var s = (d && d.settings) || {};
@@ -1995,9 +2129,29 @@
       setTimeout(function() { t.style.display = 'none'; }, 2800);
     }
 
-    // Direct dashboard initialization - NO PASSWORD BARRIER
-    loadDashboardData();
-    loadTradingSettings();
+    // Authenticated dashboard initialization
+    var savedAdminPass = sessionStorage.getItem('ttinc_admin_password');
+    if (savedAdminPass) {
+      fetch('/api/admin?action=verify_auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': savedAdminPass },
+        body: JSON.stringify({ action: 'verify_auth', password: savedAdminPass })
+      }).then(function(r) {
+        if (r.ok) {
+          document.getElementById('adminLoginGate').style.display = 'none';
+          document.getElementById('adminApp').style.display = 'flex';
+          loadDashboardData();
+          loadTradingSettings();
+        } else {
+          sessionStorage.removeItem('ttinc_admin_password');
+          showLoginGate('Admin password has changed in environment variables. Please sign in with your updated admin password.');
+        }
+      }).catch(function() {
+        showLoginGate();
+      });
+    } else {
+      showLoginGate();
+    }
   </script>
 </body>
 </html>

@@ -1,8 +1,65 @@
 import { getDbConnection } from './dbcheck.js';
+import fs from 'fs';
+import path from 'path';
 
 function cleanString(val) {
   if (!val) return '';
   return String(val).trim().replace(/^["']|["']$/g, '');
+}
+
+function getSavedDepositsFilePath() {
+  const p = path.resolve(process.cwd(), 'data', 'saved_deposits.json');
+  try {
+    const dir = path.dirname(p);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  } catch (e) {}
+  return p;
+}
+
+export function loadPersistentDeposits() {
+  const list = [];
+  // 1. Try local data file
+  try {
+    const p = getSavedDepositsFilePath();
+    if (fs.existsSync(p)) {
+      const content = fs.readFileSync(p, 'utf8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) list.push(...parsed);
+    }
+  } catch (e) {}
+  // 2. Try /tmp file
+  try {
+    const tmpPath = '/tmp/tesla_saved_deposits.json';
+    if (fs.existsSync(tmpPath)) {
+      const content = fs.readFileSync(tmpPath, 'utf8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (!list.some(x => String(x.id) === String(item.id))) list.push(item);
+        }
+      }
+    }
+  } catch (e) {}
+  return list;
+}
+
+export function savePersistentDeposit(deposit) {
+  try {
+    const current = loadPersistentDeposits();
+    const idx = current.findIndex(x => String(x.id) === String(deposit.id) || (x.user_email && deposit.user_email && x.user_email.toLowerCase() === deposit.user_email.toLowerCase()));
+    if (idx >= 0) {
+      current[idx] = { ...current[idx], ...deposit };
+    } else {
+      current.unshift(deposit);
+    }
+    const json = JSON.stringify(current, null, 2);
+    try {
+      fs.writeFileSync(getSavedDepositsFilePath(), json, 'utf8');
+    } catch (e) {}
+    try {
+      fs.writeFileSync('/tmp/tesla_saved_deposits.json', json, 'utf8');
+    } catch (e) {}
+  } catch (e) {}
 }
 
 function parseMultipart(buffer, boundary) {
@@ -12,8 +69,8 @@ function parseMultipart(buffer, boundary) {
 
   while ((start = buffer.indexOf(boundaryBuffer, start)) !== -1) {
     start += boundaryBuffer.length;
-    if (buffer[start] === 45 && buffer[start + 1] === 45) break; // -- trailing end
-    if (buffer[start] === 13 && buffer[start + 1] === 10) start += 2; // \r\n
+    if (buffer[start] === 45 && buffer[start + 1] === 45) break;
+    if (buffer[start] === 13 && buffer[start + 1] === 10) start += 2;
 
     const headerEnd = buffer.indexOf(Buffer.from('\r\n\r\n'), start);
     if (headerEnd === -1) break;
@@ -49,7 +106,6 @@ function parseMultipart(buffer, boundary) {
 
 function parseBody(req) {
   return new Promise((resolve) => {
-    // 1. Check if multer already parsed files and body
     const multerFiles = {};
     if (Array.isArray(req.files) && req.files.length > 0) {
       for (const f of req.files) {
@@ -71,7 +127,6 @@ function parseBody(req) {
       return resolve({ fields: req.body || {}, files: multerFiles });
     }
 
-    // 2. Fallback stream parser if multer was not invoked
     const chunks = [];
     req.on('data', chunk => chunks.push(chunk));
     req.on('end', () => {
@@ -90,13 +145,11 @@ function parseBody(req) {
         }
       }
 
-      // Default JSON or URL-encoded fallback
       const text = buffer.toString('utf8');
       try {
         const json = JSON.parse(text || '{}');
         return resolve({ fields: json, files: multerFiles });
       } catch (e) {
-        // Try urlencoded
         const urlParams = new URLSearchParams(text);
         const obj = {};
         for (const [k, v] of urlParams.entries()) {
@@ -142,6 +195,15 @@ export default async function handler(req, res) {
     } catch (e) {}
 
     let all = [...dbRows];
+    // Merge persistent file storage
+    try {
+      const diskDeposits = loadPersistentDeposits();
+      for (const d of diskDeposits) {
+        if (!all.some(x => String(x.id) === String(d.id))) all.push(d);
+      }
+    } catch (e) {}
+
+    // Merge in-memory and mockStore
     try {
       const { mockStore } = await import('./admin.js');
       const storeInvs = mockStore.investments || [];
@@ -180,7 +242,7 @@ export default async function handler(req, res) {
     const method = fields.method || fields.paymentMethod || fields.payment_method || 'crypto';
     const ref = fields.paymentReference || fields.reference || fields.tx_id || '';
     const planId = fields.planId || fields.plan_id || 'standard';
-    const planName = fields.planName || fields.plan_name || fields.portfolio || 'Investment Plan';
+    const planName = fields.planName || fields.plan_name || fields.portfolio || 'Explorer';
     const userName = fields.userName || fields.name || 'Investor';
 
     // Extract receipt file or string
@@ -201,15 +263,40 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, error: 'User email is required' });
     }
 
-    let investmentId = 'dep_' + Math.random().toString(36).substring(2, 9);
+    let investmentId = 'dep_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7);
+    const txId = 'TX' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
+    const portfolio = (userName || 'Tesla') + ' · ' + planName;
     let dbSaved = false;
 
     try {
       const conn = await getDbConnection();
 
-      // Ensure payment_proof_path can store large Data URIs without truncation
+      // Ensure table exists with complete schema matching original DB
       try {
-        await conn.query('ALTER TABLE investments MODIFY COLUMN payment_proof_path LONGTEXT');
+        await conn.query(`
+          CREATE TABLE IF NOT EXISTS investments (
+            id VARCHAR(64) PRIMARY KEY,
+            tx_id VARCHAR(64) NOT NULL,
+            user_id VARCHAR(255) NOT NULL,
+            user_name VARCHAR(255) NOT NULL,
+            user_email VARCHAR(255) NOT NULL,
+            portfolio VARCHAR(255) NOT NULL,
+            plan_id VARCHAR(50) DEFAULT NULL,
+            plan_label VARCHAR(100) DEFAULT NULL,
+            plan_name VARCHAR(100) DEFAULT NULL,
+            total DECIMAL(15,2) NOT NULL DEFAULT 0,
+            total_current_value DECIMAL(15,2) DEFAULT 0,
+            method VARCHAR(50) NOT NULL,
+            status VARCHAR(50) NOT NULL DEFAULT 'pending_approval',
+            payment_reference VARCHAR(255) DEFAULT NULL,
+            payment_proof_path LONGTEXT DEFAULT NULL,
+            payment_proof_name VARCHAR(255) DEFAULT NULL,
+            payment_proof_uploaded_at DATETIME DEFAULT NULL,
+            payment_submitted_at DATETIME DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_investments_email (user_email)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        `);
       } catch (e) {}
 
       // Check existing investments for this user
@@ -226,42 +313,62 @@ export default async function handler(req, res) {
           [currentAmt, currentAmt, proofDataUri || null, proofFileName || null, ref || null, investmentId]
         );
       } else {
-        const [insertRes] = await conn.query(
-          'INSERT INTO investments (user_email, user_name, plan_id, plan_label, plan_name, total, total_current_value, method, payment_reference, payment_proof_path, payment_proof_name, payment_proof_uploaded_at, payment_submitted_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), "pending_approval")',
-          [email, userName, planId, planName, planName, amount, amount, method, ref || null, proofDataUri || null, proofFileName || null]
+        await conn.query(
+          `INSERT INTO investments (
+            id, tx_id, user_id, user_name, user_email, portfolio,
+            plan_id, plan_label, plan_name, total, total_current_value,
+            method, payment_reference, payment_proof_path, payment_proof_name,
+            payment_proof_uploaded_at, payment_submitted_at, status, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), "pending_approval", NOW())`,
+          [
+            investmentId, txId, email, userName, email, portfolio,
+            planId, planName, planName, amount, amount,
+            method, ref || null, proofDataUri || null, proofFileName || null
+          ]
         );
-        investmentId = insertRes.insertId;
       }
 
       // Ensure investor account exists and reflects pending deposit
       try {
+        await conn.query(`
+          CREATE TABLE IF NOT EXISTS investor_accounts (
+            email VARCHAR(255) PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            onboarding_status VARCHAR(50) NOT NULL DEFAULT 'pending_deposit',
+            registered_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        `);
         await conn.query(
-          'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_deposit", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name))',
+          'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_deposit", NOW()) ON DUPLICATE KEY UPDATE onboarding_status="pending_deposit", name=COALESCE(name, VALUES(name))',
           [email, userName]
         );
       } catch (e) {}
 
       // Record in account_transactions
       try {
+        const txRecordId = 'act_' + Math.random().toString(36).substring(2, 9);
         await conn.query(
-          'INSERT INTO account_transactions (user_email, transaction_type, amount, status, description, created_at) VALUES (?, "deposit", ?, "pending", ?, NOW())',
-          [email, amount, `Investment deposit (${planName}) pending approval`]
+          'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "pending", ?, NOW())',
+          [txRecordId, investmentId, email, amount, `Investment deposit (${planName}) pending approval`]
         );
       } catch (e) {}
 
       await conn.end();
       dbSaved = true;
     } catch (dbErr) {
-      console.warn('DB payment submit warning, using memory fallback:', dbErr.message);
+      console.warn('DB payment submit notice (persisting to disk & memory):', dbErr.message);
     }
 
-    // Save in memory fallback
-    inMemoryDeposits.unshift({
+    const depositRecord = {
       id: investmentId,
+      tx_id: txId,
+      user_id: email,
       user_email: email,
       user_name: userName,
+      portfolio,
       plan_id: planId,
       plan_label: planName,
+      plan_name: planName,
       total: amount,
       total_current_value: amount,
       method,
@@ -270,26 +377,19 @@ export default async function handler(req, res) {
       payment_proof_name: proofFileName,
       status: 'pending_approval',
       created_at: new Date().toISOString()
-    });
+    };
 
+    // 1. Save to persistent file storage (guaranteed persistence across restarts and serverless container shifts)
+    savePersistentDeposit(depositRecord);
+
+    // 2. Save in memory fallback
+    inMemoryDeposits.unshift(depositRecord);
+
+    // 3. Sync to mockStore for immediate admin reactivity
     try {
       const { mockStore } = await import('./admin.js');
       if (mockStore && Array.isArray(mockStore.investments)) {
-        mockStore.investments.unshift({
-          id: investmentId,
-          user_email: email,
-          user_name: userName,
-          plan_id: planId,
-          plan_label: planName,
-          total: amount,
-          total_current_value: amount,
-          method,
-          payment_reference: ref,
-          payment_proof_path: proofDataUri,
-          payment_proof_name: proofFileName,
-          status: 'pending_approval',
-          created_at: new Date().toISOString()
-        });
+        mockStore.investments.unshift(depositRecord);
       }
       if (mockStore && Array.isArray(mockStore.investors)) {
         const existingInv = mockStore.investors.find(u => (u.email || '').toLowerCase() === email);

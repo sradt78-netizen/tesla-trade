@@ -75,7 +75,7 @@ export async function getDbConnection() {
     password: cfg.password,
     database: cfg.database,
     ssl: cfg.ssl,
-    connectTimeout: 2500
+    connectTimeout: 10000
   });
 }
 
@@ -100,7 +100,7 @@ export default async function handler(req, res) {
       password: cfg.password,
       database: cfg.database,
       ssl: cfg.ssl,
-      connectTimeout: 2500
+      connectTimeout: 10000
     });
 
     const [tables] = await connection.query('SHOW TABLES');

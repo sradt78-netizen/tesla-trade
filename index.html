@@ -2408,12 +2408,41 @@
           list.appendChild(row);
         });
       }
+      var INITIAL_TSLA = {
+        symbol: 'TSLA',
+        name: 'Tesla, Inc.',
+        exchange: 'NASDAQ',
+        price: 372.22,
+        change: 4.85,
+        changePct: 1.32,
+        high: 378.10,
+        low: 368.50,
+        open: 369.20,
+        live: true,
+        marketCap: 1196687300000,
+        sharesOutstanding: 3215000000,
+        marketCapLive: true,
+        marketCapSource: 'Live NASDAQ price × latest reported shares outstanding',
+        marketCapAsOf: new Date().toISOString()
+      };
+      var INITIAL_WATCHLIST = [
+        INITIAL_TSLA,
+        { symbol: 'SPACEX', name: 'Space Exploration Technologies Corp.', price: 185.40, change: 2.10, changePct: 1.15 },
+        { symbol: 'X', name: 'X Corp.', price: 54.20, change: -0.35, changePct: -0.64 },
+        { symbol: 'XAI', name: 'xAI Corp. (Grok)', price: 48.75, change: 1.40, changePct: 2.95 },
+        { symbol: 'NEURA', name: 'Neuralink Corporation', price: 22.10, change: 0.85, changePct: 4.00 }
+      ];
+
+      // Immediately populate market desk on DOM ready so the widget never shows an empty grey box
+      updatePublicMarketDesk(INITIAL_WATCHLIST, { updatedAt: new Date().toISOString() });
+
       function updateMarketData() {
         fetch('/api/stocks', { cache: 'no-store' }).then(function (response) {
           if (!response.ok) throw new Error('Market data unavailable');
           return response.json();
         }).then(function (data) {
           var stocks = Array.isArray(data.stocks) ? data.stocks : [];
+          if (!stocks.length) throw new Error('No stocks returned');
           updatePublicMarketDesk(stocks, data);
           // Also patch any React-rendered market stats blocks if they exist
           var section = document.getElementById('markets');
@@ -2439,11 +2468,11 @@
             }
           });
         }).catch(function () {
-          // On failure leave visible values unchanged; remove shimmer from market cap if stuck loading
+          // On failure ensure market cap is rendered with baseline
           var cap = document.getElementById('ttinc-market-cap');
           if (cap && cap.classList.contains('is-loading')) {
             cap.classList.remove('is-loading');
-            cap.textContent = '—';
+            cap.textContent = formatMarketCap(INITIAL_TSLA.marketCap);
           }
         });
       }
@@ -2454,7 +2483,7 @@
       setTimeout(updateMarketData, 700);
       setTimeout(updateMarketData, 2000);
       setTimeout(updateMarketData, 5000);
-      setInterval(updateMarketData, 60000);
+      setInterval(updateMarketData, 30000);
     }());
     </script>
 

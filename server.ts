@@ -13,6 +13,7 @@ import otpHandler from './api/_handlers/otp.js';
 import authHandler from './api/_handlers/auth.js';
 import supabaseConfigHandler from './api/_handlers/supabase-config.js';
 import accountsHandler from './api/_handlers/accounts.js';
+import stocksHandler from './api/_handlers/stocks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -220,6 +221,7 @@ app.all(
   ['/api/accounts', '/api/profile', '/api/my-status', '/api/account-status', '/api/transactions'],
   (req, res) => accountsHandler(req, res)
 );
+app.all(['/api/stocks', '/api/stocks.php'], (req, res) => stocksHandler(req, res));
 app.all(['/api/payment-settings', '/api/payment-settings.php'], (req, res) => paymentSettingsHandler(req, res));
 const upload = multer({
   storage: multer.memoryStorage(),

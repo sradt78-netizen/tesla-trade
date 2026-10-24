@@ -256,62 +256,91 @@
 </head>
 <body>
 
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <div class="sidebar-logo">T</div>
-      <div class="sidebar-brand">Tesla <span>Trade</span> Admin</div>
-    </div>
-    <nav class="sidebar-nav">
-      <button class="nav-btn active" onclick="switchTab('investors')">
-        <span>👥 Investors</span> <span class="badge" id="b-investors">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('investment-receipts')">
-        <span>💰 Deposit Receipts</span> <span class="badge amber" id="b-dep-receipts">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('receipts')">
-        <span>🧾 Shop Receipts</span> <span class="badge amber" id="b-receipts">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('kyc')">
-        <span>🪪 KYC Submissions</span> <span class="badge amber" id="b-kyc">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('withdrawals')">
-        <span>💸 Withdrawals</span> <span class="badge red" id="b-withdrawals">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('financing')">
-        <span>🚘 Financing</span> <span class="badge" id="b-financing">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('access')">
-        <span>🔐 Invitation Codes</span> <span class="badge green" id="b-codes">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('marketing')">
-        <span>📣 Marketing &amp; Emails</span> <span class="badge green" id="b-marketing">Autopilot</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('trading')">
-        <span>📈 Trading Graph Engine</span> <span class="badge green" id="b-trading">Live</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('activity-logs')">
-        <span>📜 Activity Logs</span> <span class="badge blue" id="b-logs" style="background:#1e3a8a;color:#93c5fd;font-weight:700;">0</span>
-      </button>
-      <button class="nav-btn" onclick="switchTab('settings')">
-        <span>⚙️ Settings &amp; Envs</span> <span class="badge" id="b-telegram-status" style="background:#172554;color:#60a5fa;font-size:10px;">Telegram</span>
-      </button>
-    </nav>
-  </aside>
+  <!-- ADMIN AUTHENTICATION SECURITY GATE -->
+  <div id="adminLoginGate" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#08090b;display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px;">
+    <div style="background:#12141a;border:1px solid #232732;border-radius:16px;width:100%;max-width:440px;padding:36px 32px;box-shadow:0 20px 40px rgba(0,0,0,0.8);text-align:center;">
+      <div style="width:48px;height:48px;background:#e31937;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:#fff;">T</div>
+      <h2 style="font-size:22px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-0.5px;">Tesla Trade Inc Admin</h2>
+      <p style="font-size:13px;color:#94a3b8;margin-bottom:24px;line-height:1.5;">Enter your Administrator Master Password to unlock the administrative dashboard, customer deposit receipts, and trading engine.</p>
 
-  <!-- Main Content Area -->
-  <main class="main">
-    <header>
-      <div class="header-title">
-        <h1 id="panelTitle">Investor Management</h1>
-        <p id="panelDesc">View all registered accounts, credit money/balance, and manage investments</p>
+      <div id="adminLoginError" style="display:none;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:18px;text-align:left;"></div>
+
+      <form onsubmit="handleAdminLoginSubmit(event)" style="display:flex;flex-direction:column;gap:14px;text-align:left;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Administrator Password</label>
+          <div style="position:relative;">
+            <input type="password" id="adminGatePassword" required placeholder="Enter admin password..." autocomplete="current-password" style="width:100%;background:#090a0d;border:1px solid #2a303d;border-radius:8px;padding:12px 42px 12px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;" />
+            <button type="button" onclick="toggleGatePasswordVisibility()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#94a3b8;cursor:pointer;padding:6px;font-size:16px;">👁️</button>
+          </div>
+        </div>
+        <button type="submit" id="adminGateSubmitBtn" class="primary" style="width:100%;padding:12px;font-size:14px;font-weight:700;justify-content:center;margin-top:4px;border-radius:8px;">
+          🔓 Sign In to Dashboard
+        </button>
+      </form>
+      <div style="margin-top:20px;font-size:11px;color:#64748b;line-height:1.4;">
+        Secured by environment variable <code style="color:#e2e8f0;background:#1a1e27;padding:2px 6px;border-radius:4px;">ADMIN_PASSWORD</code>. Changing the variable immediately requires the new password.
       </div>
-      <div class="header-actions">
-        <button type="button" class="success" onclick="openCreditModal()">💰 Add Money to Investor</button>
-        <button type="button" onclick="loadDashboardData()">🔄 Refresh</button>
-        <a href="/" style="text-decoration: none;"><button type="button">🌐 Public Site</button></a>
+    </div>
+  </div>
+
+  <div id="adminApp" style="display:none;width:100%;min-height:100vh;">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">T</div>
+        <div class="sidebar-brand">Tesla <span>Trade</span> Admin</div>
       </div>
-    </header>
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" onclick="switchTab('investors')">
+          <span>👥 Investors</span> <span class="badge" id="b-investors">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('investment-receipts')">
+          <span>💰 Deposit Receipts</span> <span class="badge amber" id="b-dep-receipts">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('receipts')">
+          <span>🧾 Shop Receipts</span> <span class="badge amber" id="b-receipts">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('kyc')">
+          <span>🪪 KYC Submissions</span> <span class="badge amber" id="b-kyc">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('withdrawals')">
+          <span>💸 Withdrawals</span> <span class="badge red" id="b-withdrawals">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('financing')">
+          <span>🚘 Financing</span> <span class="badge" id="b-financing">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('access')">
+          <span>🔐 Invitation Codes</span> <span class="badge green" id="b-codes">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('marketing')">
+          <span>📣 Marketing &amp; Emails</span> <span class="badge green" id="b-marketing">Autopilot</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('trading')">
+          <span>📈 Trading Graph Engine</span> <span class="badge green" id="b-trading">Live</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('settings')">
+          <span>⚙️ Settings &amp; Envs</span>
+        </button>
+        <button class="nav-btn" onclick="logoutAdmin()" style="margin-top:auto;color:#f87171;border-top:1px solid var(--card-border);padding-top:12px;">
+          <span>🚪 Log Out</span>
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main">
+      <header>
+        <div class="header-title">
+          <h1 id="panelTitle">Investor Management</h1>
+          <p id="panelDesc">View all registered accounts, credit money/balance, and manage investments</p>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="success" onclick="openCreditModal()">💰 Add Money to Investor</button>
+          <button type="button" onclick="loadDashboardData()">🔄 Refresh</button>
+          <button type="button" onclick="logoutAdmin()" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.35);color:#f87171;font-weight:600;">🚪 Log Out</button>
+          <a href="/" style="text-decoration: none;"><button type="button">🌐 Public Site</button></a>
+        </div>
+      </header>
 
     <!-- LIVE SYSTEM HEALTH STRIP -->
     <div style="background:#11141a;border:1px solid #232a36;border-radius:10px;padding:10px 16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:12px;">
@@ -840,176 +869,15 @@
       </div>
     </section>
 
-    <!-- TAB 10: USER ACTIVITY & MONITORING LOGS -->
-    <section id="tab-activity-logs" style="display: none;">
-      <div class="card" style="margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
-          <div>
-            <h3 style="font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 4px;">📜 Real-Time User Action & Security Audit Logs</h3>
-            <p style="font-size: 12px; color: var(--muted); margin: 0;">
-              High-security, encrypted event stream tracking investor registrations, OTP verifications, deposit submissions, approvals, link clicks, and logins.
-            </p>
-          </div>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <button type="button" class="primary" style="padding: 6px 14px; font-size: 12px;" onclick="loadActivityLogs()">🔄 Refresh Logs</button>
-            <button type="button" style="padding: 6px 14px; font-size: 12px;" onclick="exportActivityLogs()">📥 Export JSON</button>
-          </div>
-        </div>
-
-        <!-- Filter Bar -->
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; background: #0c0d10; padding: 12px; border-radius: 8px; border: 1px solid #1f232b;">
-          <div style="flex: 1; min-width: 220px;">
-            <input type="text" id="logSearchInput" placeholder="🔍 Filter by email, IP, action, or details..." oninput="filterActivityLogs()" style="width: 100%; box-sizing: border-box; background: #14171f; border: 1px solid #2a303d; border-radius: 6px; padding: 8px 12px; color: #fff; font-size: 13px;" />
-          </div>
-          <div>
-            <select id="logActionFilter" onchange="filterActivityLogs()" style="background: #14171f; border: 1px solid #2a303d; border-radius: 6px; padding: 8px 12px; color: #fff; font-size: 13px;">
-              <option value="all">All Action Types</option>
-              <option value="INVESTOR_SIGNUP">👤 Investor Signups</option>
-              <option value="DEPOSIT_SUBMITTED">💰 Deposit Submissions</option>
-              <option value="DEPOSIT_APPROVED">✅ Deposit Approvals</option>
-              <option value="USER_LOGIN">🔑 Investor Logins</option>
-              <option value="PASSWORD_SET">🔒 Passwords Set</option>
-              <option value="OTP_REQUESTED">📲 OTP Requests</option>
-              <option value="OTP_VERIFIED">✔️ OTP Verified</option>
-              <option value="LINK_CLICK">🔗 Link & Campaign Clicks</option>
-              <option value="SETTINGS_SAVED">⚙️ Admin Settings Changed</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Logs Table -->
-        <div style="overflow-x: auto;">
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 160px;">Timestamp</th>
-                <th style="width: 170px;">Action</th>
-                <th>User / Investor</th>
-                <th style="width: 130px;">IP Address</th>
-                <th>Action Details & Payload</th>
-                <th style="width: 90px;">Status</th>
-              </tr>
-            </thead>
-            <tbody id="activityLogsTableBody">
-              <tr>
-                <td colspan="6" style="text-align: center; color: var(--muted); padding: 30px;">Loading real-time activity logs...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- TAB 11: SETTINGS & ENVS -->
+    <!-- TAB 10: SETTINGS & ENVS -->
     <section id="tab-settings" style="display: none;">
-      <!-- TELEGRAM NOTIFICATIONS CARD -->
-      <div class="card" style="margin-bottom: 20px; border-left: 4px solid #0284c7; background: linear-gradient(180deg, #0d1520 0%, #0c0e12 100%);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="width: 36px; height: 36px; border-radius: 50%; background: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 18px;">
-              ✈️
-            </div>
-            <div>
-              <h3 style="font-size: 16px; font-weight: 700; color: #fff; margin: 0;">Telegram Real-Time Admin Alerts</h3>
-              <p style="font-size: 12px; color: #94a3b8; margin: 2px 0 0;">
-                Receive instant, encrypted alerts on your phone or desktop for every investor signup, deposit submission, payment proof, and link click.
-              </p>
-            </div>
-          </div>
-          <div id="telegramStatusBadge">
-            <span class="badge" style="background: #1e293b; color: #94a3b8; padding: 6px 12px; font-weight: 600;">Checking Telegram Status...</span>
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 14px;">
-          <div class="form-group">
-            <label style="display: flex; justify-content: space-between; align-items: center;">
-              <span>Telegram Bot API Token</span>
-              <a href="https://t.me/BotFather" target="_blank" style="color: #38bdf8; font-size: 11px; text-decoration: none;">Get token from @BotFather ↗</a>
-            </label>
-            <input type="password" id="cfg-telegram-token" placeholder="e.g. 7123456789:AAFlPzM... (from @BotFather)" />
-            <small style="color: var(--muted); font-size: 11px; display: block; margin-top: 4px;">
-              Created by sending <code>/newbot</code> to <b>@BotFather</b> in Telegram.
-            </small>
-          </div>
-
-          <div class="form-group">
-            <label style="display: flex; justify-content: space-between; align-items: center;">
-              <span>Telegram Chat ID</span>
-              <a href="https://t.me/userinfobot" target="_blank" style="color: #38bdf8; font-size: 11px; text-decoration: none;">Get Chat ID from @userinfobot ↗</a>
-            </label>
-            <input type="text" id="cfg-telegram-chat-id" placeholder="e.g. 583920194 or channel/group ID" />
-            <small style="color: var(--muted); font-size: 11px; display: block; margin-top: 4px;">
-              Your numeric Telegram user or group ID (send <code>/start</code> to <b>@userinfobot</b> to see your ID).
-            </small>
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
-          <button type="button" class="primary" style="background: #0284c7; padding: 10px 20px; font-weight: 700;" onclick="testTelegramNotification()">
-            ⚡ Send Test Telegram Notification
-          </button>
-          <button type="button" class="success" style="padding: 10px 20px; font-weight: 700;" onclick="saveSettings()">
-            💾 Save Telegram Settings
-          </button>
-        </div>
-        <div id="telegramTestResult" style="margin-top: 10px; font-size: 12px; display: none;"></div>
-      </div>
-
-      <!-- DATABASE CONNECTIVITY & PERSISTENT STORAGE CARD -->
-      <div class="card" style="margin-bottom: 20px; border-left: 4px solid #22c55e;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-          <div>
-            <h3 style="font-size: 15px; font-weight: 700; color: #fff; margin: 0;">⚡ Database Connectivity &amp; Storage Engine</h3>
-            <p style="font-size: 12px; color: var(--muted); margin: 2px 0 0;">
-              Multi-tier persistence ensures investor accounts, pending deposits, and receipts are safely propagated and stored in real-time.
-            </p>
-          </div>
-          <div id="dbEngineBadge">
-            <span class="badge green" style="padding: 6px 12px;">Persistent Engine Active</span>
-          </div>
-        </div>
-
-        <div id="envDiagnosticBox" style="font-size: 13px; line-height: 1.8; color: var(--muted); margin-bottom: 16px; background: #0c0e12; padding: 12px; border-radius: 8px; border: 1px solid #1f232b;">
+      <div class="card" style="margin-bottom: 20px;">
+        <h3 style="font-size: 15px; margin-bottom: 10px;">⚡ Database & Environment Variables Status</h3>
+        <div id="envDiagnosticBox" style="font-size: 13px; line-height: 1.8; color: var(--muted);">
           Checking database connection and Vercel environment variables...
         </div>
-
-        <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Configure MySQL / MariaDB Server (Optional Remote Sync)</h4>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
-          <div class="form-group">
-            <label>Database Host</label>
-            <input type="text" id="cfg-db-host" placeholder="localhost or remote-mysql-host.com" />
-          </div>
-          <div class="form-group">
-            <label>Port</label>
-            <input type="text" id="cfg-db-port" placeholder="3306" value="3306" />
-          </div>
-          <div class="form-group">
-            <label>Database User</label>
-            <input type="text" id="cfg-db-user" placeholder="root or cpanel_user" />
-          </div>
-          <div class="form-group">
-            <label>Database Password</label>
-            <input type="password" id="cfg-db-password" placeholder="••••••••••••" />
-          </div>
-          <div class="form-group">
-            <label>Database Name</label>
-            <input type="text" id="cfg-db-name" placeholder="defaultdb" value="defaultdb" />
-          </div>
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap;">
-          <button type="button" class="success" style="padding: 10px 18px; font-weight: 700;" onclick="testDatabaseConnection()">
-            🔌 Test &amp; Save Database Connection
-          </button>
-          <button type="button" style="padding: 10px 18px;" onclick="loadDbDiagnostics()">
-            🔄 Recheck Diagnostics
-          </button>
-        </div>
-        <div id="dbTestResult" style="margin-top: 10px; font-size: 12px; display: none;"></div>
       </div>
 
-      <!-- WALLETS AND BANK -->
       <div class="card">
         <h3 style="font-size: 15px; margin-bottom: 14px;">⚙️ Payment Wallet & Bank Settings</h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
@@ -1051,7 +919,6 @@
         <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save Payment Settings</button>
       </div>
 
-      <!-- RESEND AND SUPABASE -->
       <div class="card" style="margin-top: 20px;">
         <h3 style="font-size: 15px; margin-bottom: 14px;">🔑 Resend Email API & Supabase Authentication</h3>
         <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
@@ -1085,6 +952,7 @@
       </div>
     </section>
   </main>
+  </div><!-- /adminApp -->
 
   <!-- MODAL: ADD MONEY / CREDIT BALANCE -->
   <div class="modal-overlay" id="creditModal">
@@ -1148,7 +1016,7 @@
     var globalData = {};
 
     function switchTab(tabId) {
-      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'trading', 'activity-logs', 'settings'];
+      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'trading', 'settings'];
       tabs.forEach(function(t) {
         var el = document.getElementById('tab-' + t);
         if (el) el.style.display = (t === tabId) ? 'block' : 'none';
@@ -1172,8 +1040,7 @@
         access: ['Private Invitation Access', 'Manage active and revoked investor invitation tokens'],
         marketing: ['Marketing & Click Analytics', 'Track domain clicks, referral sources, and campaigns'],
         trading: ['Trading Graph Engine & Control', 'Configure live profit and loss cycle intervals, gain/loss percentages, and graph dynamics on investors dashboard'],
-        'activity-logs': ['Real-Time User Action & Audit Logs', 'Comprehensive tracking stream for all investor signups, payments, link clicks, logins, and system events'],
-        settings: ['System Settings, Telegram & Database', 'Real-time Telegram notifications, MySQL connectivity, Resend email, and payment wallets']
+        settings: ['System Settings & Environment', 'Database health, Vercel environment variables, and wallets']
       };
 
       if (titles[tabId]) {
@@ -1184,13 +1051,111 @@
       if (tabId === 'trading') {
         initTradingSimCanvas();
       }
-      if (tabId === 'activity-logs') {
-        loadActivityLogs();
+    }
+
+    function toggleGatePasswordVisibility() {
+      var inp = document.getElementById('adminGatePassword');
+      if (inp) {
+        inp.type = inp.type === 'password' ? 'text' : 'password';
       }
     }
 
+    function getAdminPassword() {
+      return sessionStorage.getItem('ttinc_admin_password') || '';
+    }
+
+    function showLoginGate(msg) {
+      var gate = document.getElementById('adminLoginGate');
+      var app = document.getElementById('adminApp');
+      if (app) app.style.display = 'none';
+      if (gate) gate.style.display = 'flex';
+      var err = document.getElementById('adminLoginError');
+      if (err) {
+        if (msg) {
+          err.textContent = msg;
+          err.style.display = 'block';
+        } else {
+          err.style.display = 'none';
+        }
+      }
+    }
+
+    function logoutAdmin() {
+      sessionStorage.removeItem('ttinc_admin_password');
+      window.__proofCache = {};
+      showLoginGate('You have been logged out securely.');
+    }
+
+    function handleAdminLoginSubmit(e) {
+      if (e) e.preventDefault();
+      var input = document.getElementById('adminGatePassword');
+      var pass = input ? input.value.trim() : '';
+      if (!pass) return;
+
+      var btn = document.getElementById('adminGateSubmitBtn');
+      var err = document.getElementById('adminLoginError');
+      if (err) err.style.display = 'none';
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Verifying password…';
+      }
+
+      fetch('/api/admin?action=verify_auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': pass
+        },
+        body: JSON.stringify({ action: 'verify_auth', password: pass })
+      }).then(function(r) {
+        if (r.status === 401) throw new Error('Incorrect admin password. Please try again.');
+        if (!r.ok) throw new Error('Verification failed. Server responded with status ' + r.status);
+        return r.json();
+      }).then(function(data) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '🔓 Sign In to Dashboard';
+        }
+        if (data.authenticated || data.success) {
+          sessionStorage.setItem('ttinc_admin_password', pass);
+          document.getElementById('adminLoginGate').style.display = 'none';
+          document.getElementById('adminApp').style.display = 'flex';
+          loadDashboardData();
+          loadTradingSettings();
+        } else {
+          throw new Error(data.error || 'Incorrect admin password.');
+        }
+      }).catch(function(error) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '🔓 Sign In to Dashboard';
+        }
+        if (err) {
+          err.textContent = error.message || 'Incorrect admin password.';
+          err.style.display = 'block';
+        }
+      });
+    }
+
+    function adminFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      var pass = getAdminPassword();
+      if (pass) {
+        options.headers['x-admin-password'] = pass;
+      }
+      return fetch(url, options).then(function(res) {
+        if (res.status === 401) {
+          sessionStorage.removeItem('ttinc_admin_password');
+          showLoginGate('Administrator password has changed in environment variables or session expired. Please sign in with your updated password.');
+          throw new Error('Admin unauthorized');
+        }
+        return res;
+      });
+    }
+
     function loadDashboardData() {
-      fetch('/api/admin?action=all_data')
+      adminFetch('/api/admin?action=all_data')
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (!data || !data.success) return;
@@ -1233,6 +1198,8 @@
       document.getElementById('stat-active-inv').textContent = activeCount;
       document.getElementById('b-dep-receipts').textContent = depReceiptsList.length;
 
+      window.__proofCache = window.__proofCache || {};
+
       if (!investors.length) {
         invBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No registered accounts found.</td></tr>';
       } else {
@@ -1242,19 +1209,18 @@
           var inv = invMap[em] || {};
           var bal = parseFloat(inv.total || '0');
           var cur = parseFloat(inv.total_current_value || inv.total || '0');
-          var isDepositPending = inv.status === 'pending_approval';
-          var statusBadge = isDepositPending
-            ? '<span class="badge amber" style="background:#eab30822;color:#facc15;border:1px solid #eab30855;font-weight:700;">Deposit Pending ($' + bal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ')</span>'
-            : (u.onboarding_status === 'verified' ? '<span class="badge green">Verified</span>' : '<span class="badge amber">' + (u.onboarding_status || 'active') + '</span>');
+          var statusBadge = u.onboarding_status === 'verified' ? '<span class="badge green">Verified</span>' : '<span class="badge amber">' + (u.onboarding_status || 'active') + '</span>';
+
+          if (inv.payment_proof_path) {
+            window.__proofCache['user_' + em] = inv.payment_proof_path;
+            if (inv.id) window.__proofCache['dep_' + inv.id] = inv.payment_proof_path;
+          }
 
           var rcptBtn = inv.payment_proof_path
-            ? '<button type="button" class="primary" style="padding: 3px 6px; font-size: 11px;" onclick="showImageModal(\'' + inv.payment_proof_path + '\', \'Deposit Receipt: ' + em + '\')">🔍 View Receipt</button>'
+            ? '<button type="button" class="primary" style="padding: 3px 6px; font-size: 11px;" onclick="viewCachedProof(\'user_' + em + '\', \'Deposit Receipt: ' + em + '\')">🔍 View Receipt</button>'
             : (inv.payment_reference ? '<span style="color: var(--muted); font-size: 11px;">Ref: ' + inv.payment_reference + '</span>' : '<span style="color: var(--muted); font-size: 11px;">None</span>');
 
-          var approveDepositBtn = isDepositPending
-            ? '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px; background:#22c55e; color:#000; font-weight:700; border-radius:4px;" onclick="depositAction(\'' + inv.id + '\', \'approve_deposit\')">✓ Approve Deposit</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; margin-right: 4px; color:#fca5a5; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); border-radius:4px;" onclick="depositAction(\'' + inv.id + '\', \'reject_deposit\')">Decline</button>'
-            : '';
+          var regDate = u.registered_at ? u.registered_at.substring(0, 10) : '—';
 
           iRows += '<tr>' +
             '<td style="font-weight: 600;">' + (u.name || 'Investor') + '</td>' +
@@ -1263,8 +1229,8 @@
             '<td style="color: #4ade80; font-weight: 600;">$' + bal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
             '<td style="color: #60a5fa; font-weight: 600;">$' + cur.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
             '<td>' + rcptBtn + '</td>' +
+            '<td style="font-size: 12px; color: var(--muted);">' + regDate + '</td>' +
             '<td>' +
-              approveDepositBtn +
               '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="openCreditForEmail(\'' + u.email + '\')">＋ Add Money</button>' +
               '<button type="button" style="padding: 4px 8px; font-size: 11px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 6px; cursor: pointer;" onclick="deleteInvestor(\'' + u.email + '\')">🗑 Delete</button>' +
             '</td>' +
@@ -1280,8 +1246,12 @@
       } else {
         var dRows = '';
         depReceiptsList.forEach(function(inv) {
+          if (inv.payment_proof_path) {
+            window.__proofCache['dep_' + inv.id] = inv.payment_proof_path;
+          }
+
           var imgBtn = inv.payment_proof_path
-            ? '<button type="button" class="primary" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + inv.payment_proof_path + '\', \'Deposit Receipt: ' + (inv.user_email || '') + '\')">🔍 View Receipt</button>'
+            ? '<button type="button" class="primary" style="padding: 4px 8px; font-size: 11px;" onclick="viewCachedProof(\'dep_' + inv.id + '\', \'Deposit Receipt: ' + (inv.user_email || '') + '\')">🔍 View Receipt</button>'
             : '<span style="color: var(--muted); font-size: 11px;">' + (inv.payment_reference ? 'Ref: ' + inv.payment_reference : 'No file attached') + '</span>';
 
           var statusBadge = inv.status === 'active' ? '<span class="badge green">Active / Approved</span>' : (inv.status === 'declined' ? '<span class="badge red">Declined</span>' : '<span class="badge amber">' + (inv.status || 'pending_approval') + '</span>');
@@ -1312,8 +1282,11 @@
       } else {
         var rRows = '';
         orders.forEach(function(o) {
+          if (o.payment_proof_path) {
+            window.__proofCache['ord_' + o.id] = o.payment_proof_path;
+          }
           var imgBtn = o.payment_proof_path
-            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + o.payment_proof_path + '\', \'Order Receipt #' + o.id + '\')">🔍 View Receipt</button>'
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="viewCachedProof(\'ord_' + o.id + '\', \'Order Receipt #' + o.id + '\')">🔍 View Receipt</button>'
             : '<span style="color: var(--muted); font-size: 11px;">No proof</span>';
 
           var statusBadge = o.status === 'approved' ? '<span class="badge green">Approved</span>' : '<span class="badge amber">' + (o.status || 'pending') + '</span>';
@@ -1344,11 +1317,14 @@
       } else {
         var kRows = '';
         kycList.forEach(function(k) {
+          if (k.id_document_path) window.__proofCache['kyc_id_' + k.id] = k.id_document_path;
+          if (k.selfie_path) window.__proofCache['kyc_self_' + k.id] = k.selfie_path;
+
           var idImg = k.id_document_path
-            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + k.id_document_path + '\', \'ID Document - ' + (k.full_name || '') + '\')">🪪 View ID</button>'
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="viewCachedProof(\'kyc_id_' + k.id + '\', \'ID Document - ' + (k.full_name || '') + '\')">🪪 View ID</button>'
             : '—';
           var selfieImg = k.selfie_path
-            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="showImageModal(\'' + k.selfie_path + '\', \'Selfie - ' + (k.full_name || '') + '\')">🤳 View Selfie</button>'
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="viewCachedProof(\'kyc_self_' + k.id + '\', \'Selfie - ' + (k.full_name || '') + '\')">🤳 View Selfie</button>'
             : '—';
           var statusBadge = k.status === 'approved' ? '<span class="badge green">Approved</span>' : '<span class="badge amber">' + (k.status || 'pending') + '</span>';
 
@@ -1387,8 +1363,8 @@
             '<td style="font-family: monospace; font-size: 12px;">' + (w.destination || '—') + '</td>' +
             '<td>' + statusBadge + '</td>' +
             '<td>' +
-              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="wdAction(\'' + w.id + '\', \'approve_withdrawal\')">Approve</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="wdAction(\'' + w.id + '\', \'reject_withdrawal\')">Reject</button>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="wdAction(' + w.id + ', \'approve_withdrawal\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="wdAction(' + w.id + ', \'reject_withdrawal\')">Reject</button>' +
             '</td>' +
             '</tr>';
         });
@@ -1412,8 +1388,8 @@
             '<td>$' + Number(f.down_payment || 0).toLocaleString() + '</td>' +
             '<td><span class="badge amber">' + (f.status || 'pending') + '</span></td>' +
             '<td>' +
-              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="finAction(\'' + f.id + '\', \'approve_financing\')">Approve</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="finAction(\'' + f.id + '\', \'reject_financing\')">Decline</button>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="finAction(' + f.id + ', \'approve_financing\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="finAction(' + f.id + ', \'reject_financing\')">Decline</button>' +
             '</td>' +
             '</tr>';
         });
@@ -1513,27 +1489,6 @@
         mkLogBody.innerHTML = mRows;
       }
 
-      // 8B. Activity Logs
-      if (document.getElementById('b-logs')) {
-        document.getElementById('b-logs').textContent = (data.activityLogs || []).length;
-      }
-      renderActivityLogs(data.activityLogs || []);
-
-      // 8C. Telegram Status Badge
-      var tgConfigured = data.telegram && data.telegram.configured;
-      var tgBadge = document.getElementById('telegramStatusBadge');
-      var bTg = document.getElementById('b-telegram-status');
-      if (tgBadge) {
-        tgBadge.innerHTML = tgConfigured
-          ? '<span class="badge green" style="background:#052e16;color:#4ade80;border:1px solid #166534;padding:6px 14px;font-weight:700;">🟢 Telegram Alerts Active</span>'
-          : '<span class="badge amber" style="background:#451a03;color:#fbbf24;border:1px solid #78350f;padding:6px 14px;font-weight:700;">⚠️ Bot Token or Chat ID Missing</span>';
-      }
-      if (bTg) {
-        bTg.textContent = tgConfigured ? 'Active' : 'Setup';
-        bTg.style.background = tgConfigured ? '#052e16' : '#78350f';
-        bTg.style.color = tgConfigured ? '#4ade80' : '#fbbf24';
-      }
-
       // 9. Settings
       var s = data.settings || {};
       if (s.wallet_usdt && document.getElementById('cfg-usdt')) document.getElementById('cfg-usdt').value = s.wallet_usdt;
@@ -1547,13 +1502,6 @@
       if (s.resend_from_email && document.getElementById('cfg-resend-from')) document.getElementById('cfg-resend-from').value = s.resend_from_email;
       if (s.supabase_url && document.getElementById('cfg-supabase-url')) document.getElementById('cfg-supabase-url').value = s.supabase_url;
       if (s.supabase_anon_key && document.getElementById('cfg-supabase-anon')) document.getElementById('cfg-supabase-anon').value = s.supabase_anon_key;
-      if (s.telegram_bot_token && document.getElementById('cfg-telegram-token')) document.getElementById('cfg-telegram-token').value = s.telegram_bot_token;
-      if (s.telegram_chat_id && document.getElementById('cfg-telegram-chat-id')) document.getElementById('cfg-telegram-chat-id').value = s.telegram_chat_id;
-      if (s.db_host && document.getElementById('cfg-db-host')) document.getElementById('cfg-db-host').value = s.db_host;
-      if (s.db_port && document.getElementById('cfg-db-port')) document.getElementById('cfg-db-port').value = s.db_port;
-      if (s.db_user && document.getElementById('cfg-db-user')) document.getElementById('cfg-db-user').value = s.db_user;
-      if (s.db_password && document.getElementById('cfg-db-password')) document.getElementById('cfg-db-password').value = s.db_password;
-      if (s.db_name && document.getElementById('cfg-db-name')) document.getElementById('cfg-db-name').value = s.db_name;
     }
 
     // ── MARKETING & AUTOPILOT CAMPAIGN DISPATCHERS ─────────────────
@@ -1564,7 +1512,7 @@
       if (!confirm(confirmMsg)) return;
 
       showToast('Dispatching campaign emails…');
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1608,7 +1556,7 @@
       if (!confirm('Broadcast this custom message to ALL registered investors?')) return;
 
       showToast('Sending broadcast…');
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1630,7 +1578,7 @@
 
     function triggerAutopilotRunNow() {
       showToast('⚡ Running Autopilot marketing cycle…');
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1649,7 +1597,7 @@
     function toggleAutopilotState() {
       var current = document.getElementById('btnToggleAutopilot').textContent.indexOf('ON') !== -1;
       var nextState = !current;
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1667,7 +1615,7 @@
 
     function clearMarketingThrottleLog() {
       if (!confirm('Clear all marketing email throttle records? This allows immediate re-sending to all recipients.')) return;
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'clear_marketing_log' })
@@ -1683,7 +1631,7 @@
       document.getElementById('emailPreviewModal').style.display = 'flex';
       document.getElementById('emailPreviewContainer').innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);">Loading template preview…</div>';
 
-      fetch('/api/admin?action=preview_template&templateId=' + encodeURIComponent(templateId))
+      adminFetch('/api/admin?action=preview_template&templateId=' + encodeURIComponent(templateId))
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (!data || !data.template) return;
@@ -1752,7 +1700,7 @@
       var note = document.getElementById('creditNoteInput').value.trim();
       if (!em || !amt) { alert('Enter investor email and amount'); return; }
 
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'credit_balance', email: em, amount: amt, note: note })
@@ -1770,7 +1718,7 @@
     }
 
     function depositAction(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1783,7 +1731,7 @@
     }
 
     function kycAction(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1796,7 +1744,7 @@
     }
 
     function orderAction(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1809,7 +1757,7 @@
     }
 
     function wdAction(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1822,7 +1770,7 @@
     }
 
     function finAction(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1836,7 +1784,7 @@
 
     function generateInvitationCode() {
       var c = document.getElementById('newCodeInput').value.trim();
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'generate_code', code: c })
@@ -1850,7 +1798,7 @@
     }
 
     function codeStatus(id, act) {
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
@@ -1881,214 +1829,18 @@
         resend_api_key: (document.getElementById('cfg-resend-key')?.value || '').trim(),
         resend_from_email: (document.getElementById('cfg-resend-from')?.value || '').trim(),
         supabase_url: (document.getElementById('cfg-supabase-url')?.value || '').trim(),
-        supabase_anon_key: (document.getElementById('cfg-supabase-anon')?.value || '').trim(),
-        telegram_bot_token: (document.getElementById('cfg-telegram-token')?.value || '').trim(),
-        telegram_chat_id: (document.getElementById('cfg-telegram-chat-id')?.value || '').trim(),
-        db_host: (document.getElementById('cfg-db-host')?.value || '').trim(),
-        db_port: (document.getElementById('cfg-db-port')?.value || '3306').trim(),
-        db_user: (document.getElementById('cfg-db-user')?.value || '').trim(),
-        db_password: (document.getElementById('cfg-db-password')?.value || '').trim(),
-        db_name: (document.getElementById('cfg-db-name')?.value || 'defaultdb').trim()
+        supabase_anon_key: (document.getElementById('cfg-supabase-anon')?.value || '').trim()
       };
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save_settings', settings: s })
       })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        showToast(d.message || 'Settings & credentials saved successfully!');
+        showToast(d.message || 'Settings & API credentials saved successfully!');
         loadDashboardData();
       });
-    }
-
-    // ── TELEGRAM TEST & CONFIGURATION ──────────────────────────────
-    function testTelegramNotification() {
-      var botToken = (document.getElementById('cfg-telegram-token')?.value || '').trim();
-      var chatId = (document.getElementById('cfg-telegram-chat-id')?.value || '').trim();
-      var resultBox = document.getElementById('telegramTestResult');
-
-      if (!botToken || !chatId) {
-        alert('Please enter both your Telegram Bot API Token and Telegram Chat ID first.');
-        return;
-      }
-
-      resultBox.style.display = 'block';
-      resultBox.innerHTML = '<span style="color:#38bdf8;">⏳ Sending live test notification to Telegram...</span>';
-
-      fetch('/api/admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'test_telegram', botToken: botToken, chatId: chatId })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (d.success) {
-          resultBox.innerHTML = '<span style="color:#4ade80;font-weight:700;">✅ ' + (d.message || 'Test message sent successfully! Check your Telegram chat.') + '</span>';
-          showToast('Telegram test message delivered!');
-          loadDashboardData();
-        } else {
-          resultBox.innerHTML = '<span style="color:#f87171;font-weight:700;">❌ ' + (d.error || 'Failed to send Telegram message.') + '</span>';
-        }
-      })
-      .catch(function(err) {
-        resultBox.innerHTML = '<span style="color:#f87171;">Network error: ' + err.message + '</span>';
-      });
-    }
-
-    // ── DATABASE TEST & AUTO-MIGRATION ─────────────────────────────
-    function testDatabaseConnection() {
-      var host = (document.getElementById('cfg-db-host')?.value || '').trim();
-      var port = (document.getElementById('cfg-db-port')?.value || '3306').trim();
-      var user = (document.getElementById('cfg-db-user')?.value || '').trim();
-      var password = (document.getElementById('cfg-db-password')?.value || '').trim();
-      var database = (document.getElementById('cfg-db-name')?.value || 'defaultdb').trim();
-      var resultBox = document.getElementById('dbTestResult');
-
-      if (!host) {
-        alert('Please enter the Database Host (e.g. localhost or database server address).');
-        return;
-      }
-
-      resultBox.style.display = 'block';
-      resultBox.innerHTML = '<span style="color:#38bdf8;">⏳ Connecting to database and verifying schema tables...</span>';
-
-      fetch('/api/admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'test_db',
-          db_host: host,
-          db_port: port,
-          db_user: user,
-          db_password: password,
-          db_name: database
-        })
-      })
-      .then(function(r) { return r.json(); })
-      .then(function(d) {
-        if (d.success) {
-          resultBox.innerHTML = '<span style="color:#4ade80;font-weight:700;">✅ ' + (d.message || 'Connected successfully!') + '</span>';
-          showToast('Database connected and verified!');
-          loadDashboardData();
-        } else {
-          resultBox.innerHTML = '<span style="color:#f87171;font-weight:700;">❌ ' + (d.error || 'Database connection failed.') + '</span>';
-        }
-      })
-      .catch(function(err) {
-        resultBox.innerHTML = '<span style="color:#f87171;">Connection error: ' + err.message + '</span>';
-      });
-    }
-
-    // ── REAL-TIME USER ACTIVITY AUDIT LOGS ─────────────────────────
-    var currentActivityLogs = [];
-
-    function renderActivityLogs(logs) {
-      currentActivityLogs = logs || [];
-      filterActivityLogs();
-    }
-
-    function filterActivityLogs() {
-      var tbody = document.getElementById('activityLogsTableBody');
-      if (!tbody) return;
-
-      var search = (document.getElementById('logSearchInput')?.value || '').trim().toLowerCase();
-      var filterAction = (document.getElementById('logActionFilter')?.value || 'all');
-
-      var list = currentActivityLogs;
-
-      if (filterAction !== 'all') {
-        list = list.filter(function(l) {
-          return (l.action || '').toUpperCase() === filterAction.toUpperCase();
-        });
-      }
-
-      if (search) {
-        list = list.filter(function(l) {
-          var str = ((l.action || '') + ' ' + (l.user_email || '') + ' ' + (l.user_name || '') + ' ' + (l.ip || '') + ' ' + JSON.stringify(l.details || {})).toLowerCase();
-          return str.indexOf(search) !== -1;
-        });
-      }
-
-      if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px;">No activity logs matching criteria.</td></tr>';
-        return;
-      }
-
-      var rows = '';
-      list.forEach(function(l) {
-        var actionColor = '#38bdf8';
-        var actionBg = '#0c4a6e';
-        var act = (l.action || 'EVENT').toUpperCase();
-
-        if (act.includes('SIGNUP') || act.includes('REGISTER')) {
-          actionColor = '#4ade80';
-          actionBg = '#052e16';
-        } else if (act.includes('DEPOSIT') || act.includes('PAYMENT')) {
-          actionColor = '#facc15';
-          actionBg = '#422006';
-        } else if (act.includes('LOGIN') || act.includes('PASSWORD')) {
-          actionColor = '#c084fc';
-          actionBg = '#3b0764';
-        } else if (act.includes('CLICK') || act.includes('VISIT')) {
-          actionColor = '#60a5fa';
-          actionBg = '#172554';
-        } else if (act.includes('FAIL') || act.includes('DECLIN') || act.includes('DELET')) {
-          actionColor = '#f87171';
-          actionBg = '#450a0a';
-        }
-
-        var statusBadge = l.status === 'success'
-          ? '<span class="badge green">Success</span>'
-          : (l.status === 'warning' ? '<span class="badge amber">Warning</span>' : '<span class="badge blue">Info</span>');
-
-        var detailsStr = '';
-        if (l.details && typeof l.details === 'object') {
-          var entries = Object.entries(l.details);
-          detailsStr = entries.slice(0, 4).map(function(e) {
-            return '<span style="color:#94a3b8;">' + e[0] + ':</span> <strong style="color:#e2e8f0;">' + String(e[1]).substring(0, 40) + '</strong>';
-          }).join(' &middot; ');
-        } else {
-          detailsStr = String(l.details || '—');
-        }
-
-        var timeFormatted = (l.timestamp || '').replace('T', ' ').substring(0, 19);
-
-        rows += '<tr>' +
-          '<td style="color:var(--muted);font-size:12px;font-family:monospace;">' + timeFormatted + '</td>' +
-          '<td><span class="badge" style="background:' + actionBg + ';color:' + actionColor + ';font-weight:700;border:1px solid ' + actionColor + '44;">' + act + '</span></td>' +
-          '<td><strong style="color:#fff;">' + (l.user_name || '—') + '</strong><br><span style="font-family:monospace;font-size:11px;color:#94a3b8;">' + (l.user_email || 'anonymous') + '</span></td>' +
-          '<td style="font-family:monospace;font-size:11px;color:#cbd5e1;">' + (l.ip || '127.0.0.1') + '</td>' +
-          '<td style="font-size:12px;color:#e2e8f0;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + (typeof l.details === 'object' ? JSON.stringify(l.details) : l.details) + '">' + (detailsStr || '—') + '</td>' +
-          '<td>' + statusBadge + '</td>' +
-          '</tr>';
-      });
-
-      tbody.innerHTML = rows;
-    }
-
-    function loadActivityLogs() {
-      fetch('/api/admin?action=activity_logs')
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (d.success && Array.isArray(d.logs)) {
-            renderActivityLogs(d.logs);
-            if (document.getElementById('b-logs')) {
-              document.getElementById('b-logs').textContent = d.logs.length;
-            }
-          }
-        })
-        .catch(function(e) {
-          console.warn('Error loading activity logs:', e);
-        });
-    }
-
-    function exportActivityLogs() {
-      var dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(currentActivityLogs, null, 2));
-      var dl = document.createElement('a');
-      dl.setAttribute('href', dataStr);
-      dl.setAttribute('download', 'tesla-trade-activity-logs-' + new Date().toISOString().substring(0, 10) + '.json');
-      dl.click();
     }
 
     function showImageModal(src, title) {
@@ -2138,7 +1890,7 @@
       if (!confirm('Are you sure you want to permanently delete investor: ' + clean + '?\n\nThis will remove their profile and all associated deposits and transactions from the system.')) {
         return;
       }
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'delete_investor', email: clean })
@@ -2183,7 +1935,7 @@
         lossRatePercent: lRate
       };
 
-      fetch('/api/admin', {
+      adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'update_trading_settings', settings: settings })
@@ -2192,7 +1944,7 @@
       .then(function(d) {
         if (d && d.success) {
           showToast('Trading graph settings saved! Live investor dashboard updated.');
-          fetch('/api/admin/trading-settings', {
+          adminFetch('/api/admin/trading-settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settings)
@@ -2207,7 +1959,7 @@
     }
 
     function loadTradingSettings() {
-      fetch('/api/admin/trading-settings')
+      adminFetch('/api/admin/trading-settings')
         .then(function(r) { return r.json(); })
         .then(function(d) {
           var s = (d && d.settings) || {};
@@ -2344,17 +2096,11 @@
           var detected = env.detected || {};
           var detectedKeys = Object.keys(detected);
 
-          var dbOk = d.database && d.database.connected;
-          var pRec = d.database?.persistent_records || {};
-          var statusHtml = dbOk
-            ? '<span style="color:#4ade80;">🟢 MySQL Connected Live (' + (d.database.tables_count || 0) + ' tables verified)</span>'
-            : '<span style="color:#38bdf8;">💾 High-Performance Persistent Engine Active (' + (pRec.investors || 0) + ' investors, ' + (pRec.investments || 0) + ' deposits protected)</span>';
-
-          var html = '<div style="margin-bottom:8px; font-size:14px; font-weight:700;">' + statusHtml + '</div>';
+          var html = '<div style="margin-bottom:8px; font-size:14px; color:' + (dbOk ? '#4ade80' : '#f87171') + '; font-weight:700;">' + (dbOk ? '🟢 Database: Live Connected (' + (d.database.tables_count || 0) + ' tables found)' : '⚠️ Database Connecting: ' + (d.database?.error || 'Offline')) + '</div>';
           html += '<div style="display:grid; grid-template-columns: 140px 1fr; gap:6px; font-size:12px; margin-bottom:8px;">';
-          html += '<span style="color:var(--muted);">Storage Backend:</span><code>' + (d.database?.source || 'Persistent Storage Engine') + '</code>';
-          html += '<span style="color:var(--muted);">Database Host:</span><code style="color:#fff;">' + (d.database?.host || '(Local Persistent Engine)') + '</code>';
-          html += '<span style="color:var(--muted);">Database Status:</span><code style="color:' + (dbOk ? '#4ade80' : '#38bdf8') + ';">' + (dbOk ? 'Live Online' : 'Local Persistence (All user data & deposits safely stored)') + '</code>';
+          html += '<span style="color:var(--muted);">Connection Source:</span><code>' + (d.database?.source || 'Auto-resolved') + '</code>';
+          html += '<span style="color:var(--muted);">Database Host:</span><code style="color:#fff;">' + (d.database?.host || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com') + '</code>';
+          html += '<span style="color:var(--muted);">Database Name:</span><code style="color:#fff;">' + (d.database?.database || 'defaultdb') + '</code>';
           html += '</div>';
 
           html += '<div style="margin-top:10px; padding-top:10px; border-top:1px solid #222;">';
@@ -2383,9 +2129,29 @@
       setTimeout(function() { t.style.display = 'none'; }, 2800);
     }
 
-    // Direct dashboard initialization - NO PASSWORD BARRIER
-    loadDashboardData();
-    loadTradingSettings();
+    // Authenticated dashboard initialization
+    var savedAdminPass = sessionStorage.getItem('ttinc_admin_password');
+    if (savedAdminPass) {
+      fetch('/api/admin?action=verify_auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': savedAdminPass },
+        body: JSON.stringify({ action: 'verify_auth', password: savedAdminPass })
+      }).then(function(r) {
+        if (r.ok) {
+          document.getElementById('adminLoginGate').style.display = 'none';
+          document.getElementById('adminApp').style.display = 'flex';
+          loadDashboardData();
+          loadTradingSettings();
+        } else {
+          sessionStorage.removeItem('ttinc_admin_password');
+          showLoginGate('Admin password has changed in environment variables. Please sign in with your updated admin password.');
+        }
+      }).catch(function() {
+        showLoginGate();
+      });
+    } else {
+      showLoginGate();
+    }
   </script>
 </body>
 </html>
