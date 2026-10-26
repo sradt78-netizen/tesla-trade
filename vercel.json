@@ -1,0 +1,23 @@
+{
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "PORT=19379 BASE_PATH=/ pnpm --filter @workspace/tesla-trade run build",
+  "outputDirectory": "artifacts/tesla-trade/dist/public",
+  "rewrites": [
+    {
+      "source": "/analytics",
+      "destination": "/analytics.html"
+    },
+    {
+      "source": "/admin",
+      "destination": "/admin.html"
+    },
+    {
+      "source": "/admin.php",
+      "destination": "/admin.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

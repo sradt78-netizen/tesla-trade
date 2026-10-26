@@ -1,0 +1,124 @@
+DirectoryIndex index.html
+Options -Indexes
+
+RewriteEngine On
+RewriteBase /
+
+# Keep the fallback admin password file out of the web.
+<FilesMatch "^\.admin-password$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# ============================================================
+# Hestia/Apache runtime configuration
+# ============================================================
+# Uncomment and replace the values below when using Hestia's Apache handler.
+# The PHP application also reads these active SetEnv lines directly if the
+# Hestia PHP-FPM bridge does not forward them through getenv().
+# Never leave an uncommented SetEnv line blank: Apache will pass the
+# blank value to PHP and it can override a working hosting configuration.
+# Keep this file private. Do not commit real passwords, API keys, database
+# credentials, bank details, or bot tokens to a public repository.
+#
+# Database
+# SetEnv TT_DB_HOST "localhost"
+# SetEnv TT_DB_NAME "your_database_name"
+# SetEnv TT_DB_USER "your_database_user"
+# SetEnv TT_DB_PASS "your_database_password"
+#
+# Admin access
+# SetEnv TT_ADMIN_PASSWORD "your_long_unique_admin_password"
+# SetEnv TT_ADMIN_TOKEN "your_long_random_admin_token"
+# SetEnv TT_ADMIN_PASSWORD_SHA256 "sha256_password_hash"
+# SetEnv TT_INVITATION_CODE "your_invitation_code"
+#
+# Email and API services
+# SetEnv RESEND_API_KEY "re_your_resend_api_key"
+# SetEnv SUPABASE_URL "https://your-project.supabase.co"
+# SetEnv SUPABASE_ANON_KEY "your_supabase_anon_key"
+# SetEnv TT_ADMIN_EMAIL "admin@example.com"
+# SetEnv TT_SENDER_NAME "Tesla Trade Inc"
+# SetEnv TT_SENDER_EMAIL "no-reply@example.com"
+#
+# Notifications
+# SetEnv TT_TELEGRAM_BOT_TOKEN "your_telegram_bot_token"
+# SetEnv TT_TELEGRAM_CHAT_ID "your_telegram_chat_id"
+#
+# Crypto payment instructions
+# SetEnv TT_WALLET_USDT "your_usdt_address"
+# SetEnv TT_WALLET_ETH "your_eth_address"
+# SetEnv TT_WALLET_BTC "your_btc_address"
+#
+# Bank transfer instructions
+# SetEnv TT_BANK_NAME "your_bank_name"
+# SetEnv TT_BANK_ACCOUNT "your_bank_account"
+# SetEnv TT_BANK_ROUTING "your_bank_routing"
+# SetEnv TT_BANK_SWIFT "your_bank_swift"
+#
+# Additional payment methods
+# SetEnv TT_VENMO_HANDLE "your_venmo_handle"
+# SetEnv TT_CASHAPP_HANDLE "your_cashapp_handle"
+# SetEnv TT_PAYPAL_HANDLE "your_paypal_handle"
+# SetEnv TT_ALIPAY_ACCOUNT "your_alipay_account"
+# SetEnv TT_WECHAT_ACCOUNT "your_wechat_account"
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>
+
+# Block direct access to internal PHP files
+RewriteRule ^api/config\.php$ - [F,L]
+RewriteRule ^api/db\.php$ - [F,L]
+RewriteRule ^api/mailer\.php$ - [F,L]
+RewriteRule ^(?:tests|uploads)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:\.env|composer\.(?:json|lock)|.*\.(?:sql|log))$ - [F,L,NC]
+
+# Route /admin to the PHP admin panel
+RewriteRule ^admin/?$ admin.php [QSA,L]
+
+# OTP and points entry points
+RewriteRule ^api/otp-send\.php$ - [L]
+RewriteRule ^api/otp-verify\.php$ - [L]
+RewriteRule ^api/supabase-config\.php$ - [L]
+RewriteRule ^api/payment-submit\.php$ - [L]
+RewriteRule ^api/payment-proof\.php$ - [L]
+RewriteRule ^api/payment-settings\.php$ - [L]
+
+# Stocks endpoint
+RewriteRule ^api/stocks\.php$ - [L]
+RewriteCond %{REQUEST_URI} ^/api/stocks(/(.*))?
+RewriteRule ^api/(.*)$ api/stocks.php [QSA,L]
+
+# Route /api/* to the PHP backend
+RewriteCond %{REQUEST_URI} ^/api(/(.*))?
+RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+# Send all other requests to the React frontend
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
+
+# Cache control
+<FilesMatch "\.(html)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+</FilesMatch>
+
+<FilesMatch "\.(js|css)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+    Header set Pragma "no-cache"
+</FilesMatch>
+
+<FilesMatch "\.(jpg|jpeg|png|gif|svg|webp|woff|woff2|ttf|eot|ico)$">
+    Header set Cache-Control "public, max-age=604800"
+</FilesMatch>

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Domain Analytics & Traffic Dashboard</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --card-bg: #141414;
+      --card-border: #262626;
+      --text-main: #f3f4f6;
+      --text-sub: #9ca3af;
+      --accent-red: #e31937;
+      --accent-green: #10b981;
+      --accent-blue: #3b82f6;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 16px;
+      line-height: 1.5;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 24px;
+    }
+    .brand h1 { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .badge {
+      font-size: 11px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    button {
+      background: #1f1f1f;
+      color: #fff;
+      border: 1px solid var(--card-border);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+    button:hover { background: #2a2a2a; }
+    button.primary {
+      background: var(--accent-red);
+      border-color: var(--accent-red);
+    }
+    button.primary:hover { background: #c7142d; }
+
+    /* Stats Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .card-title {
+      font-size: 13px;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .card-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .card-meta {
+      font-size: 12px;
+      color: var(--text-sub);
+      margin-top: 6px;
+    }
+    .card-meta span { color: var(--accent-green); font-weight: 600; }
+
+    /* Campaign Link Builder */
+    .link-builder {
+      background: linear-gradient(180deg, #181818 0%, #121212 100%);
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .link-builder h2 { font-size: 17px; margin-bottom: 6px; }
+    .link-builder p { font-size: 13px; color: var(--text-sub); margin-bottom: 14px; }
+    .builder-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .builder-controls select, .builder-controls input {
+      background: #0a0a0a;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      flex: 1;
+      min-width: 140px;
+    }
+    .generated-link-box {
+      display: flex;
+      gap: 10px;
+      background: #0a0a0a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 10px 14px;
+      align-items: center;
+    }
+    .generated-link-text {
+      font-family: monospace;
+      font-size: 13px;
+      color: var(--accent-green);
+      word-break: break-all;
+      flex: 1;
+    }
+
+    /* Tables & Sections */
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 24px 0 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      background: #1a1a1a;
+      color: var(--text-sub);
+      font-weight: 600;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #1c1c1c;
+      color: #e5e7eb;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: #181818; }
+    .tag {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: #262626;
+      color: #ddd;
+      font-weight: 500;
+    }
+    .tag-mobile { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+    .tag-desktop { background: rgba(16, 185, 129, 0.2); color: #86efac; }
+    .tag-source { background: rgba(227, 25, 55, 0.2); color: #fca5a5; }
+
+    /* Admin Password Unlock */
+    .auth-banner {
+      background: #181818;
+      border: 1px dashed #333;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .auth-input-group { display: flex; gap: 8px; }
+    .auth-input-group input {
+      background: #0a0a0a;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #10b981;
+      color: #000;
+      font-weight: 600;
+      padding: 10px 18px;
+      border-radius: 8px;
+      display: none;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <h1>📊 Domain Analytics <span class="badge">LIVE TRACKING</span></h1>
+        <p style="color: var(--text-sub); font-size: 13px; margin-top: 3px;">Real-time visitor clicks, campaigns, and investor sign-ups</p>
+      </div>
+      <div class="header-actions">
+        <a href="/" style="text-decoration: none;"><button type="button">🌐 Main Site</button></a>
+        <a href="/admin.php" style="text-decoration: none;"><button type="button">⚙️ Admin Panel</button></a>
+        <button type="button" class="primary" onclick="loadAnalytics()">🔄 Refresh</button>
+      </div>
+    </header>
+
+    <!-- Admin Authentication Bar -->
+    <div class="auth-banner" id="authBanner">
+      <span>🔒 Viewing in public mode. Enter admin password to view full customer emails:</span>
+      <div class="auth-input-group">
+        <input type="password" id="adminPassInput" placeholder="Admin password" />
+        <button type="button" class="primary" onclick="unlockAdmin()">Unlock</button>
+      </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid">
+      <div class="card">
+        <div class="card-title">Domain Clicks <span>🖱️</span></div>
+        <div class="card-value" id="valClicks">0</div>
+        <div class="card-meta">Unique Visitors: <span id="valUnique">0</span> &bull; Today: <span id="valClicksToday">0</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Investor Sign-Ups <span>👥</span></div>
+        <div class="card-value" id="valSignups">0</div>
+        <div class="card-meta">Today: <span id="valSignupsToday">0</span> &bull; Conv. Rate: <span id="valConvRate">0%</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Investments Volume <span>💼</span></div>
+        <div class="card-value" id="valInvestVolume">$0.00</div>
+        <div class="card-meta">Active Accounts: <span id="valInvestCount">0</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Store & EV Orders <span>🚗</span></div>
+        <div class="card-value" id="valOrders">0</div>
+        <div class="card-meta">Status: <span>Active</span></div>
+      </div>
+    </div>
+
+    <!-- Campaign Tracked Link Builder -->
+    <div class="link-builder">
+      <h2>🔗 Attached Campaign Link Generator</h2>
+      <p>Generate unique tracking links to share on WhatsApp, Telegram, X/Twitter, Instagram, or email. When someone clicks, their visit and sign-up will be tracked under that source.</p>
+      <div class="builder-controls">
+        <select id="linkPreset" onchange="updateLink()">
+          <option value="direct">Direct Link (Default)</option>
+          <option value="twitter">X / Twitter (?source=twitter)</option>
+          <option value="whatsapp">WhatsApp (?source=whatsapp)</option>
+          <option value="telegram">Telegram (?source=telegram)</option>
+          <option value="instagram">Instagram (?source=instagram)</option>
+          <option value="email">Email Campaign (?source=email)</option>
+          <option value="custom">Custom Source...</option>
+        </select>
+        <input type="text" id="customSourceInput" placeholder="Enter custom source name" style="display:none;" oninput="updateLink()" />
+        <input type="text" id="customCampaignInput" placeholder="Campaign name (optional)" oninput="updateLink()" />
+      </div>
+      <div class="generated-link-box">
+        <div class="generated-link-text" id="generatedLink">https://yourdomain.com</div>
+        <button type="button" class="primary" onclick="copyLink()">📋 Copy Link</button>
+      </div>
+    </div>
+
+    <!-- Traffic Sources & Devices Row -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px;">
+      <div class="card">
+        <div class="card-title">Top Traffic Sources <span>🌐</span></div>
+        <div id="sourcesList" style="margin-top: 10px; font-size: 13px;">Loading traffic sources...</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Device Breakdown <span>📱</span></div>
+        <div id="devicesList" style="margin-top: 10px; font-size: 13px;">Loading device data...</div>
+      </div>
+    </div>
+
+    <!-- Recent Domain Clicks Stream -->
+    <div class="section-title">
+      <span>🖱️ Recent Domain Clicks (Live Feed)</span>
+      <span style="font-size: 12px; color: var(--text-sub);" id="clicksCountLabel">0 recorded</span>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Source / Campaign</th>
+            <th>Landing Page</th>
+            <th>Device</th>
+            <th>Referrer</th>
+            <th>Visitor IP</th>
+          </tr>
+        </thead>
+        <tbody id="clicksTableBody">
+          <tr><td colspan="6" style="text-align: center; color: var(--text-sub); padding: 24px;">Loading click logs...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Recent Sign-Ups Stream -->
+    <div class="section-title">
+      <span>👥 Recent Registered Accounts</span>
+      <span style="font-size: 12px; color: var(--text-sub);" id="signupsCountLabel">0 recorded</span>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Date Registered</th>
+            <th>Full Name</th>
+            <th>Email</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="signupsTableBody">
+          <tr><td colspan="4" style="text-align: center; color: var(--text-sub); padding: 24px;">Loading sign-ups...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Link copied to clipboard!</div>
+
+  <script>
+    var currentAdminPassword = localStorage.getItem('ttinc_analytics_pass') || '';
+    if (currentAdminPassword) {
+      document.getElementById('adminPassInput').value = currentAdminPassword;
+    }
+
+    function updateLink() {
+      var preset = document.getElementById('linkPreset').value;
+      var customSource = document.getElementById('customSourceInput');
+      if (preset === 'custom') {
+        customSource.style.display = 'block';
+      } else {
+        customSource.style.display = 'none';
+      }
+
+      var source = preset === 'custom' ? (customSource.value.trim() || 'custom') : (preset === 'direct' ? '' : preset);
+      var campaign = document.getElementById('customCampaignInput').value.trim();
+
+      var baseUrl = window.location.origin;
+      var url = new URL(baseUrl);
+      if (source) url.searchParams.set('source', source);
+      if (campaign) url.searchParams.set('campaign', campaign);
+
+      document.getElementById('generatedLink').textContent = url.toString();
+    }
+
+    function copyLink() {
+      var text = document.getElementById('generatedLink').textContent;
+      navigator.clipboard.writeText(text).then(function () {
+        var toast = document.getElementById('toast');
+        toast.style.display = 'block';
+        setTimeout(function () { toast.style.display = 'none'; }, 2500);
+      });
+    }
+
+    function unlockAdmin() {
+      var pass = document.getElementById('adminPassInput').value.trim();
+      if (pass) {
+        currentAdminPassword = pass;
+        localStorage.setItem('ttinc_analytics_pass', pass);
+        loadAnalytics();
+      }
+    }
+
+    function loadAnalytics() {
+      var url = '/api/analytics-data';
+      if (currentAdminPassword) {
+        url += '?password=' + encodeURIComponent(currentAdminPassword);
+      }
+
+      fetch(url)
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (!data || !data.summary) return;
+
+          if (data.authenticated) {
+            document.getElementById('authBanner').innerHTML = '<span style="color: var(--accent-green); font-weight: 600;">🔓 Admin Authenticated — Full Customer Details Unlocked</span><button type="button" onclick="lockAdmin()">Lock</button>';
+          }
+
+          var s = data.summary;
+          document.getElementById('valClicks').textContent = Number(s.total_clicks).toLocaleString();
+          document.getElementById('valUnique').textContent = Number(s.unique_visitors).toLocaleString();
+          document.getElementById('valClicksToday').textContent = Number(s.clicks_today).toLocaleString();
+
+          document.getElementById('valSignups').textContent = Number(s.total_signups).toLocaleString();
+          document.getElementById('valSignupsToday').textContent = Number(s.signups_today).toLocaleString();
+          document.getElementById('valConvRate').textContent = s.conversion_rate + '%';
+
+          document.getElementById('valInvestVolume').textContent = '$' + Number(s.investment_volume).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          document.getElementById('valInvestCount').textContent = s.total_investments;
+          document.getElementById('valOrders').textContent = s.total_orders;
+
+          // Traffic sources
+          var sourcesHtml = '';
+          if (data.sources && data.sources.length) {
+            var maxCount = Math.max.apply(null, data.sources.map(function(s){ return Number(s.count); })) || 1;
+            data.sources.forEach(function (src) {
+              var pct = Math.round((src.count / maxCount) * 100);
+              sourcesHtml += '<div style="margin-bottom: 8px;">' +
+                '<div style="display: flex; justify-content: space-between; margin-bottom: 3px;">' +
+                '<span style="font-weight: 500;">' + (src.campaign_source || 'direct') + '</span>' +
+                '<span style="color: var(--text-sub);">' + src.count + ' clicks</span>' +
+                '</div>' +
+                '<div style="height: 6px; background: #262626; border-radius: 4px; overflow: hidden;">' +
+                '<div style="width: ' + pct + '%; height: 100%; background: var(--accent-red); border-radius: 4px;"></div>' +
+                '</div>' +
+                '</div>';
+            });
+          } else {
+            sourcesHtml = '<div style="color: var(--text-sub);">No sources recorded yet.</div>';
+          }
+          document.getElementById('sourcesList').innerHTML = sourcesHtml;
+
+          // Devices
+          var devicesHtml = '';
+          if (data.devices && data.devices.length) {
+            data.devices.forEach(function (d) {
+              devicesHtml += '<div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1f1f1f;">' +
+                '<span style="text-transform: capitalize;">' + (d.device_type === 'mobile' ? '📱 Mobile' : '💻 Desktop') + '</span>' +
+                '<span style="font-weight: 600;">' + d.count + '</span>' +
+                '</div>';
+            });
+          } else {
+            devicesHtml = '<div style="color: var(--text-sub);">No device data recorded yet.</div>';
+          }
+          document.getElementById('devicesList').innerHTML = devicesHtml;
+
+          // Clicks table
+          var clicksBody = document.getElementById('clicksTableBody');
+          document.getElementById('clicksCountLabel').textContent = (data.recent_clicks || []).length + ' recorded';
+          if (data.recent_clicks && data.recent_clicks.length) {
+            var rows = '';
+            data.recent_clicks.forEach(function (c) {
+              var deviceTag = c.device_type === 'mobile' ? '<span class="tag tag-mobile">Mobile</span>' : '<span class="tag tag-desktop">Desktop</span>';
+              var sourceTag = '<span class="tag tag-source">' + (c.campaign_source || 'direct') + '</span>';
+              rows += '<tr>' +
+                '<td style="white-space: nowrap; color: var(--text-sub);">' + (c.created_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
+                '<td>' + sourceTag + '</td>' +
+                '<td style="word-break: break-all;">' + (c.landing_page || '/') + '</td>' +
+                '<td>' + deviceTag + '</td>' +
+                '<td style="color: var(--text-sub); font-size: 12px; word-break: break-all;">' + (c.referrer || 'Direct') + '</td>' +
+                '<td style="font-family: monospace; font-size: 12px;">' + (c.ip_address || '—') + '</td>' +
+                '</tr>';
+            });
+            clicksBody.innerHTML = rows;
+          } else {
+            clicksBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-sub); padding: 24px;">No click logs recorded yet.</td></tr>';
+          }
+
+          // Signups table
+          var signupsBody = document.getElementById('signupsTableBody');
+          document.getElementById('signupsCountLabel').textContent = (data.recent_signups || []).length + ' recorded';
+          if (data.recent_signups && data.recent_signups.length) {
+            var sRows = '';
+            data.recent_signups.forEach(function (u) {
+              var statusTag = '<span class="tag" style="background: rgba(16, 185, 129, 0.2); color: #86efac;">' + (u.onboarding_status || 'registered') + '</span>';
+              sRows += '<tr>' +
+                '<td style="white-space: nowrap; color: var(--text-sub);">' + (u.registered_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
+                '<td style="font-weight: 500;">' + (u.name || 'Investor') + '</td>' +
+                '<td style="font-family: monospace;">' + (u.email || '—') + '</td>' +
+                '<td>' + statusTag + '</td>' +
+                '</tr>';
+            });
+            signupsBody.innerHTML = sRows;
+          } else {
+            signupsBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-sub); padding: 24px;">No user registrations recorded yet.</td></tr>';
+          }
+        })
+        .catch(function (err) {
+          console.error('Error fetching analytics:', err);
+        });
+    }
+
+    function lockAdmin() {
+      localStorage.removeItem('ttinc_analytics_pass');
+      currentAdminPassword = '';
+      location.reload();
+    }
+
+    updateLink();
+    loadAnalytics();
+    setInterval(loadAnalytics, 10000); // Live poll every 10s
+  </script>
+</body>
+</html>

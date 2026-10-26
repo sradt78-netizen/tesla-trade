@@ -1,0 +1,2606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tesla Trade Inc — Administration Dashboard</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --card-bg: #141414;
+      --card-border: #262626;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --red: #e31937;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --blue: #3b82f6;
+      --sidebar-w: 240px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+    }
+    /* Sidebar */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: #111;
+      border-right: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; bottom: 0; left: 0;
+      z-index: 50;
+    }
+    .sidebar-header {
+      padding: 18px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .sidebar-logo {
+      width: 32px; height: 32px;
+      background: var(--red);
+      color: #fff;
+      font-weight: 800;
+      font-size: 16px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .sidebar-brand { font-size: 15px; font-weight: 700; }
+    .sidebar-brand span { color: var(--red); }
+    .sidebar-nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 10px 12px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+    }
+    .nav-btn:hover { background: #1a1a1a; color: #fff; }
+    .nav-btn.active {
+      background: rgba(227, 25, 55, 0.12);
+      border-color: rgba(227, 25, 55, 0.3);
+      color: #fff;
+    }
+    .badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-weight: 700;
+      background: #2a2a2a;
+      color: #bbb;
+    }
+    .badge.red { background: rgba(227, 25, 55, 0.2); color: #f87171; }
+    .badge.green { background: rgba(16, 185, 129, 0.2); color: #86efac; }
+    .badge.amber { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+
+    /* Main Area */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      padding: 24px;
+      min-width: 0;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header-title h1 { font-size: 22px; font-weight: 700; }
+    .header-title p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .header-actions { display: flex; gap: 8px; }
+
+    button {
+      background: #1f1f1f;
+      color: #fff;
+      border: 1px solid var(--card-border);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+    button:hover { background: #2a2a2a; }
+    button.primary {
+      background: var(--red);
+      border-color: var(--red);
+    }
+    button.primary:hover { background: #c0102a; }
+    button.success {
+      background: var(--green);
+      border-color: var(--green);
+      color: #000;
+      font-weight: 600;
+    }
+
+    /* Cards & Stats */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card-title {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .card-val { font-size: 24px; font-weight: 700; color: #fff; }
+
+    /* Tables */
+    .table-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      overflow-x: auto;
+      margin-bottom: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      background: #181818;
+      color: var(--muted);
+      font-weight: 600;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+      white-space: nowrap;
+    }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #1c1c1c;
+      color: #e5e7eb;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: #161616; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    .modal-content {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 24px;
+      max-width: 500px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 14px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0a0a0a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+    }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: var(--green);
+      color: #000;
+      font-weight: 600;
+      padding: 10px 18px;
+      border-radius: 8px;
+      display: none;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      z-index: 200;
+    }
+    /* Mobile Topbar & Drawer */
+    .mobile-topbar {
+      display: none;
+    }
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(3px);
+      z-index: 998;
+    }
+    .mobile-close-btn {
+      display: none;
+    }
+    .mobile-scroll-hint {
+      display: none;
+      font-size: 11px;
+      color: #94a3b8;
+      padding: 6px 4px;
+      text-align: right;
+    }
+
+    /* DESKTOP & TABLET DEFAULT (min-width: 901px) */
+    @media (min-width: 901px) {
+      body {
+        display: flex;
+        flex-direction: row;
+      }
+      #adminApp {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        min-height: 100vh;
+      }
+      .sidebar {
+        width: var(--sidebar-w);
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 50;
+      }
+      .main {
+        margin-left: var(--sidebar-w);
+        flex: 1;
+        padding: 24px;
+        min-width: 0;
+      }
+    }
+
+    /* MOBILE & SMALL SCREEN RESPONSIVENESS (max-width: 900px) */
+    @media (max-width: 900px) {
+      body {
+        flex-direction: column;
+        overflow-x: hidden;
+      }
+      #adminApp {
+        flex-direction: column !important;
+        width: 100% !important;
+        min-height: 100vh;
+      }
+      .mobile-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 56px;
+        background: #0f1115;
+        border-bottom: 1px solid var(--card-border);
+        padding: 0 14px;
+        z-index: 990;
+      }
+      .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: -290px;
+        width: 280px;
+        height: 100vh;
+        z-index: 999;
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 6px 0 30px rgba(0, 0, 0, 0.85);
+        background: #11141a;
+      }
+      .sidebar.open {
+        transform: translateX(290px);
+      }
+      .sidebar-backdrop.active {
+        display: block;
+      }
+      .mobile-close-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: #1e2430;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        color: #fff;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      .main {
+        margin-left: 0 !important;
+        padding: 14px 12px 28px !important;
+        margin-top: 56px !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        box-sizing: border-box;
+      }
+      header {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 12px !important;
+        margin-bottom: 16px !important;
+      }
+      .header-title h1 {
+        font-size: 19px !important;
+      }
+      .header-title p {
+        font-size: 12px !important;
+      }
+      .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        width: 100%;
+      }
+      .header-actions button, .header-actions a {
+        flex: 1 1 calc(50% - 6px);
+        min-height: 40px;
+        justify-content: center;
+        font-size: 12px;
+        padding: 8px 10px;
+      }
+      .header-actions a button {
+        width: 100%;
+      }
+      .grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+        margin-bottom: 18px !important;
+      }
+      .card {
+        padding: 12px !important;
+      }
+      .card-val {
+        font-size: 20px !important;
+      }
+      .table-box {
+        margin-bottom: 18px;
+        border-radius: 10px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .table-box table {
+        font-size: 12px;
+        min-width: 700px;
+      }
+      th, td {
+        padding: 10px 10px;
+      }
+      .mobile-scroll-hint {
+        display: block !important;
+      }
+      .modal-content {
+        max-width: 95vw !important;
+        padding: 18px 14px !important;
+        max-height: 90vh;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .grid {
+        grid-template-columns: 1fr !important;
+      }
+      .header-actions button, .header-actions a {
+        flex: 1 1 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ADMIN AUTHENTICATION SECURITY GATE -->
+  <div id="adminLoginGate" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#08090b;display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px;">
+    <div style="background:#12141a;border:1px solid #232732;border-radius:16px;width:100%;max-width:440px;padding:36px 32px;box-shadow:0 20px 40px rgba(0,0,0,0.8);text-align:center;">
+      <div style="width:48px;height:48px;background:#e31937;border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:#fff;">T</div>
+      <h2 style="font-size:22px;font-weight:800;color:#fff;margin-bottom:6px;letter-spacing:-0.5px;">Tesla Trade Inc Admin</h2>
+      <p style="font-size:13px;color:#94a3b8;margin-bottom:24px;line-height:1.5;">Enter your Administrator Master Password to unlock the administrative dashboard, customer deposit receipts, and trading engine.</p>
+
+      <div id="adminLoginError" style="display:none;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:18px;text-align:left;"></div>
+
+      <form onsubmit="handleAdminLoginSubmit(event)" style="display:flex;flex-direction:column;gap:14px;text-align:left;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px;">Administrator Password</label>
+          <div style="position:relative;">
+            <input type="password" id="adminGatePassword" required placeholder="Enter admin password..." autocomplete="current-password" style="width:100%;background:#090a0d;border:1px solid #2a303d;border-radius:8px;padding:12px 42px 12px 14px;color:#fff;font-size:14px;outline:none;box-sizing:border-box;" />
+            <button type="button" onclick="toggleGatePasswordVisibility()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#94a3b8;cursor:pointer;padding:6px;font-size:16px;">👁️</button>
+          </div>
+        </div>
+        <button type="submit" id="adminGateSubmitBtn" class="primary" style="width:100%;padding:12px;font-size:14px;font-weight:700;justify-content:center;margin-top:4px;border-radius:8px;">
+          🔓 Sign In to Dashboard
+        </button>
+      </form>
+      <div style="margin-top:20px;font-size:11px;color:#64748b;line-height:1.4;">
+        Secured by environment variable <code style="color:#e2e8f0;background:#1a1e27;padding:2px 6px;border-radius:4px;">ADMIN_PASSWORD</code>. Changing the variable immediately requires the new password.
+      </div>
+    </div>
+  </div>
+
+  <div id="adminApp" style="display:none;width:100%;min-height:100vh;">
+    <!-- Mobile App Topbar (shown on <= 900px) -->
+    <div class="mobile-topbar">
+      <button type="button" onclick="toggleMobileSidebar()" style="background:transparent;border:none;color:#fff;font-size:22px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;" aria-label="Toggle Menu">
+        ☰
+      </button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:26px;height:26px;background:var(--red);color:#fff;font-weight:900;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;">T</div>
+        <span style="font-weight:700;font-size:14px;color:#fff;">Tesla Trade <span style="color:var(--red);">Admin</span></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button type="button" onclick="loadDashboardData()" style="padding:6px 10px;font-size:12px;background:#1e2430;border:1px solid #334155;border-radius:6px;" title="Refresh Data">🔄</button>
+        <button type="button" onclick="logoutAdmin()" style="padding:6px 10px;font-size:12px;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.35);border-radius:6px;" title="Log Out">🚪</button>
+      </div>
+    </div>
+
+    <!-- Mobile Drawer Backdrop Overlay -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeMobileSidebar()"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header" style="justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="sidebar-logo">T</div>
+          <div class="sidebar-brand">Tesla <span>Trade</span> Admin</div>
+        </div>
+        <button type="button" class="mobile-close-btn" onclick="closeMobileSidebar()" aria-label="Close Menu">✕</button>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" onclick="switchTab('investors')">
+          <span>👥 Investors</span> <span class="badge" id="b-investors">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('investment-receipts')">
+          <span>💰 Deposit Receipts</span> <span class="badge amber" id="b-dep-receipts">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('receipts')">
+          <span>🧾 Shop Receipts</span> <span class="badge amber" id="b-receipts">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('kyc')">
+          <span>🪪 KYC Submissions</span> <span class="badge amber" id="b-kyc">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('withdrawals')">
+          <span>💸 Withdrawals</span> <span class="badge red" id="b-withdrawals">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('financing')">
+          <span>🚘 Financing</span> <span class="badge" id="b-financing">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('access')">
+          <span>🔐 Invitation Codes</span> <span class="badge green" id="b-codes">0</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('marketing')">
+          <span>📣 Marketing &amp; Emails</span> <span class="badge green" id="b-marketing">Autopilot</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('trading')">
+          <span>📈 Trading Graph Engine</span> <span class="badge green" id="b-trading">Live</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('settings')">
+          <span>⚙️ Settings &amp; Envs</span>
+        </button>
+        <button class="nav-btn" onclick="logoutAdmin()" style="margin-top:auto;color:#f87171;border-top:1px solid var(--card-border);padding-top:12px;">
+          <span>🚪 Log Out</span>
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main">
+      <header>
+        <div class="header-title">
+          <h1 id="panelTitle">Investor Management</h1>
+          <p id="panelDesc">View all registered accounts, credit money/balance, and manage investments</p>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="success" onclick="openCreditModal()">💰 Add Money to Investor</button>
+          <button type="button" onclick="loadDashboardData()">🔄 Refresh</button>
+          <button type="button" onclick="logoutAdmin()" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.35);color:#f87171;font-weight:600;">🚪 Log Out</button>
+          <a href="/" style="text-decoration: none;"><button type="button">🌐 Public Site</button></a>
+        </div>
+      </header>
+
+    <!-- LIVE SYSTEM HEALTH STRIP -->
+    <div style="background:#11141a;border:1px solid #232a36;border-radius:10px;padding:10px 16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:12px;">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px #22c55e;"></span>
+          <strong style="color:#fff;">MySQL Database:</strong> <span style="color:#86efac;" id="healthDbStatus">Connected</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#38bdf8;box-shadow:0 0 6px #38bdf8;"></span>
+          <strong style="color:#fff;">Resend API:</strong> <span style="color:#93c5fd;" id="healthResendStatus">Checking…</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#d4af37;box-shadow:0 0 6px #d4af37;"></span>
+          <strong style="color:#fff;">Marketing Autopilot:</strong> <span style="color:#fde68a;" id="healthAutopilotStatus">Active</span>
+        </span>
+      </div>
+      <div>
+        <span style="color:var(--muted);">Promotion:</span> <span style="color:#4ade80;font-weight:700;">+20% Profit Surge Active</span>
+      </div>
+    </div>
+
+    <!-- TAB 1: INVESTORS -->
+    <section id="tab-investors">
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">Total Investors</div>
+          <div class="card-val" id="stat-investors">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Total Funded Volume</div>
+          <div class="card-val" id="stat-volume">$0.00</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Active Investments</div>
+          <div class="card-val" id="stat-active-inv">0</div>
+        </div>
+      <!-- Investors Search & Action Toolbar -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;max-width:500px;">
+          <input type="text" id="investorSearchInput" oninput="filterInvestorsTable()" placeholder="🔍 Search investor by name, email..." style="flex:1;background:#0d0e12;border:1px solid #282d38;border-radius:8px;padding:9px 12px;color:#fff;font-size:13px;outline:none;" />
+          <select id="investorStatusFilter" onchange="filterInvestorsTable()" style="background:#0d0e12;border:1px solid #282d38;border-radius:8px;padding:9px 12px;color:#cbd5e1;font-size:13px;outline:none;">
+            <option value="all">All Statuses</option>
+            <option value="verified">Verified Only</option>
+            <option value="active">Active Only</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" onclick="exportInvestorsCSV()" style="font-size:12px;padding:8px 12px;background:#181b22;border:1px solid #2a313d;color:#cbd5e1;border-radius:8px;">📥 Export Investors (CSV)</button>
+        </div>
+      </div>
+
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Investor Name</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Invested Balance</th>
+              <th>Current Value</th>
+              <th>Deposit Receipt</th>
+              <th>Registered</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="investorsTableBody">
+            <tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading investor accounts...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 2: INVESTMENT DEPOSIT RECEIPTS -->
+    <section id="tab-investment-receipts" style="display: none;">
+      <!-- Search & Status Filter Toolbar for Deposits -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;max-width:550px;">
+          <input type="text" id="depSearchInput" oninput="filterDepositsTable()" placeholder="🔍 Search deposits by email, reference, plan..." style="flex:1;background:#0d0e12;border:1px solid #282d38;border-radius:8px;padding:9px 12px;color:#fff;font-size:13px;outline:none;" />
+          <select id="depStatusFilter" onchange="filterDepositsTable()" style="background:#0d0e12;border:1px solid #282d38;border-radius:8px;padding:9px 12px;color:#cbd5e1;font-size:13px;outline:none;">
+            <option value="all">All Statuses</option>
+            <option value="pending">⏳ Pending Approval Only</option>
+            <option value="active">✅ Approved / Active Only</option>
+            <option value="declined">❌ Declined Only</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" onclick="loadDashboardData()" style="font-size:12px;padding:8px 12px;background:#181b22;border:1px solid #2a313d;color:#cbd5e1;border-radius:8px;">🔄 Refresh Deposits</button>
+        </div>
+      </div>
+
+      <div class="mobile-scroll-hint">👉 Swipe horizontally to view full table details</div>
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Investor Email</th>
+              <th>Plan</th>
+              <th>Deposit Amount</th>
+              <th>Method</th>
+              <th>Reference</th>
+              <th>Payment Receipt Image</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="depReceiptsTableBody">
+            <tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading investment deposit receipts...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 3: SHOP RECEIPTS / VEHICLE ORDERS -->
+    <section id="tab-receipts" style="display: none;">
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Customer</th>
+              <th>Email</th>
+              <th>Payment Method</th>
+              <th>Reference</th>
+              <th>Shop Receipt Image</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="receiptsTableBody">
+            <tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading shop orders and payment receipts...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 4: KYC SUBMISSIONS -->
+    <section id="tab-kyc" style="display: none;">
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>ID Type & Number</th>
+              <th>Address</th>
+              <th>ID Photo</th>
+              <th>Selfie Photo</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="kycTableBody">
+            <tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">Loading KYC verification submissions...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 5: WITHDRAWALS -->
+    <section id="tab-withdrawals" style="display: none;">
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>User Email</th>
+              <th>Amount</th>
+              <th>Payout Method</th>
+              <th>Receiving Address / Bank</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="withdrawalsTableBody">
+            <tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">Loading withdrawal requests...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 6: FINANCING -->
+    <section id="tab-financing" style="display: none;">
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Applicant</th>
+              <th>Email & Phone</th>
+              <th>Vehicle</th>
+              <th>Income</th>
+              <th>Down Payment</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="financingTableBody">
+            <tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">Loading financing applications...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 7: INVITATION CODES -->
+    <section id="tab-access" style="display: none;">
+      <div class="card" style="margin-bottom: 20px;">
+        <h3 style="font-size: 15px; margin-bottom: 6px;">🎟️ Generate New Invitation Code</h3>
+        <p style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">Create custom or random invitation tokens. Share with investors to grant them signup access.</p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <input type="text" id="newCodeInput" placeholder="Custom code (leave empty for random TT-XXXX)" style="flex: 1; min-width: 200px; padding: 10px 12px; background: #0a0a0a; border: 1px solid #333; border-radius: 8px; color: #fff;" />
+          <button type="button" class="primary" onclick="generateInvitationCode()">＋ Generate Code</button>
+        </div>
+      </div>
+
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Invitation Code</th>
+              <th>Status</th>
+              <th>Source</th>
+              <th>Created Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="codesTableBody">
+            <tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 24px;">Loading invitation tokens...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 8: MARKETING & EMAIL CAMPAIGNS (AUTOPILOT ENGINE) -->
+    <section id="tab-marketing" style="display: none;">
+      <!-- Autopilot Status & Controls Banner -->
+      <div class="card" style="padding:22px;margin-bottom:24px;background:linear-gradient(135deg,#0e151d,#0a0d13);border:1px solid #1e2c3d;position:relative;overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;color:#38bdf8;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">
+              <span style="width:7px;height:7px;border-radius:50%;background:#38bdf8;box-shadow:0 0 8px #38bdf8;"></span>
+              AUTOPILOT MARKETING ENGINE
+            </div>
+            <h2 style="font-size:20px;font-weight:800;color:#fff;margin:4px 0 8px;">Automated Email Drip Campaigns</h2>
+            <p style="color:var(--muted);font-size:13px;line-height:1.6;margin:0;max-width:650px;">
+              Autopilot automatically selects and dispatches pre-drafted, high-converting investor emails on schedule. No typing required. The system targets unfunded accounts with deposit matches, active accounts with referral rewards, and all members with yield updates.
+            </p>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:13px;color:#fff;font-weight:700;">Autopilot Status:</span>
+              <button type="button" id="btnToggleAutopilot" class="success" onclick="toggleAutopilotState()" style="padding:8px 16px;font-size:12px;font-weight:800;letter-spacing:0.5px;">● AUTOPILOT ON</button>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="primary" onclick="triggerAutopilotRunNow()" style="padding:8px 14px;font-size:12px;">🚀 Run Autopilot Cycle Now</button>
+              <button type="button" onclick="clearMarketingThrottleLog()" style="padding:8px 14px;font-size:12px;background:#18181b;color:#fca5a5;border:1px solid #3f3f46;">🗑️ Clear Throttle Log</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:20px;padding-top:18px;border-top:1px solid #1c2635;">
+          <div style="background:#07090d;border:1px solid #1a222e;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Unfunded Leads</div>
+            <div style="font-size:20px;font-weight:700;color:#f87171;" id="stat-mk-unfunded">0</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Target for 100% Match</div>
+          </div>
+          <div style="background:#07090d;border:1px solid #1a222e;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Active Investors</div>
+            <div style="font-size:20px;font-weight:700;color:#4ade80;" id="stat-mk-active">0</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Target for Referral Nudges</div>
+          </div>
+          <div style="background:#07090d;border:1px solid #1a222e;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Campaigns Sent</div>
+            <div style="font-size:20px;font-weight:700;color:#fff;" id="stat-mk-sent">0</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Recorded delivery logs</div>
+          </div>
+          <div style="background:#07090d;border:1px solid #1a222e;border-radius:10px;padding:12px 14px;">
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Resend API Mode</div>
+            <div style="font-size:16px;font-weight:700;color:#38bdf8;margin-top:3px;" id="stat-mk-apimode">Sandbox / Live</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">Audited delivery log</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pre-Drafted Investor Marketing Email Series -->
+      <h3 style="font-size:16px;font-weight:800;color:#fff;margin-bottom:14px;display:flex;align-items:center;gap:8px;">
+        <span>📬 Pre-Drafted Investor Email Series</span>
+        <span style="font-size:11px;font-weight:600;color:#94a3b8;background:#18181b;padding:3px 8px;border-radius:6px;border:1px solid #27272a;">1-Click Send · Autopilot Managed</span>
+      </h3>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;margin-bottom:28px;">
+        <!-- Series Card 1 -->
+        <div class="card" style="padding:20px;border-left:4px solid #e31937;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="badge red">Series 1 · Deposit Accelerator</span>
+            <span style="font-size:11px;color:var(--muted);">Target: Unfunded</span>
+          </div>
+          <h4 style="font-size:15px;font-weight:800;color:#fff;margin:6px 0;">100% First Deposit Match Offer</h4>
+          <p style="color:var(--muted);font-size:12px;line-height:1.55;margin:0 0 16px;">
+            Inspiring welcome invitation highlighting our limited-time 100% institutional deposit match and $30 entry tier.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="primary" style="flex:1;font-size:11px;padding:8px 10px;" onclick="sendSingleCampaign('no_deposit')">⚡ Send Campaign Now</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;" onclick="previewEmailTemplate('no_deposit')">👁️ Preview</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;background:#1c1d22;" onclick="promptSendTestEmail('no_deposit')">📨 Test</button>
+          </div>
+        </div>
+
+        <!-- Series Card 2 -->
+        <div class="card" style="padding:20px;border-left:4px solid #22c55e;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="badge green">Series 2 · Referral Growth</span>
+            <span style="font-size:11px;color:var(--muted);">Target: Active</span>
+          </div>
+          <h4 style="font-size:15px;font-weight:800;color:#fff;margin:6px 0;">Tiered Referral Commissions &amp; VIP Link</h4>
+          <p style="color:var(--muted);font-size:12px;line-height:1.55;margin:0 0 16px;">
+            Prompts investors to share their personal invitation link to earn 10% instant commissions on peer deposits.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="success" style="flex:1;font-size:11px;padding:8px 10px;" onclick="sendSingleCampaign('referral_share')">⚡ Send Campaign Now</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;" onclick="previewEmailTemplate('referral_share')">👁️ Preview</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;background:#1c1d22;" onclick="promptSendTestEmail('referral_share')">📨 Test</button>
+          </div>
+        </div>
+
+        <!-- Series Card 3 -->
+        <div class="card" style="padding:20px;border-left:4px solid #d4af37;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="badge amber">Series 3 · Daily Market Pulse</span>
+            <span style="font-size:11px;color:var(--muted);">Target: All Investors</span>
+          </div>
+          <h4 style="font-size:15px;font-weight:800;color:#fff;margin:6px 0;">Daily Arbitrage Dispatch (+20% Surge)</h4>
+          <p style="color:var(--muted);font-size:12px;line-height:1.55;margin:0 0 16px;">
+            Reports 98.4% algorithmic win-rate and highlights our +20% promotional yield surge active on all plans.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="primary" style="flex:1;font-size:11px;padding:8px 10px;background:#b45309;border-color:#d97706;" onclick="sendSingleCampaign('daily_yield')">⚡ Send Campaign Now</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;" onclick="previewEmailTemplate('daily_yield')">👁️ Preview</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;background:#1c1d22;" onclick="promptSendTestEmail('daily_yield')">📨 Test</button>
+          </div>
+        </div>
+
+        <!-- Series Card 4 -->
+        <div class="card" style="padding:20px;border-left:4px solid #a855f7;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="badge" style="background:#581c87;color:#e9d5ff;">Series 4 · VIP Tier Upgrade</span>
+            <span style="font-size:11px;color:var(--muted);">Target: High Net Worth</span>
+          </div>
+          <h4 style="font-size:15px;font-weight:800;color:#fff;margin:6px 0;">Visionary &amp; Pioneer Plus Allocation</h4>
+          <p style="color:var(--muted);font-size:12px;line-height:1.55;margin:0 0 16px;">
+            Prestige invitation to lock in 140% – 200% returns in our high-conviction institutional tiers.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" style="flex:1;font-size:11px;padding:8px 10px;background:#7e22ce;color:#fff;border:none;border-radius:6px;font-weight:700;" onclick="sendSingleCampaign('vip_tier')">⚡ Send Campaign Now</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;" onclick="previewEmailTemplate('vip_tier')">👁️ Preview</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;background:#1c1d22;" onclick="promptSendTestEmail('vip_tier')">📨 Test</button>
+          </div>
+        </div>
+
+        <!-- Series Card 5 -->
+        <div class="card" style="padding:20px;border-left:4px solid #38bdf8;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="badge" style="background:#075985;color:#bae6fd;">Series 5 · Re-engagement</span>
+            <span style="font-size:11px;color:var(--muted);">Target: Dormant</span>
+          </div>
+          <h4 style="font-size:15px;font-weight:800;color:#fff;margin:6px 0;">2-Minute Portfolio Setup Nudge</h4>
+          <p style="color:var(--muted);font-size:12px;line-height:1.55;margin:0 0 16px;">
+            Gentle reminder to users who created accounts but haven't deposited, detailing crypto &amp; wire funding.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="primary" style="flex:1;font-size:11px;padding:8px 10px;" onclick="sendSingleCampaign('reengagement')">⚡ Send Campaign Now</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;" onclick="previewEmailTemplate('reengagement')">👁️ Preview</button>
+            <button type="button" style="font-size:11px;padding:8px 10px;background:#1c1d22;" onclick="promptSendTestEmail('reengagement')">📨 Test</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom Broadcast Composer -->
+      <div class="card" style="padding:22px;margin-bottom:28px;">
+        <h3 style="font-size:15px;margin-bottom:6px;">📢 Custom Announcement Broadcast</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Send a customized announcement or event invitation directly to all registered investors.</p>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;">Email Subject</label>
+          <input type="text" id="customBroadcastSubject" placeholder="e.g. Important Platform Update — Tesla Trade Inc" style="width:100%;padding:10px 12px;background:#0a0a0a;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;outline:none;" />
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px;">Message Body (Paragraphs will be auto-formatted)</label>
+          <textarea id="customBroadcastBody" rows="4" placeholder="Write your message here..." style="width:100%;padding:10px 12px;background:#0a0a0a;border:1px solid #333;border-radius:8px;color:#fff;font-size:13px;outline:none;resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;">
+            <input type="checkbox" id="customForceSend" value="1" style="accent-color:#e31937;" /> Force Send (bypass daily throttle)
+          </label>
+          <button type="button" class="primary" onclick="sendCustomBroadcast()">📨 Send Broadcast to All</button>
+        </div>
+      </div>
+
+      <!-- Live Dispatch History & Delivery Log -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="font-size:15px;margin:0;">📜 Recent Marketing Email Dispatch Log</h3>
+        <button type="button" onclick="loadDashboardData()" style="font-size:11px;padding:6px 10px;">🔄 Refresh Log</button>
+      </div>
+
+      <div class="table-box" style="margin-bottom:28px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Recipient Email</th>
+              <th>Campaign Series</th>
+              <th>Subject</th>
+              <th>Status</th>
+              <th>Resend ID</th>
+            </tr>
+          </thead>
+          <tbody id="marketingLogsTableBody">
+            <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">No marketing emails recorded yet. Trigger Autopilot or send a campaign above!</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Analytics & Clicks Tracker -->
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">Domain Clicks Tracked</div>
+          <div class="card-val" id="stat-clicks">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Detailed Traffic Analytics</div>
+          <a href="/analytics" style="text-decoration: none;"><button type="button" class="primary" style="margin-top: 6px;">Open Full Analytics Suite →</button></a>
+        </div>
+      </div>
+
+      <div class="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Source</th>
+              <th>Landing Page</th>
+              <th>Device</th>
+              <th>Referrer</th>
+              <th>IP Address</th>
+            </tr>
+          </thead>
+          <tbody id="clicksTableBody">
+            <tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 24px;">Loading click logs...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 9: TRADING GRAPH ENGINE & PROFIT/LOSS FIX -->
+    <section id="tab-trading" style="display: none;">
+      <div style="background:#13151b;border:1px solid #282d3b;border-radius:14px;padding:22px;margin-bottom:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+          <div>
+            <h3 style="font-size:17px;font-weight:800;color:#fff;margin:0 0 6px;">📈 Investor Trading Graph Engine &amp; Cycle Control</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0;line-height:1.5;">
+              Configure the exact amount of profit and loss on investors' trading graphs, including how many seconds the graph goes up in profit and how many seconds later it will read loss.
+            </p>
+          </div>
+          <div>
+            <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);border-radius:999px;padding:5px 12px;color:#4ade80;font-size:11px;font-weight:700;">
+              <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px #22c55e;"></span>
+              Real-Time Graph Engine Active
+            </span>
+          </div>
+        </div>
+
+        <!-- QUICK PRESET BUTTONS -->
+        <div style="margin-bottom:20px;padding:12px 14px;background:#0d0e12;border:1px solid #232733;border-radius:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:12px;font-weight:700;color:#94a3b8;">Quick Presets:</span>
+          <button type="button" style="font-size:11px;padding:5px 10px;background:#181b22;border:1px solid #2a313d;color:#cbd5e1;border-radius:6px;cursor:pointer;" onclick="applyTradingPreset(3, 2, 2.0, 1.0)">⚡ Fast Cycle (3s Up / 2s Down)</button>
+          <button type="button" style="font-size:11px;padding:5px 10px;background:#181b22;border:1px solid #2a313d;color:#cbd5e1;border-radius:6px;cursor:pointer;" onclick="applyTradingPreset(6, 2, 3.5, 1.2)">🚀 Bull Momentum (6s Up / 2s Down)</button>
+          <button type="button" style="font-size:11px;padding:5px 10px;background:#181b22;border:1px solid #2a313d;color:#cbd5e1;border-radius:6px;cursor:pointer;" onclick="applyTradingPreset(8, 3, 4.0, 1.5)">📈 Steady Growth (8s Up / 3s Down)</button>
+          <button type="button" style="font-size:11px;padding:5px 10px;background:#181b22;border:1px solid #2a313d;color:#cbd5e1;border-radius:6px;cursor:pointer;" onclick="applyTradingPreset(2, 1, 1.5, 0.8)">⚡ Micro-Scalp (2s Up / 1s Down)</button>
+        </div>
+
+        <!-- 4 PARAMETER CONTROLS -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:22px;">
+          <div style="background:#0d0e12;border:1px solid #262b36;border-radius:12px;padding:16px;">
+            <div style="font-size:11px;font-weight:800;color:#4ade80;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">1. Profit Cycle Duration</div>
+            <label style="font-size:13px;color:#fff;font-weight:700;display:block;margin-bottom:4px;">How many seconds it goes UP</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 10px;line-height:1.4;">Number of consecutive seconds the graph climbs in positive profit.</p>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="number" id="tradeProfitSec" min="1" max="3600" value="3" style="width:100%;background:#161922;border:1px solid #2d3444;border-radius:8px;padding:10px 12px;color:#4ade80;font-size:16px;font-weight:800;outline:none;" oninput="updateTradingSimulationPreview()" />
+              <span style="font-size:13px;color:#94a3b8;font-weight:700;">sec</span>
+            </div>
+          </div>
+
+          <div style="background:#0d0e12;border:1px solid #262b36;border-radius:12px;padding:16px;">
+            <div style="font-size:11px;font-weight:800;color:#f87171;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">2. Loss Delay &amp; Duration</div>
+            <label style="font-size:13px;color:#fff;font-weight:700;display:block;margin-bottom:4px;">How many seconds later it reads LOSS</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 10px;line-height:1.4;">Number of seconds the trade dips into a loss phase before rising again.</p>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="number" id="tradeLossSec" min="1" max="3600" value="2" style="width:100%;background:#161922;border:1px solid #2d3444;border-radius:8px;padding:10px 12px;color:#f87171;font-size:16px;font-weight:800;outline:none;" oninput="updateTradingSimulationPreview()" />
+              <span style="font-size:13px;color:#94a3b8;font-weight:700;">sec</span>
+            </div>
+          </div>
+
+          <div style="background:#0d0e12;border:1px solid #262b36;border-radius:12px;padding:16px;">
+            <div style="font-size:11px;font-weight:800;color:#4ade80;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">3. Profit Amount / Rate</div>
+            <label style="font-size:13px;color:#fff;font-weight:700;display:block;margin-bottom:4px;">Profit Gain Percentage (%)</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 10px;line-height:1.4;">The exact profit yield percentage reached when the graph climbs.</p>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="number" id="tradeProfitRate" min="0.1" max="100" step="0.1" value="2.0" style="width:100%;background:#161922;border:1px solid #2d3444;border-radius:8px;padding:10px 12px;color:#4ade80;font-size:16px;font-weight:800;outline:none;" oninput="updateTradingSimulationPreview()" />
+              <span style="font-size:13px;color:#94a3b8;font-weight:700;">%</span>
+            </div>
+          </div>
+
+          <div style="background:#0d0e12;border:1px solid #262b36;border-radius:12px;padding:16px;">
+            <div style="font-size:11px;font-weight:800;color:#f87171;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">4. Loss Amount / Rate</div>
+            <label style="font-size:13px;color:#fff;font-weight:700;display:block;margin-bottom:4px;">Loss Pullback Percentage (%)</label>
+            <p style="font-size:11px;color:var(--muted);margin:0 0 10px;line-height:1.4;">The exact loss dip percentage displayed during the loss phase.</p>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="number" id="tradeLossRate" min="0.1" max="100" step="0.1" value="1.0" style="width:100%;background:#161922;border:1px solid #2d3444;border-radius:8px;padding:10px 12px;color:#f87171;font-size:16px;font-weight:800;outline:none;" oninput="updateTradingSimulationPreview()" />
+              <span style="font-size:13px;color:#94a3b8;font-weight:700;">%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- LIVE SIMULATION PREVIEW GRAPH -->
+        <div style="background:#0a0c0f;border:1px solid #232834;border-radius:14px;padding:18px;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <span style="font-size:12px;font-weight:800;color:#fff;letter-spacing:0.5px;">Live Simulation Preview (Investors Dashboard View)</span>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">Shows real-time oscillation using your configured seconds and percentages.</div>
+            </div>
+            <div id="simLiveBadge" style="display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800;color:#4ade80;">
+              ▲ PROFIT PHASE (+2.00%)
+            </div>
+          </div>
+          <div style="position:relative;width:100%;height:160px;background:#060709;border-radius:10px;overflow:hidden;border:1px solid #1a1e28;">
+            <canvas id="tradingSimCanvas" style="width:100%;height:100%;display:block;"></canvas>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" class="primary" style="font-size:14px;font-weight:800;padding:12px 24px;border-radius:10px;box-shadow:0 4px 14px rgba(227,25,55,0.4);" onclick="saveTradingSettings()">
+            💾 Save Trading Graph Settings
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 10: SETTINGS & ENVS -->
+    <section id="tab-settings" style="display: none;">
+      <div class="card" style="margin-bottom: 20px;">
+        <h3 style="font-size: 15px; margin-bottom: 10px;">⚡ Database & Environment Variables Status</h3>
+        <div id="envDiagnosticBox" style="font-size: 13px; line-height: 1.8; color: var(--muted);">
+          Checking database connection and Vercel environment variables...
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size: 15px; margin-bottom: 14px;">⚙️ Payment Wallet & Bank Settings</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+          <div>
+            <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Crypto Receiving Wallets</h4>
+            <div class="form-group">
+              <label>USDT Wallet (TRC20)</label>
+              <input type="text" id="cfg-usdt" placeholder="e.g. TR7NHkorwbQ82DuP2nJvdN5v7v7uE8oA7r" />
+            </div>
+            <div class="form-group">
+              <label>Bitcoin Wallet (BTC)</label>
+              <input type="text" id="cfg-btc" placeholder="e.g. 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa" />
+            </div>
+            <div class="form-group">
+              <label>Ethereum Wallet (ETH)</label>
+              <input type="text" id="cfg-eth" placeholder="e.g. 0x71C...8976F" />
+            </div>
+          </div>
+          <div>
+            <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Bank Wire Transfer Details</h4>
+            <div class="form-group">
+              <label>Bank Name</label>
+              <input type="text" id="cfg-bank-name" placeholder="e.g. JPMorgan Chase Bank, N.A." />
+            </div>
+            <div class="form-group">
+              <label>Account Number</label>
+              <input type="text" id="cfg-bank-account" placeholder="e.g. 8839201948" />
+            </div>
+            <div class="form-group">
+              <label>Routing Number</label>
+              <input type="text" id="cfg-bank-routing" placeholder="e.g. 021000021" />
+            </div>
+            <div class="form-group">
+              <label>SWIFT / BIC Code</label>
+              <input type="text" id="cfg-bank-swift" placeholder="e.g. CHASUS33" />
+            </div>
+          </div>
+        </div>
+        <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save Payment Settings</button>
+      </div>
+
+      <div class="card" style="margin-top: 20px;">
+        <h3 style="font-size: 15px; margin-bottom: 14px;">🔑 Resend Email API & Supabase Authentication</h3>
+        <p style="font-size: 12px; color: var(--muted); margin-bottom: 16px;">
+          Configure your external API credentials here. Saved values take effect immediately for all visitors and investors without requiring a Vercel redeployment.
+        </p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+          <div>
+            <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Resend Email API (OTP & Notifications)</h4>
+            <div class="form-group">
+              <label>Resend API Key</label>
+              <input type="password" id="cfg-resend-key" placeholder="re_123456789..." />
+            </div>
+            <div class="form-group">
+              <label>Sender Email (From)</label>
+              <input type="text" id="cfg-resend-from" placeholder="onboarding@resend.dev or no-reply@yourdomain.com" />
+            </div>
+          </div>
+          <div>
+            <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Supabase (Social Google, X & Facebook Login)</h4>
+            <div class="form-group">
+              <label>Supabase Project URL</label>
+              <input type="text" id="cfg-supabase-url" placeholder="https://xyzcompany.supabase.co" />
+            </div>
+            <div class="form-group">
+              <label>Supabase Public Anon Key</label>
+              <input type="password" id="cfg-supabase-anon" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+            </div>
+          </div>
+        </div>
+        <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save API Credentials</button>
+      </div>
+    </section>
+  </main>
+  </div><!-- /adminApp -->
+
+  <!-- MODAL: ADD MONEY / CREDIT BALANCE -->
+  <div class="modal-overlay" id="creditModal">
+    <div class="modal-content">
+      <div class="modal-title">💰 Credit Balance to Investor Account</div>
+      <div class="form-group">
+        <label>Investor Email Address</label>
+        <input type="email" id="creditEmailInput" placeholder="investor@example.com" />
+      </div>
+      <div class="form-group">
+        <label>Amount to Add ($ USD)</label>
+        <input type="number" id="creditAmountInput" placeholder="1000.00" step="any" min="1" />
+      </div>
+      <div class="form-group">
+        <label>Note / Transaction Description</label>
+        <input type="text" id="creditNoteInput" placeholder="Deposit match, manual deposit credit, profit" />
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+        <button type="button" onclick="closeCreditModal()">Cancel</button>
+        <button type="button" class="success" onclick="submitCreditBalance()">Add Funds</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DEPOSIT RECEIPT DETAIL & VERIFICATION -->
+  <div class="modal-overlay" id="depositReceiptModal" onclick="closeDepositReceiptModal()">
+    <div class="modal-content" style="max-width: 720px; padding: 22px; background: #0f1218; border: 1px solid #263143;" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #20293a; padding-bottom: 12px;">
+        <div>
+          <h3 style="font-size: 17px; font-weight: 800; color: #fff; margin: 0 0 2px;">💰 Investment Deposit Receipt</h3>
+          <span id="depModalSubtitle" style="font-size: 12px; color: var(--muted);">Investor Proof of Payment</span>
+        </div>
+        <button type="button" onclick="closeDepositReceiptModal()" style="padding: 6px 12px; background: #1a202c; border: 1px solid #334155;">✕ Close</button>
+      </div>
+
+      <!-- Deposit Details Grid -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; background: #07090d; padding: 12px; border-radius: 10px; border: 1px solid #1c2331; font-size: 12px;">
+        <div><span style="color: var(--muted); display: block;">Investor Email:</span> <strong id="depModalEmail" style="color: #fff; word-break: break-all;">—</strong></div>
+        <div><span style="color: var(--muted); display: block;">Plan / Portfolio:</span> <strong id="depModalPlan" style="color: #60a5fa;">—</strong></div>
+        <div><span style="color: var(--muted); display: block;">Deposit Amount:</span> <strong id="depModalAmount" style="color: #4ade80; font-size: 15px;">—</strong></div>
+        <div><span style="color: var(--muted); display: block;">Payment Method:</span> <strong id="depModalMethod" style="color: #cbd5e1;">—</strong></div>
+        <div><span style="color: var(--muted); display: block;">Reference / TX:</span> <code id="depModalRef" style="color: #fde68a; word-break: break-all;">—</code></div>
+        <div><span style="color: var(--muted); display: block;">Status:</span> <span id="depModalStatusBadge">—</span></div>
+      </div>
+
+      <!-- Receipt Document / Image Preview Box -->
+      <div style="background: #000; border: 1px solid #232c3d; border-radius: 10px; padding: 8px; text-align: center; position: relative; min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 16px;">
+        <div id="depReceiptLoading" style="color: var(--muted); font-size: 13px; display: none;">Loading high-resolution receipt…</div>
+        <img id="depReceiptImg" src="" style="max-width: 100%; max-height: 52vh; object-fit: contain; border-radius: 6px; display: none;" />
+        <iframe id="depReceiptPdf" src="" style="width: 100%; height: 52vh; border: none; display: none;"></iframe>
+        <div id="depReceiptEmpty" style="color: var(--muted); font-size: 13px; display: none; padding: 30px 16px;">
+          📄 No file attachment was uploaded for this deposit.<br>
+          <span style="font-size: 11px; color: #64748b; margin-top: 6px; display: block;">Payment Reference: <code id="depReceiptEmptyRef"></code></span>
+        </div>
+      </div>
+
+      <!-- Modal Action Buttons Footer -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-top: 1px solid #20293a; padding-top: 14px;">
+        <div style="display: flex; gap: 8px;">
+          <button type="button" id="depModalOpenFullBtn" style="font-size: 12px; padding: 8px 12px; background: #1a2230; border: 1px solid #2b3952;">↗ Open Full Size</button>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" id="depModalDeclineBtn" style="padding: 8px 14px; font-size: 12px; background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.35);">❌ Decline</button>
+          <button type="button" id="depModalApproveBtn" class="success" style="padding: 8px 18px; font-size: 12px; font-weight: 700;">✅ Approve Deposit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: IMAGE PREVIEW -->
+  <div class="modal-overlay" id="imageModal" onclick="closeImageModal()">
+    <div class="modal-content" style="max-width: 760px; text-align: center; background: #000;" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 15px;" id="imageModalTitle">Receipt Preview</h3>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" id="imageModalOpenBtn" style="font-size: 12px; padding: 4px 10px;">↗ Open Full Size</button>
+          <button type="button" onclick="closeImageModal()">✕ Close</button>
+        </div>
+      </div>
+      <div style="overflow: auto; max-height: 75vh; border-radius: 8px; border: 1px solid #333; background: #0d0d0d; padding: 4px;">
+        <img id="imageModalImg" src="" style="max-width: 100%; display: block; margin: 0 auto; border-radius: 6px;" />
+        <iframe id="imageModalPdf" src="" style="width: 100%; height: 70vh; border: none; display: none;"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EMAIL TEMPLATE PREVIEW -->
+  <div class="modal-overlay" id="emailPreviewModal" onclick="closeEmailPreviewModal()">
+    <div class="modal-content" style="max-width: 680px; background: #11141a; padding: 20px;" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid #252b38; padding-bottom: 12px;">
+        <div>
+          <h3 style="font-size: 16px; margin: 0 0 4px;" id="emailPreviewTitle">Email Template Preview</h3>
+          <div style="font-size: 12px; color: var(--muted);" id="emailPreviewSubject">Subject: ...</div>
+        </div>
+        <button type="button" onclick="closeEmailPreviewModal()">✕ Close</button>
+      </div>
+      <div id="emailPreviewContainer" style="overflow-y: auto; max-height: 70vh; border-radius: 12px; border: 1px solid #2b3345; background: #07080a; padding: 12px;">
+        Loading email preview...
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Notification</div>
+
+  <script>
+    var globalData = {};
+
+    function toggleMobileSidebar() {
+      var sb = document.querySelector('.sidebar');
+      var bd = document.getElementById('sidebarBackdrop');
+      if (sb) sb.classList.toggle('open');
+      if (bd) bd.classList.toggle('active');
+    }
+
+    function closeMobileSidebar() {
+      var sb = document.querySelector('.sidebar');
+      var bd = document.getElementById('sidebarBackdrop');
+      if (sb) sb.classList.remove('open');
+      if (bd) bd.classList.remove('active');
+    }
+
+    function switchTab(tabId) {
+      closeMobileSidebar();
+      try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
+
+      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'trading', 'settings'];
+      tabs.forEach(function(t) {
+        var el = document.getElementById('tab-' + t);
+        if (el) el.style.display = (t === tabId) ? 'block' : 'none';
+      });
+
+      var btns = document.querySelectorAll('.nav-btn');
+      btns.forEach(function(b) {
+        b.classList.remove('active');
+        if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf(tabId) !== -1) {
+          b.classList.add('active');
+        }
+      });
+
+      var titles = {
+        investors: ['Investor Management', 'View all registered accounts, credit money/balance, and manage investments'],
+        'investment-receipts': ['Deposit & Investment Receipts', 'Review proof of payment uploaded by investors for their deposits'],
+        receipts: ['Shop Receipts & Vehicle Orders', 'Review customer payment receipts and verify EV store orders'],
+        kyc: ['KYC Document Review', 'Verify government IDs and identity verification submissions'],
+        withdrawals: ['Withdrawal Requests', 'Review and process investor payout requests'],
+        financing: ['Vehicle Financing Applications', 'Approve or decline customer financing applications'],
+        access: ['Private Invitation Access', 'Manage active and revoked investor invitation tokens'],
+        marketing: ['Marketing & Click Analytics', 'Track domain clicks, referral sources, and campaigns'],
+        trading: ['Trading Graph Engine & Control', 'Configure live profit and loss cycle intervals, gain/loss percentages, and graph dynamics on investors dashboard'],
+        settings: ['System Settings & Environment', 'Database health, Vercel environment variables, and wallets']
+      };
+
+      if (titles[tabId]) {
+        document.getElementById('panelTitle').textContent = titles[tabId][0];
+        document.getElementById('panelDesc').textContent = titles[tabId][1];
+      }
+
+      if (tabId === 'trading') {
+        initTradingSimCanvas();
+      }
+    }
+
+    function toggleGatePasswordVisibility() {
+      var inp = document.getElementById('adminGatePassword');
+      if (inp) {
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+      }
+    }
+
+    function getAdminPassword() {
+      return sessionStorage.getItem('ttinc_admin_password') || '';
+    }
+
+    function showLoginGate(msg) {
+      var gate = document.getElementById('adminLoginGate');
+      var app = document.getElementById('adminApp');
+      if (app) app.style.display = 'none';
+      if (gate) gate.style.display = 'flex';
+      var err = document.getElementById('adminLoginError');
+      if (err) {
+        if (msg) {
+          err.textContent = msg;
+          err.style.display = 'block';
+        } else {
+          err.style.display = 'none';
+        }
+      }
+    }
+
+    function logoutAdmin() {
+      sessionStorage.removeItem('ttinc_admin_password');
+      window.__proofCache = {};
+      showLoginGate('You have been logged out securely.');
+    }
+
+    function handleAdminLoginSubmit(e) {
+      if (e) e.preventDefault();
+      var input = document.getElementById('adminGatePassword');
+      var pass = input ? input.value.trim() : '';
+      if (!pass) return;
+
+      var btn = document.getElementById('adminGateSubmitBtn');
+      var err = document.getElementById('adminLoginError');
+      if (err) err.style.display = 'none';
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Verifying password…';
+      }
+
+      fetch('/api/admin?action=verify_auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': pass
+        },
+        body: JSON.stringify({ action: 'verify_auth', password: pass })
+      }).then(function(r) {
+        if (r.status === 401) throw new Error('Incorrect admin password. Please try again.');
+        if (!r.ok) throw new Error('Verification failed. Server responded with status ' + r.status);
+        return r.json();
+      }).then(function(data) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '🔓 Sign In to Dashboard';
+        }
+        if (data.authenticated || data.success) {
+          sessionStorage.setItem('ttinc_admin_password', pass);
+          document.getElementById('adminLoginGate').style.display = 'none';
+          document.getElementById('adminApp').style.display = 'flex';
+          loadDashboardData();
+          loadTradingSettings();
+        } else {
+          throw new Error(data.error || 'Incorrect admin password.');
+        }
+      }).catch(function(error) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '🔓 Sign In to Dashboard';
+        }
+        if (err) {
+          err.textContent = error.message || 'Incorrect admin password.';
+          err.style.display = 'block';
+        }
+      });
+    }
+
+    function adminFetch(url, options) {
+      options = options || {};
+      options.headers = options.headers || {};
+      var pass = getAdminPassword();
+      if (pass) {
+        options.headers['x-admin-password'] = pass;
+      }
+      return fetch(url, options).then(function(res) {
+        if (res.status === 401) {
+          sessionStorage.removeItem('ttinc_admin_password');
+          showLoginGate('Administrator password has changed in environment variables or session expired. Please sign in with your updated password.');
+          throw new Error('Admin unauthorized');
+        }
+        return res;
+      });
+    }
+
+    function loadDashboardData() {
+      adminFetch('/api/admin?action=all_data')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.success) return;
+          globalData = data;
+          renderDashboard(data);
+        })
+        .catch(function(err) {
+          console.error('Error fetching admin data:', err);
+        });
+
+      loadDbDiagnostics();
+    }
+
+    function renderDashboard(data) {
+      // 1. Investors & Investments
+      var invBody = document.getElementById('investorsTableBody');
+      var investors = data.investors || [];
+      var investments = data.investments || [];
+      document.getElementById('stat-investors').textContent = investors.length;
+      document.getElementById('b-investors').textContent = investors.length;
+
+      var invMap = {};
+      var totalVol = 0;
+      var activeCount = 0;
+      var depReceiptsList = [];
+
+      investments.forEach(function(inv) {
+        var em = (inv.user_email || '').toLowerCase();
+        if (!invMap[em] || (!invMap[em].payment_proof_path && inv.payment_proof_path)) {
+          invMap[em] = inv;
+        }
+        totalVol += parseFloat(inv.total || '0');
+        if (inv.status === 'active') activeCount++;
+        // Include in Deposit Receipts list if proof is attached, OR pending approval, OR reference provided, OR amount > 0
+        if (inv.payment_proof_path || inv.payment_proof_name || inv.payment_reference || inv.status === 'pending_approval' || (inv.total && parseFloat(inv.total) > 0)) {
+          depReceiptsList.push(inv);
+        }
+      });
+      // Sort pending deposits first so the admin sees them immediately
+      depReceiptsList.sort(function(a, b) {
+        if (a.status === 'pending_approval' && b.status !== 'pending_approval') return -1;
+        if (b.status === 'pending_approval' && a.status !== 'pending_approval') return 1;
+        return 0;
+      });
+
+      document.getElementById('stat-volume').textContent = '$' + totalVol.toLocaleString('en-US', { minimumFractionDigits: 2 });
+      document.getElementById('stat-active-inv').textContent = activeCount;
+      document.getElementById('b-dep-receipts').textContent = depReceiptsList.length;
+
+      window.__proofCache = window.__proofCache || {};
+
+      if (!investors.length) {
+        invBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No registered accounts yet. (Fresh database)</td></tr>';
+      } else {
+        var iRows = '';
+        investors.forEach(function(u) {
+          var em = (u.email || '').toLowerCase();
+          var inv = invMap[em] || {};
+          var bal = parseFloat(inv.total || '0');
+          var cur = parseFloat(inv.total_current_value || inv.total || '0');
+          var statusBadge = u.onboarding_status === 'verified' ? '<span class="badge green">Verified</span>' : '<span class="badge amber">' + (u.onboarding_status || 'active') + '</span>';
+
+          if (inv.payment_proof_path) {
+            window.__proofCache['user_' + em] = inv.payment_proof_path;
+            if (inv.id) {
+              window.__proofCache['dep_' + inv.id] = inv.payment_proof_path;
+              window.__proofCache[String(inv.id)] = inv.payment_proof_path;
+            }
+          }
+
+          var rcptBtn = inv.payment_proof_path
+            ? '<div style="display:inline-flex;align-items:center;gap:6px;"><img src="' + inv.payment_proof_path + '" onclick="viewDepositReceipt(\'' + (inv.id || em) + '\')" style="width:32px;height:32px;object-fit:cover;border-radius:6px;border:1px solid #3b82f6;cursor:pointer;background:#0d1117;" title="Click to view full receipt" /><button type="button" class="primary" style="padding: 3px 6px; font-size: 11px;" onclick="viewDepositReceipt(\'' + (inv.id || em) + '\')">🔍 View</button></div>'
+            : (inv.payment_reference ? '<button type="button" style="padding: 3px 6px; font-size: 11px; background:#181e29; color:#93c5fd; border:1px solid #2b3952;" onclick="viewDepositReceipt(\'' + (inv.id || em) + '\')">Ref: ' + inv.payment_reference + '</button>' : '<span style="color: var(--muted); font-size: 11px;">None</span>');
+
+          var regDate = u.registered_at ? u.registered_at.substring(0, 10) : '—';
+
+          iRows += '<tr>' +
+            '<td style="font-weight: 600;">' + (u.name || 'Investor') + '</td>' +
+            '<td style="font-family: monospace;">' + (u.email || '—') + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td style="color: #4ade80; font-weight: 600;">$' + bal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+            '<td style="color: #60a5fa; font-weight: 600;">$' + cur.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+            '<td>' + rcptBtn + '</td>' +
+            '<td style="font-size: 12px; color: var(--muted);">' + regDate + '</td>' +
+            '<td>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="openCreditForEmail(\'' + u.email + '\')">＋ Add Money</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 6px; cursor: pointer;" onclick="deleteInvestor(\'' + u.email + '\')">🗑 Delete</button>' +
+            '</td>' +
+            '</tr>';
+        });
+        invBody.innerHTML = iRows;
+      }
+
+      // 2. Investment Deposit Receipts Panel
+      var depBody = document.getElementById('depReceiptsTableBody');
+      if (!depReceiptsList.length) {
+        depBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No investment deposit receipts uploaded yet. (Fresh state)</td></tr>';
+      } else {
+        var dRows = '';
+        depReceiptsList.forEach(function(inv) {
+          var proofSrc = inv.payment_proof_path || '';
+          if (proofSrc) {
+            window.__proofCache['dep_' + inv.id] = proofSrc;
+            window.__proofCache[String(inv.id)] = proofSrc;
+            if (inv.user_email) window.__proofCache['user_' + inv.user_email.toLowerCase()] = proofSrc;
+          }
+
+          var proofCell = '';
+          if (proofSrc) {
+            proofCell = '<div style="display:inline-flex;align-items:center;gap:8px;">' +
+              '<img src="' + proofSrc + '" onclick="viewDepositReceipt(\'' + inv.id + '\')" style="width:40px;height:40px;object-fit:cover;border-radius:6px;border:1px solid #3b82f6;cursor:pointer;background:#0d1117;" title="Click to view full receipt" />' +
+              '<button type="button" class="primary" style="padding: 4px 8px; font-size: 11px;" onclick="viewDepositReceipt(\'' + inv.id + '\')">🔍 View Receipt</button>' +
+              '</div>';
+          } else {
+            proofCell = '<button type="button" style="padding: 4px 8px; font-size: 11px; background:#181e29; color:#93c5fd; border:1px solid #2b3952;" onclick="viewDepositReceipt(\'' + inv.id + '\')">📄 ' + (inv.payment_reference ? 'Ref: ' + inv.payment_reference : 'View Details') + '</button>';
+          }
+
+          var statusBadge = inv.status === 'active'
+            ? '<span class="badge green">Active / Approved</span>'
+            : (inv.status === 'declined' ? '<span class="badge red">Declined</span>' : '<span class="badge amber">⏳ Pending Approval</span>');
+
+          var approveBtn = inv.status === 'active'
+            ? '<span style="color:#4ade80;font-size:11px;font-weight:700;">✓ Approved</span>'
+            : '<button type="button" class="success" style="padding: 5px 10px; font-size: 11px; font-weight: 700; margin-right: 4px;" onclick="depositAction(\'' + inv.id + '\', \'approve_deposit\')">✅ Approve Deposit</button>' +
+              '<button type="button" style="padding: 5px 8px; font-size: 11px; color: #fca5a5;" onclick="depositAction(\'' + inv.id + '\', \'reject_deposit\')">❌ Decline</button>';
+
+          dRows += '<tr>' +
+            '<td style="font-family: monospace; font-weight: 500;">' + (inv.user_email || '—') + '</td>' +
+            '<td>' + (inv.plan_label || inv.plan_name || 'Standard') + '</td>' +
+            '<td style="color: #4ade80; font-weight: 600;">$' + Number(inv.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+            '<td>' + (inv.method || 'Crypto') + '</td>' +
+            '<td style="font-family: monospace; font-size: 12px;">' + (inv.payment_reference || '—') + '</td>' +
+            '<td>' + proofCell + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' + approveBtn + '</td>' +
+            '</tr>';
+        });
+        depBody.innerHTML = dRows;
+      }
+
+      // 3. Shop Receipts / EV Orders
+      var rBody = document.getElementById('receiptsTableBody');
+      var orders = data.orders || [];
+      document.getElementById('b-receipts').textContent = orders.length;
+      if (!orders.length) {
+        rBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No shop orders submitted yet.</td></tr>';
+      } else {
+        var rRows = '';
+        orders.forEach(function(o) {
+          if (o.payment_proof_path) {
+            window.__proofCache['ord_' + o.id] = o.payment_proof_path;
+          }
+          var imgBtn = o.payment_proof_path
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="viewCachedProof(\'ord_' + o.id + '\', \'Order Receipt #' + o.id + '\')">🔍 View Receipt</button>'
+            : '<span style="color: var(--muted); font-size: 11px;">No proof</span>';
+
+          var statusBadge = o.status === 'approved' ? '<span class="badge green">Approved</span>' : '<span class="badge amber">' + (o.status || 'pending') + '</span>';
+
+          rRows += '<tr>' +
+            '<td>#' + o.id + '</td>' +
+            '<td style="font-weight: 500;">' + (o.customer_name || '—') + '</td>' +
+            '<td style="font-family: monospace;">' + (o.customer_email || '—') + '</td>' +
+            '<td>' + (o.payment_method || 'Crypto') + '</td>' +
+            '<td style="font-family: monospace; font-size: 12px;">' + (o.payment_reference || '—') + '</td>' +
+            '<td>' + imgBtn + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="orderAction(\'' + o.id + '\', \'approve_receipt\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="orderAction(\'' + o.id + '\', \'reject_receipt\')">Reject</button>' +
+            '</td>' +
+            '</tr>';
+        });
+        rBody.innerHTML = rRows;
+      }
+
+      // 4. KYC
+      var kBody = document.getElementById('kycTableBody');
+      var kycList = data.kyc || [];
+      document.getElementById('b-kyc').textContent = kycList.length;
+      if (!kycList.length) {
+        kBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--muted); padding: 24px;">No KYC submissions pending.</td></tr>';
+      } else {
+        var kRows = '';
+        kycList.forEach(function(k) {
+          if (k.id_document_path) window.__proofCache['kyc_id_' + k.id] = k.id_document_path;
+          if (k.selfie_path) window.__proofCache['kyc_self_' + k.id] = k.selfie_path;
+
+          var idImg = k.id_document_path
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="viewCachedProof(\'kyc_id_' + k.id + '\', \'ID Document - ' + (k.full_name || '') + '\')">🪪 View ID</button>'
+            : '—';
+          var selfieImg = k.selfie_path
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px;" onclick="viewCachedProof(\'kyc_self_' + k.id + '\', \'Selfie - ' + (k.full_name || '') + '\')">🤳 View Selfie</button>'
+            : '—';
+          var statusBadge = k.status === 'approved' ? '<span class="badge green">Approved</span>' : '<span class="badge amber">' + (k.status || 'pending') + '</span>';
+
+          kRows += '<tr>' +
+            '<td style="font-weight: 500;">' + (k.full_name || '—') + '</td>' +
+            '<td style="font-family: monospace;">' + (k.user_email || '—') + '</td>' +
+            '<td>' + (k.id_type || 'Passport') + ' - ' + (k.id_number || '—') + '</td>' +
+            '<td style="font-size: 12px; color: var(--muted);">' + (k.address || '—') + '</td>' +
+            '<td>' + idImg + '</td>' +
+            '<td>' + selfieImg + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="kycAction(\'' + k.id + '\', \'approve_kyc\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="kycAction(\'' + k.id + '\', \'reject_kyc\')">Reject</button>' +
+            '</td>' +
+            '</tr>';
+        });
+        kBody.innerHTML = kRows;
+      }
+
+      // 5. Withdrawals
+      var wBody = document.getElementById('withdrawalsTableBody');
+      var wds = data.withdrawals || [];
+      document.getElementById('b-withdrawals').textContent = wds.length;
+      if (!wds.length) {
+        wBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">No withdrawal requests found.</td></tr>';
+      } else {
+        var wRows = '';
+        wds.forEach(function(w) {
+          var statusBadge = w.status === 'approved' ? '<span class="badge green">Approved</span>' : '<span class="badge red">' + (w.status || 'pending') + '</span>';
+          wRows += '<tr>' +
+            '<td style="font-size: 12px; color: var(--muted);">' + (w.created_at || '').substring(0, 10) + '</td>' +
+            '<td style="font-family: monospace;">' + (w.user_email || '—') + '</td>' +
+            '<td style="font-weight: 600; color: #f87171;">$' + Number(w.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
+            '<td>' + (w.method || 'Crypto') + '</td>' +
+            '<td style="font-family: monospace; font-size: 12px;">' + (w.destination || '—') + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="wdAction(' + w.id + ', \'approve_withdrawal\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="wdAction(' + w.id + ', \'reject_withdrawal\')">Reject</button>' +
+            '</td>' +
+            '</tr>';
+        });
+        wBody.innerHTML = wRows;
+      }
+
+      // 6. Financing
+      var fBody = document.getElementById('financingTableBody');
+      var fins = data.financing || [];
+      document.getElementById('b-financing').textContent = fins.length;
+      if (!fins.length) {
+        fBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">No financing applications submitted.</td></tr>';
+      } else {
+        var fRows = '';
+        fins.forEach(function(f) {
+          fRows += '<tr>' +
+            '<td style="font-weight: 500;">' + (f.applicant_name || '—') + '</td>' +
+            '<td>' + (f.applicant_email || '—') + ' (' + (f.applicant_phone || '') + ')</td>' +
+            '<td>' + (f.vehicle_model || 'Tesla') + '</td>' +
+            '<td>$' + Number(f.monthly_income || 0).toLocaleString() + '</td>' +
+            '<td>$' + Number(f.down_payment || 0).toLocaleString() + '</td>' +
+            '<td><span class="badge amber">' + (f.status || 'pending') + '</span></td>' +
+            '<td>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="finAction(' + f.id + ', \'approve_financing\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="finAction(' + f.id + ', \'reject_financing\')">Decline</button>' +
+            '</td>' +
+            '</tr>';
+        });
+        fBody.innerHTML = fRows;
+      }
+
+      // 7. Invitation Codes
+      var cBody = document.getElementById('codesTableBody');
+      var codes = data.codes || [];
+      document.getElementById('b-codes').textContent = codes.length;
+      if (!codes.length) {
+        cBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--muted); padding: 24px;">No invitation codes found. Generate one above.</td></tr>';
+      } else {
+        var cRows = '';
+        codes.forEach(function(c) {
+          var statusTag = c.status === 'active' ? '<span class="badge green">Active</span>' : '<span class="badge red">Revoked</span>';
+          var actionBtn = c.status === 'active'
+            ? '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="codeStatus(' + c.id + ', \'revoke_code\')">Revoke</button>'
+            : '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #86efac;" onclick="codeStatus(' + c.id + ', \'reinstate_code\')">Reinstate</button>';
+
+          cRows += '<tr>' +
+            '<td style="font-family: monospace; font-weight: 700; color: #fff;">' + c.code + '</td>' +
+            '<td>' + statusTag + '</td>' +
+            '<td style="color: var(--muted);">' + (c.source || 'admin') + '</td>' +
+            '<td style="color: var(--muted); font-size: 12px;">' + (c.created_at || '').substring(0, 10) + '</td>' +
+            '<td><button type="button" style="padding: 4px 8px; font-size: 11px; margin-right: 6px;" onclick="copyCodeLink(\'' + c.code + '\')">📋 Copy Link</button>' + actionBtn + '</td>' +
+            '</tr>';
+        });
+        cBody.innerHTML = cRows;
+      }
+
+      // 8. Clicks & Marketing Hub
+      var clkBody = document.getElementById('clicksTableBody');
+      var clicks = data.clicks || [];
+      document.getElementById('stat-clicks').textContent = clicks.length;
+      if (!clicks.length) {
+        clkBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 24px;">No click logs recorded yet.</td></tr>';
+      } else {
+        var clkRows = '';
+        clicks.forEach(function(c) {
+          clkRows += '<tr>' +
+            '<td style="color: var(--muted); font-size: 12px;">' + (c.created_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
+            '<td><span class="badge">' + (c.campaign_source || 'direct') + '</span></td>' +
+            '<td>' + (c.landing_page || '/') + '</td>' +
+            '<td>' + (c.device_type || 'desktop') + '</td>' +
+            '<td style="color: var(--muted); font-size: 12px;">' + (c.referrer || 'Direct') + '</td>' +
+            '<td style="font-family: monospace; font-size: 12px;">' + (c.ip_address || '—') + '</td>' +
+            '</tr>';
+        });
+        clkBody.innerHTML = clkRows;
+      }
+
+      // 8b. Marketing Autopilot Stats & Logs
+      var mkStats = data.marketingStats || {};
+      if (document.getElementById('stat-mk-unfunded')) document.getElementById('stat-mk-unfunded').textContent = mkStats.unfundedCount != null ? mkStats.unfundedCount : 0;
+      if (document.getElementById('stat-mk-active')) document.getElementById('stat-mk-active').textContent = mkStats.activeCount != null ? mkStats.activeCount : 0;
+      if (document.getElementById('stat-mk-sent')) document.getElementById('stat-mk-sent').textContent = mkStats.marketingEmailsSent != null ? mkStats.marketingEmailsSent : (data.marketingLogs || []).length;
+      
+      var isResendLive = !!(mkStats.resendApiKeyConfigured);
+      if (document.getElementById('stat-mk-apimode')) {
+        document.getElementById('stat-mk-apimode').textContent = isResendLive ? '● Live Resend SMTP' : '● Sandbox Simulator';
+        document.getElementById('stat-mk-apimode').style.color = isResendLive ? '#4ade80' : '#38bdf8';
+      }
+      if (document.getElementById('healthResendStatus')) {
+        document.getElementById('healthResendStatus').textContent = isResendLive ? 'Active (Live)' : 'Connected (Sandbox Mock)';
+        document.getElementById('healthResendStatus').style.color = isResendLive ? '#86efac' : '#93c5fd';
+      }
+      if (document.getElementById('healthAutopilotStatus')) {
+        var autoOn = mkStats.autopilotActive !== false;
+        document.getElementById('healthAutopilotStatus').textContent = autoOn ? 'Running (Active)' : 'Paused';
+        document.getElementById('healthAutopilotStatus').style.color = autoOn ? '#fde68a' : '#94a3b8';
+        if (document.getElementById('btnToggleAutopilot')) {
+          document.getElementById('btnToggleAutopilot').textContent = autoOn ? '● AUTOPILOT ON' : '○ AUTOPILOT PAUSED';
+          document.getElementById('btnToggleAutopilot').className = autoOn ? 'success' : '';
+        }
+      }
+
+      // Render Marketing Emails Log Table
+      var mkLogBody = document.getElementById('marketingLogsTableBody');
+      var mkLogs = data.marketingLogs || [];
+      if (!mkLogs.length) {
+        mkLogBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 24px;">No marketing emails sent yet. Click any "⚡ Send Campaign Now" button above or trigger Autopilot!</td></tr>';
+      } else {
+        var mRows = '';
+        mkLogs.forEach(function(l) {
+          var isSim = (l.status || '').indexOf('sandbox') !== -1;
+          var statusBadge = isSim ? '<span class="badge" style="background:#0c4a6e;color:#7dd3fc;">Sent (Sandbox)</span>' : '<span class="badge green">Delivered</span>';
+          mRows += '<tr>' +
+            '<td style="color: var(--muted); font-size: 12px;">' + (l.created_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
+            '<td style="font-family: monospace; font-weight: 500;">' + (l.user_email || '—') + '</td>' +
+            '<td><strong style="color: #fff;">' + (l.campaign_type || 'General') + '</strong></td>' +
+            '<td style="font-size: 12px; color: #cbd5e1;">' + (l.subject || '—') + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td style="font-family: monospace; font-size: 11px; color: var(--muted);">' + (l.resend_id || 'sim') + '</td>' +
+            '</tr>';
+        });
+        mkLogBody.innerHTML = mRows;
+      }
+
+      // 9. Settings
+      var s = data.settings || {};
+      if (s.wallet_usdt && document.getElementById('cfg-usdt')) document.getElementById('cfg-usdt').value = s.wallet_usdt;
+      if (s.wallet_btc && document.getElementById('cfg-btc')) document.getElementById('cfg-btc').value = s.wallet_btc;
+      if (s.wallet_eth && document.getElementById('cfg-eth')) document.getElementById('cfg-eth').value = s.wallet_eth;
+      if (s.bank_name && document.getElementById('cfg-bank-name')) document.getElementById('cfg-bank-name').value = s.bank_name;
+      if (s.bank_account && document.getElementById('cfg-bank-account')) document.getElementById('cfg-bank-account').value = s.bank_account;
+      if (s.bank_routing && document.getElementById('cfg-bank-routing')) document.getElementById('cfg-bank-routing').value = s.bank_routing;
+      if (s.bank_swift && document.getElementById('cfg-bank-swift')) document.getElementById('cfg-bank-swift').value = s.bank_swift;
+      if (s.resend_api_key && document.getElementById('cfg-resend-key')) document.getElementById('cfg-resend-key').value = s.resend_api_key;
+      if (s.resend_from_email && document.getElementById('cfg-resend-from')) document.getElementById('cfg-resend-from').value = s.resend_from_email;
+      if (s.supabase_url && document.getElementById('cfg-supabase-url')) document.getElementById('cfg-supabase-url').value = s.supabase_url;
+      if (s.supabase_anon_key && document.getElementById('cfg-supabase-anon')) document.getElementById('cfg-supabase-anon').value = s.supabase_anon_key;
+    }
+
+    // ── MARKETING & AUTOPILOT CAMPAIGN DISPATCHERS ─────────────────
+    function sendSingleCampaign(type, testRecipient) {
+      var confirmMsg = testRecipient 
+        ? 'Send test email of campaign "' + type + '" to ' + testRecipient + '?'
+        : 'Dispatch campaign "' + type + '" to eligible investors?';
+      if (!confirm(confirmMsg)) return;
+
+      showToast('Dispatching campaign emails…');
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'marketing_blast',
+          campaign_type: type,
+          test_recipient: testRecipient || '',
+          force_send: true
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.success) {
+          showToast(d.message || 'Campaign successfully sent!');
+          loadDashboardData();
+        } else {
+          alert('Error: ' + (d.error || 'Failed to dispatch'));
+        }
+      })
+      .catch(function(err) {
+        showToast('Campaign dispatched (simulated)');
+        loadDashboardData();
+      });
+    }
+
+    function promptSendTestEmail(type) {
+      var email = prompt('Enter recipient email address to send a preview test:', 'investor@example.com');
+      if (email && email.trim()) {
+        sendSingleCampaign(type, email.trim());
+      }
+    }
+
+    function sendCustomBroadcast() {
+      var sub = (document.getElementById('customBroadcastSubject')?.value || '').trim();
+      var msg = (document.getElementById('customBroadcastBody')?.value || '').trim();
+      var force = document.getElementById('customForceSend')?.checked;
+
+      if (!sub || !msg) {
+        alert('Please fill out both Subject and Message body for the broadcast.');
+        return;
+      }
+      if (!confirm('Broadcast this custom message to ALL registered investors?')) return;
+
+      showToast('Sending broadcast…');
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'marketing_blast',
+          campaign_type: 'custom_broadcast',
+          custom_subject: sub,
+          custom_body: msg,
+          force_send: force
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Broadcast dispatched!');
+        document.getElementById('customBroadcastSubject').value = '';
+        document.getElementById('customBroadcastBody').value = '';
+        loadDashboardData();
+      });
+    }
+
+    function triggerAutopilotRunNow() {
+      showToast('⚡ Running Autopilot marketing cycle…');
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'marketing_blast',
+          campaign_type: 'no_deposit',
+          force_send: true
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast('Autopilot cycle completed: ' + (d.sent || 1) + ' email(s) processed.');
+        loadDashboardData();
+      });
+    }
+
+    function toggleAutopilotState() {
+      var current = document.getElementById('btnToggleAutopilot').textContent.indexOf('ON') !== -1;
+      var nextState = !current;
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'toggle_autopilot',
+          enabled: nextState,
+          interval: '24h'
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function() {
+        showToast(nextState ? 'Autopilot Enabled ✦' : 'Autopilot Paused');
+        loadDashboardData();
+      });
+    }
+
+    function clearMarketingThrottleLog() {
+      if (!confirm('Clear all marketing email throttle records? This allows immediate re-sending to all recipients.')) return;
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'clear_marketing_log' })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Throttle log cleared.');
+        loadDashboardData();
+      });
+    }
+
+    function previewEmailTemplate(templateId) {
+      document.getElementById('emailPreviewModal').style.display = 'flex';
+      document.getElementById('emailPreviewContainer').innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);">Loading template preview…</div>';
+
+      adminFetch('/api/admin?action=preview_template&templateId=' + encodeURIComponent(templateId))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (!data || !data.template) return;
+          var t = data.template;
+          document.getElementById('emailPreviewTitle').textContent = t.name;
+          document.getElementById('emailPreviewSubject').textContent = 'Subject: ' + t.subject;
+          document.getElementById('emailPreviewContainer').innerHTML = t.html;
+        })
+        .catch(function() {
+          document.getElementById('emailPreviewContainer').innerHTML = '<div style="padding:20px;color:#fca5a5;">Could not load template preview.</div>';
+        });
+    }
+
+    function closeEmailPreviewModal() {
+      document.getElementById('emailPreviewModal').style.display = 'none';
+      document.getElementById('emailPreviewContainer').innerHTML = '';
+    }
+
+    // ── SEARCH & CSV EXPORT FUNCTIONS ──────────────────────────────
+    function filterInvestorsTable() {
+      var query = (document.getElementById('investorSearchInput')?.value || '').toLowerCase();
+      var status = document.getElementById('investorStatusFilter')?.value || 'all';
+      var rows = document.querySelectorAll('#investorsTableBody tr');
+
+      rows.forEach(function(r) {
+        var text = r.textContent.toLowerCase();
+        var matchesQuery = !query || text.indexOf(query) !== -1;
+        var matchesStatus = true;
+        if (status === 'verified') matchesStatus = text.indexOf('verified') !== -1;
+        if (status === 'active') matchesStatus = text.indexOf('active') !== -1;
+
+        r.style.display = (matchesQuery && matchesStatus) ? '' : 'none';
+      });
+    }
+
+    function filterDepositsTable() {
+      var query = (document.getElementById('depSearchInput')?.value || '').toLowerCase();
+      var status = document.getElementById('depStatusFilter')?.value || 'all';
+      var rows = document.querySelectorAll('#depReceiptsTableBody tr');
+
+      rows.forEach(function(r) {
+        var text = r.textContent.toLowerCase();
+        var matchesQuery = !query || text.indexOf(query) !== -1;
+        var matchesStatus = true;
+        if (status === 'pending') matchesStatus = text.indexOf('pending') !== -1;
+        if (status === 'active') matchesStatus = text.indexOf('active') !== -1 || text.indexOf('approved') !== -1;
+        if (status === 'declined') matchesStatus = text.indexOf('declined') !== -1 || text.indexOf('rejected') !== -1;
+
+        r.style.display = (matchesQuery && matchesStatus) ? '' : 'none';
+      });
+    }
+
+    function exportInvestorsCSV() {
+      var investors = (globalData && globalData.investors) || [];
+      if (!investors.length) { alert('No investors to export.'); return; }
+
+      var csv = 'Name,Email,Status,Registered At\n';
+      investors.forEach(function(i) {
+        csv += '"' + (i.name || '').replace(/"/g, '""') + '","' + (i.email || '') + '","' + (i.onboarding_status || '') + '","' + (i.registered_at || '') + '"\n';
+      });
+
+      var blob = new Blob([csv], { type: 'text/csv' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'tesla_trade_investors_' + new Date().toISOString().substring(0, 10) + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Investors CSV downloaded successfully!');
+    }
+
+    // Modal Actions
+    function openCreditModal() { document.getElementById('creditModal').style.display = 'flex'; }
+    function closeCreditModal() { document.getElementById('creditModal').style.display = 'none'; }
+    function openCreditForEmail(em) {
+      document.getElementById('creditEmailInput').value = em;
+      openCreditModal();
+    }
+
+    function submitCreditBalance() {
+      var em = document.getElementById('creditEmailInput').value.trim();
+      var amt = document.getElementById('creditAmountInput').value.trim();
+      var note = document.getElementById('creditNoteInput').value.trim();
+      if (!em || !amt) { alert('Enter investor email and amount'); return; }
+
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'credit_balance', email: em, amount: amt, note: note })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.success) {
+          showToast(d.message || 'Funds credited successfully!');
+          closeCreditModal();
+          loadDashboardData();
+        } else {
+          alert(d.error || 'Failed to credit funds');
+        }
+      });
+    }
+
+    function depositAction(id, act) {
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Deposit status updated');
+        loadDashboardData();
+      });
+    }
+
+    function kycAction(id, act) {
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'KYC updated');
+        loadDashboardData();
+      });
+    }
+
+    function orderAction(id, act) {
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Order updated');
+        loadDashboardData();
+      });
+    }
+
+    function wdAction(id, act) {
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Withdrawal updated');
+        loadDashboardData();
+      });
+    }
+
+    function finAction(id, act) {
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Financing updated');
+        loadDashboardData();
+      });
+    }
+
+    function generateInvitationCode() {
+      var c = document.getElementById('newCodeInput').value.trim();
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate_code', code: c })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        document.getElementById('newCodeInput').value = '';
+        showToast('Created code: ' + d.created);
+        loadDashboardData();
+      });
+    }
+
+    function codeStatus(id, act) {
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast('Code status updated');
+        loadDashboardData();
+      });
+    }
+
+    function copyCodeLink(c) {
+      var link = window.location.origin + '/?invitation=' + encodeURIComponent(c);
+      navigator.clipboard.writeText(link).then(function() {
+        showToast('Invitation link copied!');
+      });
+    }
+
+    function saveSettings() {
+      var s = {
+        wallet_usdt: (document.getElementById('cfg-usdt')?.value || '').trim(),
+        wallet_btc: (document.getElementById('cfg-btc')?.value || '').trim(),
+        wallet_eth: (document.getElementById('cfg-eth')?.value || '').trim(),
+        bank_name: (document.getElementById('cfg-bank-name')?.value || '').trim(),
+        bank_account: (document.getElementById('cfg-bank-account')?.value || '').trim(),
+        bank_routing: (document.getElementById('cfg-bank-routing')?.value || '').trim(),
+        bank_swift: (document.getElementById('cfg-bank-swift')?.value || '').trim(),
+        resend_api_key: (document.getElementById('cfg-resend-key')?.value || '').trim(),
+        resend_from_email: (document.getElementById('cfg-resend-from')?.value || '').trim(),
+        supabase_url: (document.getElementById('cfg-supabase-url')?.value || '').trim(),
+        supabase_anon_key: (document.getElementById('cfg-supabase-anon')?.value || '').trim()
+      };
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_settings', settings: s })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'Settings & API credentials saved successfully!');
+        loadDashboardData();
+      });
+    }
+
+    function viewDepositReceipt(invId) {
+      if (!invId) {
+        showToast('Invalid deposit ID');
+        return;
+      }
+      var cleanId = String(invId).replace(/^dep_/, '').replace(/^user_/, '');
+      var inv = null;
+      if (globalData && globalData.investments) {
+        inv = globalData.investments.find(function(i) {
+          return String(i.id) === cleanId || String(i.id) === String(invId) || ('dep_' + i.id) === String(invId) || (i.user_email && i.user_email.toLowerCase() === cleanId.toLowerCase());
+        });
+      }
+
+      function renderModalWithInv(record) {
+        record = record || {};
+        var email = record.user_email || record.email || '—';
+        var plan = record.plan_label || record.plan_name || 'Standard Portfolio';
+        var amt = Number(record.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+        var method = record.method || 'Crypto / Wire';
+        var ref = record.payment_reference || record.tx_id || 'None provided';
+        var status = record.status || 'pending_approval';
+
+        document.getElementById('depModalEmail').textContent = email;
+        document.getElementById('depModalPlan').textContent = plan;
+        document.getElementById('depModalAmount').textContent = '$' + amt;
+        document.getElementById('depModalMethod').textContent = method;
+        document.getElementById('depModalRef').textContent = ref;
+
+        var statusEl = document.getElementById('depModalStatusBadge');
+        if (status === 'active') {
+          statusEl.innerHTML = '<span class="badge green">Active / Approved</span>';
+        } else if (status === 'declined') {
+          statusEl.innerHTML = '<span class="badge red">Declined</span>';
+        } else {
+          statusEl.innerHTML = '<span class="badge amber">⏳ Pending Approval</span>';
+        }
+
+        var proof = record.payment_proof_path || (window.__proofCache && (window.__proofCache['dep_' + record.id] || window.__proofCache[String(record.id)] || window.__proofCache['user_' + (record.user_email||'').toLowerCase()]));
+        var img = document.getElementById('depReceiptImg');
+        var pdf = document.getElementById('depReceiptPdf');
+        var empty = document.getElementById('depReceiptEmpty');
+        var openBtn = document.getElementById('depModalOpenFullBtn');
+
+        if (proof) {
+          empty.style.display = 'none';
+          if (proof.toLowerCase().endsWith('.pdf') || proof.indexOf('application/pdf') !== -1) {
+            img.style.display = 'none';
+            pdf.style.display = 'block';
+            pdf.src = proof;
+          } else {
+            pdf.style.display = 'none';
+            img.style.display = 'block';
+            img.src = proof;
+          }
+          openBtn.style.display = 'inline-flex';
+          openBtn.onclick = function() {
+            var w = window.open('');
+            if (w) {
+              if (proof.indexOf('application/pdf') !== -1 || proof.toLowerCase().endsWith('.pdf')) {
+                w.location.href = proof;
+              } else {
+                w.document.write('<title>Deposit Receipt - ' + email + '</title><body style="margin:0;background:#0d0d0d;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="' + proof + '" style="max-width:96%;max-height:96vh;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,0.8);" /></body>');
+              }
+            }
+          };
+        } else {
+          img.style.display = 'none';
+          pdf.style.display = 'none';
+          empty.style.display = 'block';
+          document.getElementById('depReceiptEmptyRef').textContent = ref;
+          openBtn.style.display = 'none';
+        }
+
+        // Connect action buttons
+        document.getElementById('depModalApproveBtn').onclick = function() {
+          depositAction(record.id, 'approve_deposit');
+          closeDepositReceiptModal();
+        };
+        document.getElementById('depModalDeclineBtn').onclick = function() {
+          depositAction(record.id, 'reject_deposit');
+          closeDepositReceiptModal();
+        };
+
+        document.getElementById('depositReceiptModal').style.display = 'flex';
+      }
+
+      if (inv && (inv.payment_proof_path || inv.payment_reference)) {
+        renderModalWithInv(inv);
+      } else {
+        adminFetch('/api/admin?action=get_receipt&id=' + encodeURIComponent(cleanId))
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data && data.success && data.deposit) {
+              renderModalWithInv(data.deposit);
+            } else if (inv) {
+              renderModalWithInv(inv);
+            } else {
+              showToast('Could not load deposit receipt details.');
+            }
+          })
+          .catch(function() {
+            if (inv) renderModalWithInv(inv);
+            else showToast('Could not load deposit receipt details.');
+          });
+      }
+    }
+
+    function closeDepositReceiptModal() {
+      var m = document.getElementById('depositReceiptModal');
+      if (m) m.style.display = 'none';
+      var img = document.getElementById('depReceiptImg');
+      if (img) img.src = '';
+      var pdf = document.getElementById('depReceiptPdf');
+      if (pdf) pdf.src = '';
+    }
+
+    function viewCachedProof(cacheKey, title) {
+      var proof = (window.__proofCache && window.__proofCache[cacheKey]) || '';
+      if (!proof && typeof cacheKey === 'string' && (cacheKey.startsWith('data:') || cacheKey.startsWith('http') || cacheKey.startsWith('/'))) {
+        proof = cacheKey;
+      }
+      if (!proof && globalData && globalData.investments) {
+        var clean = String(cacheKey).replace(/^dep_/, '').replace(/^user_/, '');
+        var found = globalData.investments.find(function(i) {
+          return ('dep_' + i.id) === cacheKey || ('user_' + (i.user_email||'').toLowerCase()) === cacheKey || String(i.id) === clean || (i.user_email && i.user_email.toLowerCase() === clean.toLowerCase());
+        });
+        if (found && found.payment_proof_path) proof = found.payment_proof_path;
+      }
+      if (proof) {
+        showImageModal(proof, title || 'Receipt Preview');
+      } else if (cacheKey) {
+        viewDepositReceipt(cacheKey);
+      } else {
+        showToast('No receipt file attached.');
+      }
+    }
+
+    function showImageModal(src, title) {
+      if (!src) {
+        showToast('No receipt file attached for this deposit.');
+        return;
+      }
+      document.getElementById('imageModalTitle').textContent = title || 'Receipt Preview';
+      var img = document.getElementById('imageModalImg');
+      var pdf = document.getElementById('imageModalPdf');
+      var openBtn = document.getElementById('imageModalOpenBtn');
+
+      if (src.toLowerCase().endsWith('.pdf') || src.indexOf('application/pdf') !== -1) {
+        img.style.display = 'none';
+        pdf.style.display = 'block';
+        pdf.src = src;
+      } else {
+        pdf.style.display = 'none';
+        img.style.display = 'block';
+        img.src = src;
+      }
+
+      openBtn.onclick = function() {
+        var w = window.open('');
+        if (w) {
+          if (src.indexOf('application/pdf') !== -1 || src.toLowerCase().endsWith('.pdf')) {
+            w.location.href = src;
+          } else {
+            w.document.write('<title>' + (title || 'Receipt') + '</title><body style="margin:0;background:#0d0d0d;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="' + src + '" style="max-width:96%;max-height:96vh;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,0.8);" /></body>');
+          }
+        }
+      };
+
+      document.getElementById('imageModal').style.display = 'flex';
+    }
+
+    function closeImageModal() {
+      document.getElementById('imageModal').style.display = 'none';
+      document.getElementById('imageModalImg').src = '';
+      if (document.getElementById('imageModalPdf')) document.getElementById('imageModalPdf').src = '';
+    }
+
+    // ── DELETE INVESTOR HANDLER ────────────────────────────────────
+    function deleteInvestor(email) {
+      if (!email) return;
+      var clean = email.trim().toLowerCase();
+      if (!confirm('Are you sure you want to permanently delete investor: ' + clean + '?\n\nThis will remove their profile and all associated deposits and transactions from the system.')) {
+        return;
+      }
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_investor', email: clean })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (res && res.success) {
+          showToast('Investor ' + clean + ' deleted successfully.');
+          loadDashboardData();
+        } else {
+          showToast((res && res.error) || 'Failed to delete investor.');
+        }
+      })
+      .catch(function(err) {
+        showToast('Error deleting investor: ' + err.message);
+      });
+    }
+
+    // ── TRADING GRAPH ENGINE CONTROLS ──────────────────────────────
+    var simAnimationTimer = null;
+    var simStartTime = Date.now();
+
+    function applyTradingPreset(pSec, lSec, pRate, lRate) {
+      document.getElementById('tradeProfitSec').value = pSec;
+      document.getElementById('tradeLossSec').value = lSec;
+      document.getElementById('tradeProfitRate').value = Number(pRate).toFixed(1);
+      document.getElementById('tradeLossRate').value = Number(lRate).toFixed(1);
+      updateTradingSimulationPreview();
+      showToast('Preset applied! Click "Save Trading Graph Settings" to deploy.');
+    }
+
+    function saveTradingSettings() {
+      var pSec = Math.max(1, parseInt(document.getElementById('tradeProfitSec')?.value || '3', 10));
+      var lSec = Math.max(1, parseInt(document.getElementById('tradeLossSec')?.value || '2', 10));
+      var pRate = Math.max(0, parseFloat(document.getElementById('tradeProfitRate')?.value || '2.0'));
+      var lRate = Math.max(0, parseFloat(document.getElementById('tradeLossRate')?.value || '1.0'));
+
+      var settings = {
+        profitIntervalSeconds: pSec,
+        lossIntervalSeconds: lSec,
+        profitRatePercent: pRate,
+        lossRatePercent: lRate
+      };
+
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_trading_settings', settings: settings })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.success) {
+          showToast('Trading graph settings saved! Live investor dashboard updated.');
+          adminFetch('/api/admin/trading-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+          }).catch(function() {});
+        } else {
+          showToast((d && d.error) || 'Could not save trading settings.');
+        }
+      })
+      .catch(function(err) {
+        showToast('Save failed: ' + err.message);
+      });
+    }
+
+    function loadTradingSettings() {
+      adminFetch('/api/admin/trading-settings')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var s = (d && d.settings) || {};
+          if (s.profitIntervalSeconds && document.getElementById('tradeProfitSec')) document.getElementById('tradeProfitSec').value = s.profitIntervalSeconds;
+          if (s.lossIntervalSeconds && document.getElementById('tradeLossSec')) document.getElementById('tradeLossSec').value = s.lossIntervalSeconds;
+          if (s.profitRatePercent != null && document.getElementById('tradeProfitRate')) document.getElementById('tradeProfitRate').value = s.profitRatePercent;
+          if (s.lossRatePercent != null && document.getElementById('tradeLossRate')) document.getElementById('tradeLossRate').value = s.lossRatePercent;
+          updateTradingSimulationPreview();
+        })
+        .catch(function() {});
+    }
+
+    function initTradingSimCanvas() {
+      simStartTime = Date.now();
+      if (!simAnimationTimer) {
+        simAnimationTimer = setInterval(drawSimFrame, 120);
+      }
+    }
+
+    function updateTradingSimulationPreview() {
+      simStartTime = Date.now();
+    }
+
+    function drawSimFrame() {
+      var canvas = document.getElementById('tradingSimCanvas');
+      if (!canvas || canvas.offsetParent === null) return;
+      var ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      var width = canvas.parentElement.clientWidth || 600;
+      var height = canvas.parentElement.clientHeight || 160;
+      var dpr = window.devicePixelRatio || 1;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
+
+      var pSec = Math.max(1, parseInt(document.getElementById('tradeProfitSec')?.value || '3', 10));
+      var lSec = Math.max(1, parseInt(document.getElementById('tradeLossSec')?.value || '2', 10));
+      var pRate = Math.max(0.1, parseFloat(document.getElementById('tradeProfitRate')?.value || '2.0'));
+      var lRate = Math.max(0.1, parseFloat(document.getElementById('tradeLossRate')?.value || '1.0'));
+
+      var cycle = pSec + lSec;
+      var nowSec = (Date.now() - simStartTime) / 1000;
+      var inCycle = cycle > 0 ? (nowSec % cycle) : 0;
+      var isProfit = inCycle < pSec;
+
+      var badge = document.getElementById('simLiveBadge');
+      if (badge) {
+        if (isProfit) {
+          badge.style.background = 'rgba(34,197,94,0.12)';
+          badge.style.borderColor = 'rgba(34,197,94,0.3)';
+          badge.style.color = '#4ade80';
+          badge.innerHTML = '▲ PROFIT PHASE (+' + pRate.toFixed(2) + '%) · ' + Math.ceil(pSec - inCycle) + 's left';
+        } else {
+          badge.style.background = 'rgba(239,68,68,0.12)';
+          badge.style.borderColor = 'rgba(239,68,68,0.3)';
+          badge.style.color = '#f87171';
+          badge.innerHTML = '▼ LOSS PHASE (-' + lRate.toFixed(2) + '%) · ' + Math.ceil(cycle - inCycle) + 's left';
+        }
+      }
+
+      var ptsCount = 40;
+      var values = [];
+      for (var i = 0; i < ptsCount; i++) {
+        var t = nowSec - (ptsCount - 1 - i) * (cycle / 20);
+        var tInCycle = ((t % cycle) + cycle) % cycle;
+        var pFraction = tInCycle < pSec ? (tInCycle / pSec) : 1 - ((tInCycle - pSec) / lSec);
+        var base = 1000;
+        var val = isProfit
+          ? base + (base * (pRate / 100) * pFraction)
+          : base - (base * (lRate / 100) * (1 - pFraction));
+        values.push(val);
+      }
+
+      var minVal = Math.min.apply(null, values) * 0.998;
+      var maxVal = Math.max.apply(null, values) * 1.002;
+      var range = Math.max(1, maxVal - minVal);
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      for (var g = 1; g <= 3; g++) {
+        var gy = (height / 4) * g;
+        ctx.beginPath();
+        ctx.moveTo(10, gy);
+        ctx.lineTo(width - 10, gy);
+        ctx.stroke();
+      }
+
+      var strokeColor = isProfit ? '#22c55e' : '#f87171';
+      var glowColor = isProfit ? 'rgba(34, 197, 94, 0.25)' : 'rgba(248, 113, 113, 0.25)';
+
+      var grad = ctx.createLinearGradient(0, 10, 0, height - 10);
+      grad.addColorStop(0, glowColor);
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      var getX = function(idx) { return 14 + (width - 28) * (idx / (ptsCount - 1)); };
+      var getY = function(v) { return height - 14 - ((v - minVal) / range) * (height - 28); };
+
+      ctx.beginPath();
+      ctx.moveTo(getX(0), height - 14);
+      for (var i = 0; i < ptsCount; i++) {
+        ctx.lineTo(getX(i), getY(values[i]));
+      }
+      ctx.lineTo(getX(ptsCount - 1), height - 14);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(getX(0), getY(values[0]));
+      for (var i = 1; i < ptsCount; i++) {
+        ctx.lineTo(getX(i), getY(values[i]));
+      }
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      var lastX = getX(ptsCount - 1);
+      var lastY = getY(values[ptsCount - 1]);
+      ctx.fillStyle = strokeColor;
+      ctx.beginPath();
+      ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function loadDbDiagnostics() {
+      fetch('/api/dbcheck')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var box = document.getElementById('envDiagnosticBox');
+          if (!box) return;
+          var dbOk = d.database && d.database.connected;
+          var env = d.environment_variables || d.environment || {};
+          var detected = env.detected || {};
+          var detectedKeys = Object.keys(detected);
+
+          var html = '<div style="margin-bottom:8px; font-size:14px; color:' + (dbOk ? '#4ade80' : '#f87171') + '; font-weight:700;">' + (dbOk ? '🟢 Database: Live Connected (' + (d.database.tables_count || 0) + ' tables found)' : '⚠️ Database Connecting: ' + (d.database?.error || 'Offline')) + '</div>';
+          html += '<div style="display:grid; grid-template-columns: 140px 1fr; gap:6px; font-size:12px; margin-bottom:8px;">';
+          html += '<span style="color:var(--muted);">Connection Source:</span><code>' + (d.database?.source || 'Auto-resolved') + '</code>';
+          html += '<span style="color:var(--muted);">Database Host:</span><code style="color:#fff;">' + (d.database?.host || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com') + '</code>';
+          html += '<span style="color:var(--muted);">Database Name:</span><code style="color:#fff;">' + (d.database?.database || 'defaultdb') + '</code>';
+          html += '</div>';
+
+          html += '<div style="margin-top:10px; padding-top:10px; border-top:1px solid #222;">';
+          html += '<div style="font-weight:600; margin-bottom:6px; font-size:12px; color:#93c5fd;">Vercel Environment Variables Status:</div>';
+
+          if (detectedKeys.length > 0) {
+            html += '<div style="color:#4ade80; font-size:12px; margin-bottom:6px;">✅ ' + detectedKeys.length + ' Environment Variable(s) Detected in Vercel Runtime:</div>';
+            html += '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">';
+            detectedKeys.forEach(function(k) {
+              html += '<span style="background:#1e3a29; color:#86efac; border:1px solid #22c55e44; padding:3px 8px; border-radius:4px; font-family:monospace; font-size:11px;">' + k + ': ' + detected[k] + '</span>';
+            });
+            html += '</div>';
+          } else {
+            html += '<div style="color:#fbbf24; font-size:12px; margin-bottom:6px;">⚡ Connected via built-in default database configuration.</div>';
+            html += '<div style="font-size:11px; color:var(--muted); line-height:1.5;">Notice: If you added variables to Vercel Settings → Environment Variables, remember to trigger a <strong>Redeployment</strong> in Vercel so they take effect. You can also configure all wallets and bank details in the fields below!</div>';
+          }
+          html += '</div>';
+          box.innerHTML = html;
+        });
+    }
+
+    function showToast(msg) {
+      var t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      setTimeout(function() { t.style.display = 'none'; }, 2800);
+    }
+
+    // Authenticated dashboard initialization
+    var savedAdminPass = sessionStorage.getItem('ttinc_admin_password');
+    if (savedAdminPass) {
+      fetch('/api/admin?action=verify_auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': savedAdminPass },
+        body: JSON.stringify({ action: 'verify_auth', password: savedAdminPass })
+      }).then(function(r) {
+        if (r.ok) {
+          document.getElementById('adminLoginGate').style.display = 'none';
+          document.getElementById('adminApp').style.display = 'flex';
+          loadDashboardData();
+          loadTradingSettings();
+        } else {
+          sessionStorage.removeItem('ttinc_admin_password');
+          showLoginGate('Admin password has changed in environment variables. Please sign in with your updated admin password.');
+        }
+      }).catch(function() {
+        showLoginGate();
+      });
+    } else {
+      showLoginGate();
+    }
+  </script>
+</body>
+</html>

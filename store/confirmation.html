@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Request received | Tesla Trade</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+      :root { color-scheme: light; font-family: Arial, Helvetica, sans-serif; color: #17191d; background: #f6f6f6; }
+      * { box-sizing: border-box; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; }
+      main { width: min(100%, 620px); padding: clamp(32px, 8vw, 70px); background: #fff; border: 1px solid #e1e1e1; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.08); }
+      .wordmark { margin-bottom: 46px; font-size: 20px; font-weight: 700; letter-spacing: .28em; }
+      .check { width: 54px; height: 54px; margin: 0 auto 26px; display: grid; place-items: center; color: #fff; border-radius: 50%; background: #2f6a56; font-size: 28px; }
+      h1 { margin: 0; font-size: clamp(28px, 5vw, 43px); font-weight: 500; letter-spacing: -.04em; }
+      p { margin: 20px auto 0; max-width: 440px; color: #5c6066; font-size: 17px; line-height: 1.55; }
+      a { display: inline-flex; margin-top: 34px; padding: 14px 22px; color: #fff; border-radius: 4px; background: #3e6fe8; font-weight: 600; text-decoration: none; }
+      a:hover { background: #2d5bd1; }
+      #receipt-upload { margin: 30px auto 0; max-width: 460px; padding: 22px; border: 1px solid #dfe3e8; border-radius: 8px; text-align: left; }
+      #receipt-upload[hidden] { display: none; }
+      #receipt-upload label { display: block; margin: 0 0 7px; color: #30343a; font-size: 13px; font-weight: 700; }
+      #receipt-upload input { width: 100%; margin: 0 0 15px; padding: 11px; border: 1px solid #cbd1d8; border-radius: 5px; background: #fff; font: inherit; }
+      #receipt-upload button { width: 100%; padding: 13px 18px; border: 0; border-radius: 4px; color: #fff; background: #17191d; font: inherit; font-weight: 700; cursor: pointer; }
+      #receipt-upload button:disabled { opacity: .6; cursor: wait; }
+      #receipt-help { margin: 0 0 17px; color: #697078; font-size: 13px; line-height: 1.5; }
+      #receipt-status { margin: 14px 0 0; color: #2f6a56; font-size: 13px; line-height: 1.5; }
+      #receipt-status.error { color: #a32222; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="wordmark">TESLA</div>
+      <div class="check" aria-hidden="true">✓</div>
+      <h1>Request received</h1>
+      <p id="confirmation-message">A representative will contact you via email to assist you with your order.</p>
+      <section id="receipt-upload" hidden aria-labelledby="receipt-title">
+        <h2 id="receipt-title" style="margin:0 0 9px;font-size:20px;color:#17191d;">Upload your payment receipt</h2>
+        <p id="receipt-help">Complete your payment, then attach the receipt or transfer confirmation below. Accepted files: JPG, PNG, WEBP, GIF, or PDF up to 10MB.</p>
+        <form id="receipt-form" enctype="multipart/form-data">
+          <input type="hidden" name="orderId" id="receipt-order-id">
+          <input type="hidden" name="uploadToken" id="receipt-upload-token">
+          <label for="payment-reference">Payment reference (optional)</label>
+          <input id="payment-reference" name="paymentReference" maxlength="190" placeholder="Transaction or transfer reference">
+          <label for="payment-proof">Payment receipt</label>
+          <input id="payment-proof" name="paymentProof" type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,image/jpeg,image/png,image/webp,image/gif,application/pdf" required>
+          <button type="submit" id="receipt-submit">Upload payment receipt</button>
+          <p id="receipt-status" role="status"></p>
+        </form>
+      </section>
+      <a href="./">Return to vehicles</a>
+    </main>
+    <script>
+      (function () {
+        var type = new URLSearchParams(window.location.search).get("type");
+        var params = new URLSearchParams(window.location.search);
+        if (type === "finance") {
+          document.getElementById("confirmation-message").textContent = "Your quote request has been received. A representative will contact you via email to assist you with your order.";
+        }
+        if (type === "cash") {
+          document.getElementById("confirmation-message").textContent = "Your order request has been received. Upload your payment receipt below so the admin team can review your payment.";
+          var uploadBox = document.getElementById("receipt-upload");
+          var orderId = params.get("orderId") || "";
+          var token = params.get("token") || "";
+          uploadBox.hidden = false;
+          document.getElementById("receipt-order-id").value = orderId;
+          document.getElementById("receipt-upload-token").value = token;
+          var form = document.getElementById("receipt-form");
+          var status = document.getElementById("receipt-status");
+          var submit = document.getElementById("receipt-submit");
+          if (!orderId || !token) {
+            status.className = "error";
+            status.textContent = "This receipt upload link is incomplete. Please contact the distributor team with your order details.";
+            submit.disabled = true;
+          } else {
+            form.addEventListener("submit", function (event) {
+              event.preventDefault();
+              var file = document.getElementById("payment-proof").files[0];
+              if (!file) return;
+              submit.disabled = true;
+              submit.textContent = "Uploading…";
+              status.className = "";
+              status.textContent = "";
+              fetch("api/payment-proof.php", { method: "POST", body: new FormData(form), headers: { Accept: "application/json" } })
+                .then(function (response) {
+                  return response.json().then(function (json) {
+                    if (!response.ok || !json.success) throw new Error(json.error || "The receipt could not be uploaded.");
+                    return json;
+                  });
+                })
+                .then(function (json) {
+                  status.textContent = json.message || "Your payment receipt was uploaded successfully.";
+                  form.reset();
+                  document.getElementById("receipt-order-id").value = orderId;
+                  document.getElementById("receipt-upload-token").value = token;
+                  submit.textContent = "Receipt uploaded";
+                })
+                .catch(function (error) {
+                  status.className = "error";
+                  status.textContent = error.message;
+                  submit.disabled = false;
+                  submit.textContent = "Upload payment receipt";
+                });
+            });
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>

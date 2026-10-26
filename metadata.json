@@ -1,0 +1,8 @@
+{
+  "name": "Tesla Trade Inc — Secure Investment Platform",
+  "description": "Institutional investment platform featuring high-yield automated trading portfolios, real-time analytics, and automated investor communication.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

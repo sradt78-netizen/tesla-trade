@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "note": "Reference catalog seeded from public Tesla vehicle and shop categories. Replace this file with your approved distributor catalog, local prices, stock, currency, images, and disclosures before accepting orders.",
+  "products": [
+    {
+      "id": "model-x",
+      "name": "Model X",
+      "category": "Vehicles",
+      "vehicleCategory": "Model X",
+      "description": "Long Range certified pre-owned Model X reference listing. Confirm vehicle history, VIN, local price, warranty, and availability before accepting an order.",
+      "price": 35600,
+      "currency": "USD",
+      "priceLabel": "$35,600",
+      "image": "assets/model-x-front.jpeg",
+      "available": true,
+      "sourceUrl": "https://www.tesla.com/"
+    },
+    {
+      "id": "model-s",
+      "name": "Model S",
+      "category": "Vehicles",
+      "vehicleCategory": "Model S",
+      "description": "Long Range Plus certified pre-owned Model S reference listing. Confirm vehicle history, VIN, local price, warranty, and availability before accepting an order.",
+      "price": 41600,
+      "currency": "USD",
+      "priceLabel": "$41,600",
+      "image": "assets/model-s-front.jpeg",
+      "available": true,
+      "sourceUrl": "https://www.tesla.com/"
+    },
+    {
+      "id": "model-3",
+      "name": "Model 3",
+      "category": "Vehicles",
+      "vehicleCategory": "Model 3",
+      "description": "Sport sedan reference listing. Confirm trim, market, price, and availability before accepting an order.",
+      "price": 42990,
+      "currency": "USD",
+      "priceLabel": "$42,990",
+      "image": "assets/model-3-toggle-premium.jpg",
+      "available": true,
+      "sourceUrl": "https://www.tesla.com/model3"
+    },
+    {
+      "id": "model-y",
+      "name": "Model Y",
+      "category": "Vehicles",
+      "vehicleCategory": "Model Y",
+      "description": "Midsize SUV reference listing. Update local trim and stock details here.",
+      "price": 39990,
+      "currency": "USD",
+      "priceLabel": "$39,990",
+      "image": "assets/model-y-front.jpeg",
+      "available": true,
+      "sourceUrl": "https://www.tesla.com/modely"
+    },
+    {
+      "id": "cybertruck",
+      "name": "Cybertruck",
+      "category": "Vehicles",
+      "vehicleCategory": "Cybertruck",
+      "description": "Premium all-wheel-drive Cybertruck reference listing. Confirm local trim, pricing, availability and delivery before accepting an order.",
+      "price": 84990,
+      "currency": "USD",
+      "priceLabel": "$84,990",
+      "image": "assets/cybertruck-side.jpeg",
+      "available": true,
+      "sourceUrl": "https://www.tesla.com/cybertruck"
+    },
+    {
+      "id": "model-y-l-premium",
+      "name": "Model Y L Premium",
+      "category": "Vehicles",
+      "description": "Three-row premium SUV reference listing. Use your approved distributor terms for final pricing.",
+      "priceLabel": "Request current quote",
+      "image": "assets/tesla-car-4-Khxv0zna.jpg",
+      "available": true,
+      "sourceUrl": "https://www.tesla.com/"
+    },
+    {
+      "id": "wall-connector",
+      "name": "Wall Connector",
+      "category": "Charging",
+      "description": "Home charging reference product for an approved installation plan.",
+      "priceLabel": "Request current quote",
+      "image": "assets/wall-connector.svg",
+      "available": true,
+      "sourceUrl": "https://shop.tesla.com/"
+    },
+    {
+      "id": "mobile-connector",
+      "name": "Mobile Connector",
+      "category": "Charging",
+      "description": "Portable charging reference product. Confirm regional plug and compatibility details.",
+      "priceLabel": "Request current quote",
+      "image": "assets/mobile-connector.svg",
+      "available": true,
+      "sourceUrl": "https://shop.tesla.com/"
+    },
+    {
+      "id": "model-y-liner",
+      "name": "Model Y All-Weather Interior Liners",
+      "category": "Accessories",
+      "description": "Vehicle accessory reference product for Model Y configurations.",
+      "priceLabel": "Request current quote",
+      "image": "assets/tesla-car-3-BYNaxZMy.jpg",
+      "available": true,
+      "sourceUrl": "https://shop.tesla.com/"
+    },
+    {
+      "id": "model-3-y-key-fob",
+      "name": "Model 3/Y Key Fob",
+      "category": "Accessories",
+      "description": "Vehicle accessory reference product. Verify compatibility with the customer vehicle.",
+      "priceLabel": "Request current quote",
+      "image": "assets/tesla-car-1-B2eyxrXH.jpg",
+      "available": true,
+      "sourceUrl": "https://shop.tesla.com/"
+    },
+    {
+      "id": "desktop-supercharger",
+      "name": "Desktop Supercharger",
+      "category": "Lifestyle",
+      "description": "Lifestyle reference product from the official shop catalog.",
+      "priceLabel": "Request current quote",
+      "image": "assets/hero-tesla-lineup-CJtpdCZo.jpg",
+      "available": true,
+      "sourceUrl": "https://shop.tesla.com/"
+    }
+  ]
+}
