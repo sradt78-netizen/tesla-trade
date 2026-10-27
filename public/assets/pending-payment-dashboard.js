@@ -8,7 +8,7 @@
 
   function onInvestorRoute() {
     var p = (window.location.pathname || '').toLowerCase();
-    return p === '/overview' || p === '/dashboard' || p === '/waiting' ||
+    return p === '/overview' || p === '/dashboard' || p === '/waiting' || p === '/invest' ||
       p.indexOf('/overview/') === 0 || p.indexOf('/dashboard/') === 0 ||
       p.indexOf('/portfolio') === 0;
   }
@@ -65,18 +65,35 @@
     };
   }
 
-  // Intercept any attempts to redirect back to /invest when a deposit is pending
+  // Intercept any attempts to redirect back to /invest when a deposit is active or pending
   function guardNavigation() {
     var origPush = window.history.pushState;
     var origReplace = window.history.replaceState;
     function shouldBlock(targetUrl) {
-      if (!isDepositPendingLocal()) return false;
       var meta = {};
       try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
-      if (meta.status === 'active' || meta.status === 'approved') return false;
+      var dep = localStorage.getItem('ttinc_deposit_status');
+      var pay = localStorage.getItem('ttinc_payment_status');
+      var isActive = (meta.status === 'active' || meta.status === 'approved' || dep === 'active' || pay === 'active');
+      var isPending = (dep === 'pending_approval' || pay === 'pending_approval' || meta.status === 'pending_approval' || meta.status === 'pending');
       var str = String(targetUrl || '').toLowerCase();
-      return (str.indexOf('/invest') !== -1 || str.indexOf('/payment') !== -1) &&
-        str.indexOf('approved') === -1;
+
+      // If active, prevent kicking back to /invest or /waiting
+      if (isActive) {
+        if (str.indexOf('/invest') !== -1 || str.indexOf('/waiting') !== -1) {
+          if (window.location.pathname !== '/overview') {
+            window.location.replace('/overview');
+          }
+          return true;
+        }
+        return false;
+      }
+
+      if (isPending || isDepositPendingLocal()) {
+        return (str.indexOf('/invest') !== -1 || str.indexOf('/payment') !== -1) &&
+          str.indexOf('approved') === -1;
+      }
+      return false;
     }
 
     window.history.pushState = function (state, title, url) {
@@ -201,7 +218,7 @@
     }
   }
 
-  function celebrateAndUnlock() {
+  function celebrateAndUnlock(data) {
     var overlay = document.getElementById(LOCK_OVERLAY_ID);
     if (!overlay) return;
 
@@ -214,7 +231,7 @@
         '</div>' +
         '<h2 style="font-size:24px;font-weight:900;color:#ffffff;margin:0 0 10px;">Deposit Approved!</h2>' +
         '<p style="font-size:14px;color:#86efac;margin:0 0 20px;line-height:1.5;">' +
-          'Your deposit has been verified by the administrator. Unlocking your dashboard now…' +
+          'Your deposit has been verified by the administrator. 100% Match Bonus applied. Unlocking your dashboard…' +
         '</p>' +
       '</div>';
 
@@ -223,7 +240,26 @@
       localStorage.removeItem('ttinc_payment_status');
       var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
       meta.status = 'active';
+      if (data && data.total) meta.total = Number(data.total);
+      if (data && data.totalCurrentValue) {
+        meta.totalCurrentValue = Number(data.totalCurrentValue);
+        meta.bonus = Number(data.bonus || data.total || 0);
+      } else if (meta.total) {
+        meta.totalCurrentValue = Number(meta.total) * 2;
+        meta.bonus = Number(meta.total);
+      }
+      if (data && data.planName) meta.planName = data.planName;
       localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
+
+      if (data && data.activeInvestmentId) {
+        localStorage.setItem('ttinc_investment_id', String(data.activeInvestmentId));
+      }
+
+      var curAuth = auth() || {};
+      curAuth.onboardingState = 'completed';
+      curAuth.onboarding_status = 'verified';
+      localStorage.setItem('ttinc_auth', JSON.stringify(curAuth));
+
       if (window.location.search && window.location.search.indexOf('payment=pending') !== -1) {
         window.history.replaceState(null, '', window.location.pathname);
       }
@@ -234,6 +270,8 @@
       removeBanner();
       var overlay1 = document.getElementById('ttinc-account-status-overlay');
       if (overlay1) overlay1.remove();
+      var overlay2 = document.getElementById('ttinc-pending-overlay');
+      if (overlay2) overlay2.remove();
       if (window.location.pathname !== '/overview' || (window.location.search && window.location.search.indexOf('payment=pending') !== -1)) {
         window.location.replace('/overview');
       } else {
@@ -278,7 +316,26 @@
             localStorage.removeItem('ttinc_payment_status');
             var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
             meta.status = 'active';
+            if (data.total) meta.total = Number(data.total);
+            if (data.totalCurrentValue) {
+              meta.totalCurrentValue = Number(data.totalCurrentValue);
+              meta.bonus = Number(data.bonus || data.total || 0);
+            } else if (meta.total) {
+              meta.totalCurrentValue = Number(meta.total) * 2;
+              meta.bonus = Number(meta.total);
+            }
+            if (data.planName) meta.planName = data.planName;
             localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
+
+            if (data.activeInvestmentId) {
+              localStorage.setItem('ttinc_investment_id', String(data.activeInvestmentId));
+            }
+
+            var curAuth = auth() || {};
+            curAuth.onboardingState = 'completed';
+            curAuth.onboarding_status = 'verified';
+            localStorage.setItem('ttinc_auth', JSON.stringify(curAuth));
+
             if (window.location.search && window.location.search.indexOf('payment=pending') !== -1) {
               window.history.replaceState(null, '', window.location.pathname);
             }
@@ -286,12 +343,21 @@
 
           // If we were previously locked, celebrate and unlock!
           if (document.getElementById(LOCK_OVERLAY_ID)) {
-            celebrateAndUnlock();
+            celebrateAndUnlock(data);
             return;
           }
           removeLock();
           var overlay1 = document.getElementById('ttinc-account-status-overlay');
           if (overlay1) overlay1.remove();
+          var overlay2 = document.getElementById('ttinc-pending-overlay');
+          if (overlay2) overlay2.remove();
+
+          // If current route is /waiting or /invest, route to /overview
+          var currentPath = (window.location.pathname || '').toLowerCase();
+          if (currentPath === '/waiting' || currentPath === '/invest') {
+            window.location.replace('/overview');
+            return;
+          }
 
           // If there is an additional follow-up deposit pending review for an already active investor:
           if (Array.isArray(data.pendingPayments) && data.pendingPayments.length) {

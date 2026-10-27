@@ -1,1 +1,41 @@
-[]
+[
+  {
+    "id": "dep_mvqp8gqc_oqo7n",
+    "tx_id": "TXMVQP8GQDXX5",
+    "user_id": "pending_user@example.com",
+    "user_email": "pending_user@example.com",
+    "user_name": "Pending Investor",
+    "portfolio": "Pending Investor · Pioneer",
+    "plan_id": "standard",
+    "plan_label": "Pioneer",
+    "plan_name": "Pioneer",
+    "total": 2500,
+    "total_current_value": 5000,
+    "method": "USDT (TRC-20)",
+    "payment_reference": "",
+    "payment_proof_path": "",
+    "payment_proof_name": "",
+    "status": "active",
+    "created_at": "2026-10-27T13:06:08.449Z",
+    "totalCurrentValue": 5000,
+    "earnings": 2500
+  },
+  {
+    "id": "dep_mvqp8afm",
+    "tx_id": "TXMVQP8AFN",
+    "user_id": "test_investor@example.com",
+    "user_email": "test_investor@example.com",
+    "user_name": "Investor",
+    "portfolio": "Tesla · Explorer",
+    "plan_id": "starter_ai",
+    "plan_label": "Explorer",
+    "plan_name": "Explorer",
+    "total": 1000,
+    "total_current_value": 2000,
+    "totalCurrentValue": 2000,
+    "earnings": 1000,
+    "status": "active",
+    "method": "Admin Credit",
+    "created_at": "2026-10-27T13:06:00.275Z"
+  }
+]

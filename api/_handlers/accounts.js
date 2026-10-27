@@ -133,15 +133,28 @@ export default async function handler(req, res) {
     let pendingDepositTotal = 0;
     const pendingPayments = [];
 
+    // Format all investments with proper values
+    const formattedInvestments = userInvestments.map(inv => {
+      const depAmt = parseFloat(inv.total || '0');
+      const val = parseFloat(inv.total_current_value != null ? inv.total_current_value : (inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.status === 'active' ? depAmt * 2 : depAmt)));
+      return {
+        ...inv,
+        total: depAmt,
+        totalCurrentValue: val,
+        total_current_value: val,
+        status: inv.status || 'pending_approval'
+      };
+    });
+
     // Check for active or approved investment first
-    const activeInv = userInvestments.find(inv => inv.status === 'active' || inv.status === 'approved');
+    const activeInv = formattedInvestments.find(inv => inv.status === 'active' || inv.status === 'approved');
     if (activeInv) {
       status = 'active';
       activeInvestmentId = activeInv.id;
     }
 
     // Check for pending or declined investments
-    for (const inv of userInvestments) {
+    for (const inv of formattedInvestments) {
       if (inv.status === 'pending_approval' || inv.status === 'pending') {
         const amt = parseFloat(inv.total || '0');
         if (status !== 'active') {
@@ -163,6 +176,9 @@ export default async function handler(req, res) {
       }
     }
 
+    const activeTotal = activeInv ? parseFloat(activeInv.total || '0') : 0;
+    const activeVal = activeInv ? parseFloat(activeInv.totalCurrentValue || (activeTotal * 2)) : 0;
+
     return res.status(200).json({
       success: true,
       account: hasAccount,
@@ -172,9 +188,12 @@ export default async function handler(req, res) {
       id: activeInvestmentId || (pendingPayments[0] ? pendingPayments[0].id : null),
       hasActiveInvestment: status === 'active',
       activeInvestmentId: activeInvestmentId,
+      total: activeTotal,
+      totalCurrentValue: activeVal,
+      total_current_value: activeVal,
       pendingDepositTotal,
       pendingPayments,
-      investments: userInvestments
+      investments: formattedInvestments
     });
   }
 
@@ -253,7 +272,15 @@ export default async function handler(req, res) {
       } catch (e) {}
 
       try {
-        const { mockStore } = await import('./admin.js');
+        const { mockStore, savePersistentInvestor } = await import('./admin.js');
+        if (typeof savePersistentInvestor === 'function') {
+          savePersistentInvestor({
+            name,
+            email,
+            phone,
+            onboarding_status: 'pending_deposit'
+          });
+        }
         const existing = mockStore.investors.find(u => u.email.toLowerCase() === email);
         if (existing) {
           existing.name = name;
@@ -264,7 +291,7 @@ export default async function handler(req, res) {
             name,
             email,
             phone,
-            onboarding_status: 'plan_selection',
+            onboarding_status: 'pending_deposit',
             registered_at: new Date().toISOString()
           });
         }

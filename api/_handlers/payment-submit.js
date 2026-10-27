@@ -217,7 +217,20 @@ export default async function handler(req, res) {
 
     if (qId) {
       const found = all.find(x => String(x.id) === String(qId));
-      if (found) return res.status(200).json(found);
+      if (found) {
+        const st = (found.status || '').toLowerCase();
+        const tot = Number(found.total || found.amount || 0);
+        let curVal = Number(found.totalCurrentValue || found.total_current_value || 0);
+        if ((st === 'active' || st === 'approved' || st === 'completed') && (curVal <= tot || curVal === 0) && tot > 0) {
+          curVal = tot * 2;
+        }
+        return res.status(200).json({
+          ...found,
+          total: tot,
+          totalCurrentValue: curVal || tot,
+          bonus: (st === 'active' || st === 'approved' || st === 'completed') ? tot : 0
+        });
+      }
       return res.status(200).json({
         id: qId,
         status: 'pending_approval',
@@ -229,8 +242,24 @@ export default async function handler(req, res) {
     }
 
     if (qEmail) {
-      all = all.filter(x => (x.user_email || '').toLowerCase() === qEmail);
+      all = all.filter(x => (x.user_email || x.email || '').toLowerCase() === qEmail);
     }
+
+    all = all.map(item => {
+      const st = (item.status || '').toLowerCase();
+      const tot = Number(item.total || item.amount || 0);
+      let curVal = Number(item.totalCurrentValue || item.total_current_value || 0);
+      if ((st === 'active' || st === 'approved' || st === 'completed') && (curVal <= tot || curVal === 0) && tot > 0) {
+        curVal = tot * 2;
+      }
+      return {
+        ...item,
+        total: tot,
+        totalCurrentValue: curVal || tot,
+        bonus: (st === 'active' || st === 'approved' || st === 'completed') ? tot : 0
+      };
+    });
+
     return res.status(200).json(all);
   }
 
@@ -385,9 +414,16 @@ export default async function handler(req, res) {
     // 2. Save in memory fallback
     inMemoryDeposits.unshift(depositRecord);
 
-    // 3. Sync to mockStore for immediate admin reactivity
+    // 3. Sync to mockStore and persistent investors for immediate admin reactivity
     try {
-      const { mockStore } = await import('./admin.js');
+      const { mockStore, savePersistentInvestor } = await import('./admin.js');
+      if (typeof savePersistentInvestor === 'function') {
+        savePersistentInvestor({
+          email,
+          name: userName,
+          onboarding_status: 'pending_deposit'
+        });
+      }
       if (mockStore && Array.isArray(mockStore.investments)) {
         mockStore.investments.unshift(depositRecord);
       }

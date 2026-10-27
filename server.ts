@@ -8,7 +8,7 @@ import multer from 'multer';
 import adminHandler from './api/_handlers/admin.js';
 import dbcheckHandler from './api/_handlers/dbcheck.js';
 import paymentSettingsHandler from './api/_handlers/payment-settings.js';
-import paymentSubmitHandler from './api/_handlers/payment-submit.js';
+import paymentSubmitHandler, { loadPersistentDeposits } from './api/_handlers/payment-submit.js';
 import otpHandler from './api/_handlers/otp.js';
 import authHandler from './api/_handlers/auth.js';
 import supabaseConfigHandler from './api/_handlers/supabase-config.js';
@@ -317,7 +317,19 @@ app.get('/api/investments/:id/trading-state', (req, res) => {
   const now = Number(req.query.now || Math.floor(Date.now() / 1000));
   let inv = mockTradingInvestments[id];
   if (!inv) {
-    inv = { id, status: 'active', total: 1000, totalCurrentValue: 1000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
+    try {
+      const diskDeposits = loadPersistentDeposits();
+      const found = diskDeposits.find((d: any) => String(d.id) === String(id));
+      if (found) {
+        const tot = Number(found.total || 1000);
+        const curVal = Number(found.totalCurrentValue || found.total_current_value || (tot * 2));
+        inv = { id, status: found.status || 'active', total: tot, totalCurrentValue: curVal, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
+        mockTradingInvestments[id] = inv;
+      }
+    } catch (e) {}
+  }
+  if (!inv) {
+    inv = { id, status: 'active', total: 1000, totalCurrentValue: 2000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
     mockTradingInvestments[id] = inv;
   }
   return res.json({
@@ -331,7 +343,19 @@ app.post('/api/investments/:id/trading/start', (req, res) => {
   const now = Number(req.query.now || Math.floor(Date.now() / 1000));
   let inv = mockTradingInvestments[id];
   if (!inv) {
-    inv = { id, status: 'active', total: 1000, totalCurrentValue: 1000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
+    try {
+      const diskDeposits = loadPersistentDeposits();
+      const found = diskDeposits.find((d: any) => String(d.id) === String(id));
+      if (found) {
+        const tot = Number(found.total || 1000);
+        const curVal = Number(found.totalCurrentValue || found.total_current_value || (tot * 2));
+        inv = { id, status: found.status || 'active', total: tot, totalCurrentValue: curVal, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
+        mockTradingInvestments[id] = inv;
+      }
+    } catch (e) {}
+  }
+  if (!inv) {
+    inv = { id, status: 'active', total: 1000, totalCurrentValue: 2000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
     mockTradingInvestments[id] = inv;
   }
   const amount = Number(req.body.amount || 0);

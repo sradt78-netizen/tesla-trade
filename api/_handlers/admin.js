@@ -1,6 +1,46 @@
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import { getDbConnection } from './dbcheck.js';
 import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
+
+const INVESTORS_FILE = path.join(process.cwd(), 'data', 'saved_investors.json');
+
+export function loadPersistentInvestors() {
+  try {
+    if (fs.existsSync(INVESTORS_FILE)) {
+      const raw = fs.readFileSync(INVESTORS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+  return [];
+}
+
+export function savePersistentInvestor(account) {
+  if (!account || !account.email) return;
+  try {
+    const list = loadPersistentInvestors();
+    const cleanEmail = String(account.email).toLowerCase().trim();
+    const idx = list.findIndex(u => (u.email || '').toLowerCase() === cleanEmail);
+    const updated = {
+      id: account.id || (idx >= 0 ? list[idx].id : ('u_' + Date.now().toString(36))),
+      name: account.name || (idx >= 0 ? list[idx].name : 'Investor'),
+      email: cleanEmail,
+      phone: account.phone || (idx >= 0 ? list[idx].phone : '—'),
+      onboarding_status: account.onboarding_status || (idx >= 0 ? list[idx].onboarding_status : 'active'),
+      registered_at: account.registered_at || (idx >= 0 ? list[idx].registered_at : new Date().toISOString())
+    };
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...updated };
+    } else {
+      list.unshift(updated);
+    }
+    const dir = path.dirname(INVESTORS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(INVESTORS_FILE, JSON.stringify(list, null, 2), 'utf8');
+  } catch (e) {}
+}
 
 function cleanString(val) {
   if (!val) return '';
@@ -539,16 +579,37 @@ export default async function handler(req, res) {
         investments = mergedInvs;
       }
 
-      // Ensure investors list includes any depositor
+      // Merge disk persistent registered investors
+      try {
+        const diskInvestors = loadPersistentInvestors();
+        if (Array.isArray(diskInvestors)) {
+          for (const u of diskInvestors) {
+            const em = (u.email || '').toLowerCase();
+            const idx = investors.findIndex(x => (x.email || '').toLowerCase() === em);
+            if (idx >= 0) {
+              investors[idx] = { ...investors[idx], ...u };
+            } else {
+              investors.unshift(u);
+            }
+          }
+        }
+      } catch (e) {}
+
+      // Ensure investors list includes any depositor and reflects their active/pending status accurately
       for (const inv of investments) {
         const em = (inv.user_email || '').toLowerCase();
-        if (em && !investors.some(u => (u.email || '').toLowerCase() === em)) {
+        if (!em) continue;
+        const existingIdx = investors.findIndex(u => (u.email || '').toLowerCase() === em);
+        const isActive = inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed';
+        if (existingIdx >= 0) {
+          if (isActive) investors[existingIdx].onboarding_status = 'active';
+        } else {
           investors.push({
             id: 'u_' + Math.random().toString(36).substring(2, 7),
             name: inv.user_name || 'Investor',
             email: em,
             phone: '—',
-            onboarding_status: inv.status === 'active' ? 'active' : 'pending_deposit',
+            onboarding_status: isActive ? 'active' : 'pending_deposit',
             registered_at: inv.created_at || new Date().toISOString()
           });
         }
@@ -750,97 +811,340 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Valid email and positive amount required.' });
       }
 
-      if (isDbConnected && conn) {
-        try {
-          const [invRows] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? LIMIT 1', [email]);
-          if (invRows.length > 0) {
-            const currentTotal = parseFloat(invRows[0].total || '0') + amount;
-            const currentValue = parseFloat(invRows[0].total_current_value || invRows[0].total || '0') + amount;
-            await conn.query('UPDATE investments SET total=?, total_current_value=?, status="active" WHERE id=?', [currentTotal, currentValue, invRows[0].id]);
-          } else {
-            await conn.query(
-              'INSERT INTO investments (user_email, user_name, plan_id, plan_name, total, total_current_value, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-              [email, 'Investor', 'starter_ai', 'Explorer', amount, amount, 'active']
-            );
-          }
-          await conn.query('UPDATE investor_accounts SET onboarding_status="active" WHERE LOWER(email)=?', [email]);
-          await conn.end();
-        } catch (e) {}
-      } else {
-        const found = mockStore.investments.find(i => i.user_email.toLowerCase() === email);
+      // 100% Matching Deposit Bonus Policy
+      const bonusMatch = amount;
+      const bonusCredited = amount * 2; // investor amount + 100% bonus
+
+      let updatedTotal = amount;
+      let updatedCurrentValue = bonusCredited;
+      let targetInvId = 'dep_' + Date.now().toString(36);
+
+      // Check persistent disk deposits first
+      try {
+        const diskDeposits = loadPersistentDeposits();
+        const found = diskDeposits.find(d => (d.user_email || '').toLowerCase() === email);
         if (found) {
-          found.total += amount;
-          found.total_current_value += amount;
+          targetInvId = found.id;
+          const prevTotal = parseFloat(found.total || '0');
+          const prevVal = parseFloat(found.total_current_value || found.totalCurrentValue || (prevTotal > 0 ? prevTotal * 2 : 0));
+          updatedTotal = prevTotal + amount;
+          updatedCurrentValue = prevVal + bonusCredited;
+          found.total = updatedTotal;
+          found.total_current_value = updatedCurrentValue;
+          found.totalCurrentValue = updatedCurrentValue;
+          found.earnings = updatedCurrentValue - updatedTotal;
           found.status = 'active';
+          savePersistentDeposit(found);
         } else {
-          mockStore.investments.unshift({
-            id: Date.now(),
+          const newDisk = {
+            id: targetInvId,
+            tx_id: 'TX' + Date.now().toString(36).toUpperCase(),
+            user_id: email,
             user_email: email,
             user_name: 'Investor',
+            portfolio: 'Tesla · Explorer',
             plan_id: 'starter_ai',
+            plan_label: 'Explorer',
             plan_name: 'Explorer',
-            total: amount,
-            total_current_value: amount,
-            status: 'active'
+            total: updatedTotal,
+            total_current_value: updatedCurrentValue,
+            totalCurrentValue: updatedCurrentValue,
+            earnings: bonusMatch,
+            status: 'active',
+            method: 'Admin Credit',
+            created_at: new Date().toISOString()
+          };
+          savePersistentDeposit(newDisk);
+        }
+      } catch (eDisk) {}
+
+      // Check and update inMemoryDeposits
+      if (Array.isArray(inMemoryDeposits)) {
+        const memFound = inMemoryDeposits.find(d => (d.user_email || '').toLowerCase() === email);
+        if (memFound) {
+          memFound.total = updatedTotal;
+          memFound.total_current_value = updatedCurrentValue;
+          memFound.totalCurrentValue = updatedCurrentValue;
+          memFound.earnings = updatedCurrentValue - updatedTotal;
+          memFound.status = 'active';
+        } else {
+          inMemoryDeposits.unshift({
+            id: targetInvId,
+            tx_id: 'TX' + Date.now().toString(36).toUpperCase(),
+            user_id: email,
+            user_email: email,
+            user_name: 'Investor',
+            portfolio: 'Tesla · Explorer',
+            plan_id: 'starter_ai',
+            plan_label: 'Explorer',
+            plan_name: 'Explorer',
+            total: updatedTotal,
+            total_current_value: updatedCurrentValue,
+            totalCurrentValue: updatedCurrentValue,
+            earnings: bonusMatch,
+            status: 'active',
+            method: 'Admin Credit',
+            created_at: new Date().toISOString()
           });
         }
       }
 
-      return res.status(200).json({ success: true, message: `Successfully credited $${amount} to ${email}!` });
-    }
-
-    // ── 6. APPROVE / REJECT INVESTMENT DEPOSIT RECEIPT ──────────────
-    if (action === 'approve_deposit' || action === 'reject_deposit') {
-      const id = body.id;
-      const status = action === 'approve_deposit' ? 'active' : 'declined';
-      if (isDbConnected && conn) {
-        try {
-          await conn.query('UPDATE investments SET status=? WHERE id=?', [status, id]);
-          if (status === 'active') {
-            await conn.query('UPDATE investor_accounts SET onboarding_status="active" WHERE email=(SELECT user_email FROM investments WHERE id=? LIMIT 1)', [id]);
-          }
-          await conn.end();
-        } catch (e) {}
+      // Update mockStore
+      const foundMock = mockStore.investments.find(i => (i.user_email || '').toLowerCase() === email);
+      if (foundMock) {
+        foundMock.total = updatedTotal;
+        foundMock.total_current_value = updatedCurrentValue;
+        foundMock.totalCurrentValue = updatedCurrentValue;
+        foundMock.earnings = updatedCurrentValue - updatedTotal;
+        foundMock.status = 'active';
+      } else {
+        mockStore.investments.unshift({
+          id: targetInvId,
+          user_email: email,
+          user_name: 'Investor',
+          plan_id: 'starter_ai',
+          plan_name: 'Explorer',
+          total: updatedTotal,
+          total_current_value: updatedCurrentValue,
+          totalCurrentValue: updatedCurrentValue,
+          earnings: bonusMatch,
+          status: 'active',
+          created_at: new Date().toISOString()
+        });
       }
-      const inv = mockStore.investments.find(i => String(i.id) === String(id));
-      if (inv) inv.status = status;
-      const mem = inMemoryDeposits.find(i => String(i.id) === String(id));
-      if (mem) mem.status = status;
 
-      // Update disk storage
-      let foundDeposit = null;
-      try {
-        const diskDeposits = loadPersistentDeposits();
-        const found = diskDeposits.find(d => String(d.id) === String(id));
-        if (found) {
-          found.status = status;
-          savePersistentDeposit(found);
-          foundDeposit = found;
-        }
-      } catch (e) {}
+      // Ensure mockStore investor is active and persistent
+      savePersistentInvestor({ email, onboarding_status: 'active' });
+      const mockInvUser = mockStore.investors.find(x => (x.email || '').toLowerCase() === email);
+      if (mockInvUser) {
+        mockInvUser.onboarding_status = 'active';
+      } else {
+        mockStore.investors.unshift({
+          id: 'u_' + Date.now().toString(36),
+          name: 'Investor',
+          email: email,
+          phone: '—',
+          onboarding_status: 'active',
+          registered_at: new Date().toISOString()
+        });
+      }
 
-      // Sync with algorithmic trading store so trading wallet reflects approved funds immediately
+      // Sync trading store
       try {
         const { tradingInvestments } = await import('./trading.js');
-        const approvedAmount = parseFloat((foundDeposit && foundDeposit.total) || (inv && inv.total) || (mem && mem.total) || '1000');
-        tradingInvestments[id] = {
-          id,
-          status: status,
-          total: approvedAmount,
-          totalCurrentValue: approvedAmount,
+        tradingInvestments[targetInvId] = {
+          id: targetInvId,
+          status: 'active',
+          total: updatedCurrentValue,
+          totalCurrentValue: updatedCurrentValue,
           tradingStatus: 'idle',
           tradingAmount: 0,
           tradingStartedAt: null
         };
       } catch (eTr) {}
 
-      const targetEmail = (inv && inv.user_email) || (mem && mem.user_email) || (foundDeposit && foundDeposit.user_email);
-      if (targetEmail && status === 'active') {
-        const u = mockStore.investors.find(x => x.email.toLowerCase() === targetEmail.toLowerCase());
-        if (u) u.onboarding_status = 'active';
+      if (isDbConnected && conn) {
+        try {
+          const [invRows] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? LIMIT 1', [email]);
+          if (invRows.length > 0) {
+            await conn.query('UPDATE investments SET total=?, total_current_value=?, earnings=?, status="active" WHERE id=?', [updatedTotal, updatedCurrentValue, updatedCurrentValue - updatedTotal, invRows[0].id]);
+          } else {
+            await conn.query(
+              'INSERT INTO investments (id, tx_id, user_id, user_email, user_name, plan_id, plan_name, total, total_current_value, earnings, status, method, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "active", "admin_credit", NOW())',
+              [targetInvId, 'TX' + Date.now(), email, email, 'Investor', 'starter_ai', 'Explorer', updatedTotal, updatedCurrentValue, bonusMatch]
+            );
+          }
+          await conn.query('UPDATE investor_accounts SET onboarding_status="active", deposit_match_eligible=1 WHERE LOWER(email)=?', [email]);
+
+          const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
+          const txBonId = 'tx_bonus_' + Math.random().toString(36).substring(2, 9);
+          try {
+            await conn.query(
+              'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "processed", ?, NOW())',
+              [txDepId, targetInvId, email, amount, note || 'Account deposit credited']
+            );
+            await conn.query(
+              'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "bonus", ?, "processed", "100% First Deposit Match Bonus", NOW())',
+              [txBonId, targetInvId, email, bonusMatch]
+            );
+          } catch (eTx) {}
+          await conn.end();
+        } catch (e) {}
       }
 
-      return res.status(200).json({ success: true, message: `Deposit receipt updated to ${status}.` });
+      return res.status(200).json({
+        success: true,
+        message: `Successfully credited $${amount.toFixed(2)} + 100% matching bonus ($${bonusMatch.toFixed(2)}) to ${email}! Total balance: $${updatedCurrentValue.toFixed(2)}.`,
+        total: updatedTotal,
+        totalCurrentValue: updatedCurrentValue
+      });
+    }
+
+    // ── 6. APPROVE / REJECT INVESTMENT DEPOSIT RECEIPT ──────────────
+    if (action === 'approve_deposit' || action === 'reject_deposit' || action === 'approve_investor') {
+      const id = body.id;
+      const targetEmail = cleanString(body.email || url.searchParams.get('email')).toLowerCase();
+      const status = action === 'reject_deposit' ? 'declined' : 'active';
+
+      let approvedDepositAmount = parseFloat(body.amount || '0');
+      let foundDeposit = null;
+
+      // 1. Check disk persistent deposits
+      try {
+        const diskDeposits = loadPersistentDeposits();
+        const found = diskDeposits.find(d => (id && String(d.id) === String(id)) || (targetEmail && (d.user_email || '').toLowerCase() === targetEmail));
+        if (found) {
+          foundDeposit = found;
+          if (!approvedDepositAmount) approvedDepositAmount = parseFloat(found.total || '1000');
+          found.status = status;
+          if (status === 'active') {
+            const bonusMatch = approvedDepositAmount;
+            const doubleVal = approvedDepositAmount * 2;
+            found.total = approvedDepositAmount;
+            found.total_current_value = doubleVal;
+            found.totalCurrentValue = doubleVal;
+            found.earnings = bonusMatch;
+          }
+          savePersistentDeposit(found);
+        }
+      } catch (e) {}
+
+      // 2. Check memory deposits
+      const mem = inMemoryDeposits.find(i => (id && String(i.id) === String(id)) || (targetEmail && (i.user_email || '').toLowerCase() === targetEmail));
+      if (mem) {
+        if (!approvedDepositAmount) approvedDepositAmount = parseFloat(mem.total || '1000');
+        mem.status = status;
+        if (status === 'active') {
+          const doubleVal = approvedDepositAmount * 2;
+          mem.total = approvedDepositAmount;
+          mem.total_current_value = doubleVal;
+          mem.totalCurrentValue = doubleVal;
+          mem.earnings = approvedDepositAmount;
+        }
+        if (!foundDeposit) foundDeposit = mem;
+      }
+
+      // 3. Check mockStore
+      const inv = mockStore.investments.find(i => (id && String(i.id) === String(id)) || (targetEmail && (i.user_email || '').toLowerCase() === targetEmail));
+      if (inv) {
+        if (!approvedDepositAmount) approvedDepositAmount = parseFloat(inv.total || '1000');
+        inv.status = status;
+        if (status === 'active') {
+          const doubleVal = approvedDepositAmount * 2;
+          inv.total = approvedDepositAmount;
+          inv.total_current_value = doubleVal;
+          inv.totalCurrentValue = doubleVal;
+          inv.earnings = approvedDepositAmount;
+        }
+        if (!foundDeposit) foundDeposit = inv;
+      }
+
+      if (!approvedDepositAmount) approvedDepositAmount = 1000;
+      const bonusMatch = approvedDepositAmount;
+      const totalBalanceWithBonus = approvedDepositAmount * 2;
+
+      // If no deposit was found on disk or memory yet, create an approved record now
+      const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || (inv && inv.user_email) || (mem && mem.user_email);
+      const effectiveId = id || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
+
+      if (!foundDeposit && effectiveEmail && status === 'active') {
+        const freshDep = {
+          id: effectiveId,
+          tx_id: 'TX' + Date.now().toString(36).toUpperCase(),
+          user_id: effectiveEmail,
+          user_email: effectiveEmail,
+          user_name: 'Investor',
+          portfolio: 'Tesla · Explorer',
+          plan_id: 'starter_ai',
+          plan_label: 'Explorer',
+          plan_name: 'Explorer',
+          total: approvedDepositAmount,
+          total_current_value: totalBalanceWithBonus,
+          totalCurrentValue: totalBalanceWithBonus,
+          earnings: bonusMatch,
+          status: 'active',
+          method: 'Crypto',
+          created_at: new Date().toISOString()
+        };
+        savePersistentDeposit(freshDep);
+        inMemoryDeposits.unshift(freshDep);
+        mockStore.investments.unshift(freshDep);
+      }
+
+      // 4. Update investor account status in mockStore and persistent disk storage
+      if (effectiveEmail && status === 'active') {
+        savePersistentInvestor({
+          email: effectiveEmail,
+          name: (foundDeposit && foundDeposit.user_name) || 'Investor',
+          onboarding_status: 'active'
+        });
+        const u = mockStore.investors.find(x => (x.email || '').toLowerCase() === effectiveEmail.toLowerCase());
+        if (u) {
+          u.onboarding_status = 'active';
+        } else {
+          mockStore.investors.unshift({
+            id: 'u_' + Date.now().toString(36),
+            name: (foundDeposit && foundDeposit.user_name) || 'Investor',
+            email: effectiveEmail,
+            phone: '—',
+            onboarding_status: 'active',
+            registered_at: new Date().toISOString()
+          });
+        }
+      }
+
+      // 5. Sync with algorithmic trading store so trading wallet reflects approved funds + 100% bonus
+      try {
+        const { tradingInvestments } = await import('./trading.js');
+        tradingInvestments[effectiveId] = {
+          id: effectiveId,
+          status: status,
+          total: totalBalanceWithBonus,
+          totalCurrentValue: totalBalanceWithBonus,
+          tradingStatus: 'idle',
+          tradingAmount: 0,
+          tradingStartedAt: null
+        };
+      } catch (eTr) {}
+
+      // 6. Update MySQL Database if available
+      if (isDbConnected && conn) {
+        try {
+          if (id) {
+            await conn.query('UPDATE investments SET status=?, total=?, total_current_value=?, earnings=? WHERE id=?', [status, approvedDepositAmount, totalBalanceWithBonus, bonusMatch, id]);
+          }
+          if (effectiveEmail) {
+            await conn.query('UPDATE investments SET status=?, total=?, total_current_value=?, earnings=? WHERE LOWER(user_email)=?', [status, approvedDepositAmount, totalBalanceWithBonus, bonusMatch, effectiveEmail]);
+            if (status === 'active') {
+              await conn.query('UPDATE investor_accounts SET onboarding_status="active", deposit_match_eligible=1 WHERE LOWER(email)=?', [effectiveEmail]);
+
+              const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
+              const txBonId = 'tx_bonus_' + Math.random().toString(36).substring(2, 9);
+              try {
+                await conn.query(
+                  'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "processed", "Investment deposit approved", NOW())',
+                  [txDepId, effectiveId, effectiveEmail, approvedDepositAmount]
+                );
+                await conn.query(
+                  'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "bonus", ?, "processed", "100% First Deposit Match Bonus", NOW())',
+                  [txBonId, effectiveId, effectiveEmail, bonusMatch]
+                );
+              } catch (eTx) {}
+            }
+          }
+          await conn.end();
+        } catch (e) {}
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: status === 'active'
+          ? `Deposit of $${approvedDepositAmount.toFixed(2)} approved with 100% Match Bonus ($${bonusMatch.toFixed(2)})! Total dashboard balance: $${totalBalanceWithBonus.toFixed(2)}.`
+          : `Deposit receipt updated to ${status}.`,
+        status: status,
+        total: approvedDepositAmount,
+        totalCurrentValue: totalBalanceWithBonus
+      });
     }
 
     // ── 7. KYC APPROVE / REJECT ─────────────────────────────────────

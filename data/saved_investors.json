@@ -1,0 +1,18 @@
+[
+  {
+    "id": "u_pending_user",
+    "name": "Pending Investor",
+    "email": "pending_user@example.com",
+    "phone": "—",
+    "onboarding_status": "active",
+    "registered_at": "2026-10-27T13:06:08.449Z"
+  },
+  {
+    "id": "u_test_investor",
+    "name": "Investor",
+    "email": "test_investor@example.com",
+    "phone": "—",
+    "onboarding_status": "active",
+    "registered_at": "2026-10-27T13:06:00.275Z"
+  }
+]
