@@ -9,6 +9,24 @@ import authHandler from './_handlers/auth.js';
 import supabaseConfigHandler from './_handlers/supabase-config.js';
 import accountsHandler from './_handlers/accounts.js';
 import stocksHandler from './_handlers/stocks.js';
+import {
+  handleTradingState,
+  handleTradingStart,
+  handleTradingStop,
+  handleTradingSettingsGet,
+  handleTradingSettingsPost
+} from './_handlers/trading.js';
+
+function parseJsonBody(req) {
+  return new Promise((resolve) => {
+    if (req.body && typeof req.body === 'object') return resolve(req.body);
+    let data = '';
+    req.on('data', chunk => { data += chunk; });
+    req.on('end', () => {
+      try { resolve(JSON.parse(data || '{}')); } catch (e) { resolve({}); }
+    });
+  });
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -96,6 +114,32 @@ export default async function handler(req, res) {
   // 11. Invitation verification fallback
   if (normalizedPath === '/invitation/verify') {
     return res.status(200).json({ valid: true });
+  }
+
+  // 12. Trading Settings
+  if (normalizedPath === '/admin/trading-settings') {
+    if (req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      return handleTradingSettingsPost(req, res, body);
+    }
+    return handleTradingSettingsGet(req, res);
+  }
+
+  // 13. Algorithmic Trading Endpoints (state, start, stop)
+  const tradingMatch = normalizedPath.match(/^\/investments\/([^/]+)\/(trading-state|trading\/start|trading\/stop)$/);
+  if (tradingMatch) {
+    const invId = decodeURIComponent(tradingMatch[1]);
+    const action = tradingMatch[2];
+    if (action === 'trading-state') {
+      return handleTradingState(req, res, invId);
+    }
+    if (action === 'trading/start') {
+      const body = await parseJsonBody(req);
+      return handleTradingStart(req, res, invId, body);
+    }
+    if (action === 'trading/stop') {
+      return handleTradingStop(req, res, invId);
+    }
   }
 
   return res.status(200).json({ ok: true, path: pathname });

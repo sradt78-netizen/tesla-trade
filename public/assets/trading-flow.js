@@ -191,10 +191,19 @@
 
   // Draw modern glowing canvas chart with smooth spline and neon gradient fill
   function drawChart(canvas, points) {
-    if (!canvas || !points || !points.length) return;
+    if (!canvas) return;
+    if (!points || !points.length) {
+      points = [{ timestamp: Date.now() - 1500, value: 1000 }, { timestamp: Date.now(), value: 1005 }];
+    }
+    if (points.length === 1) {
+      points = [
+        { timestamp: points[0].timestamp - 1500, value: Number(points[0].value) * 0.998 },
+        points[0]
+      ];
+    }
     var rect = canvas.getBoundingClientRect();
-    var width = Math.max(260, Math.floor(rect.width));
-    var height = Math.max(120, Math.floor(rect.height));
+    var width = Math.max(280, Math.floor(rect.width || canvas.offsetWidth || (canvas.parentElement ? canvas.parentElement.clientWidth : 0) || 320));
+    var height = Math.max(140, Math.floor(rect.height || canvas.offsetHeight || (canvas.parentElement ? canvas.parentElement.clientHeight : 0) || 180));
     var ratio = window.devicePixelRatio || 1;
     canvas.width = width * ratio;
     canvas.height = height * ratio;
@@ -226,12 +235,6 @@
       ctx.stroke();
     }
     ctx.setLineDash([]);
-
-    if (points.length === 1) {
-      ctx.fillStyle = '#22c55e';
-      ctx.beginPath(); ctx.arc(x(0), y(points[0].value), 5, 0, Math.PI * 2); ctx.fill();
-      return;
-    }
 
     // 1. Draw smooth gradient fill under the curve
     var lastIdx = points.length - 1;
@@ -357,12 +360,43 @@
     var pnlPercent = Number(trade.pnlPercent || 0);
     var points = Array.isArray(trade.history) ? trade.history.slice() : [];
 
-    if (active && points.length) {
-      var latest = points[points.length - 1];
-      if (!history.length || history[history.length - 1].timestamp !== latest.timestamp) history.push(latest);
+    if (active) {
+      if (points.length > 1) {
+        if (!history.length) {
+          history = points.slice(-60);
+        } else {
+          var latest = points[points.length - 1];
+          if (history[history.length - 1].timestamp !== latest.timestamp) {
+            history.push(latest);
+          }
+        }
+      } else if (points.length === 1) {
+        if (!history.length) {
+          history = [
+            { timestamp: points[0].timestamp - 1500, value: points[0].value * 0.998 },
+            points[0]
+          ];
+        } else {
+          var latestOne = points[0];
+          if (history[history.length - 1].timestamp !== latestOne.timestamp) {
+            history.push(latestOne);
+          }
+        }
+      } else {
+        if (!history.length) {
+          var baseVal = Number(trade.tradeValue || trade.tradingAmount || 100);
+          var nowT = Date.now();
+          for (var pIdx = 15; pIdx >= 0; pIdx--) {
+            history.push({
+              timestamp: nowT - (pIdx * 1500),
+              value: Number((baseVal * (1 + (Math.sin(pIdx * 0.7) * 0.0035))).toFixed(2))
+            });
+          }
+        }
+      }
       history = history.slice(-60);
       points = history;
-    } else if (!active) {
+    } else {
       history = [];
     }
 
@@ -424,7 +458,12 @@
     container.innerHTML = html + '<div class="ttinc-trade-error" data-trade-error></div>';
     var start = container.querySelector('[data-start-trading]');
     if (start) start.addEventListener('click', function () { openModal(available); });
-    if (active) drawChart(container.querySelector('#ttinc-trade-canvas'), points);
+    if (active) {
+      window.requestAnimationFrame(function () {
+        var canvas = container.querySelector('#ttinc-trade-canvas');
+        if (canvas) drawChart(canvas, points);
+      });
+    }
   }
 
   function showError(message) {
@@ -476,30 +515,41 @@
 
     findInvestmentId().then(function (id) {
       lastInvestmentId = id || 'sim_inv_1';
+      var now = Date.now();
+      var initHist = [];
+      var baseVal = amount;
+      for (var k = 20; k >= 0; k--) {
+        var t = now - (k * 1500);
+        var jitter = (Math.sin(k * 0.7) * 0.0035) + ((20 - k) * 0.001);
+        initHist.push({ timestamp: t, value: Number((baseVal * (1 + jitter)).toFixed(2)) });
+      }
+      saveLocalSimTrade({
+        status: 'active',
+        initialAmount: amount,
+        availableBalance: Math.max(0, available - amount),
+        startedAt: now,
+        history: initHist
+      });
+      history = initHist.slice();
+
       return api('/api/investments/' + encodeURIComponent(lastInvestmentId) + '/trading/start', {
         method: 'POST',
         body: JSON.stringify({ amount: Number(amount.toFixed(2)) })
+      }).then(function (res) {
+        if (res && res.trade && Array.isArray(res.trade.history) && res.trade.history.length > 1) {
+          history = res.trade.history.slice();
+          var s = getLocalSimTrade();
+          if (s) {
+            s.history = history;
+            saveLocalSimTrade(s);
+          }
+        }
+        return res;
       }).catch(function () {
-        // Smooth client-side fallback simulation if server route is in test/mock mode
-        var now = Date.now();
-        var initHist = [
-          { timestamp: now - 8000, value: amount },
-          { timestamp: now - 5000, value: amount * 1.002 },
-          { timestamp: now - 2000, value: amount * 1.006 },
-          { timestamp: now, value: amount * 1.008 }
-        ];
-        saveLocalSimTrade({
-          status: 'active',
-          initialAmount: amount,
-          availableBalance: Math.max(0, available - amount),
-          startedAt: now,
-          history: initHist
-        });
         return { success: true };
       });
     }).then(function () {
       modal.style.display = 'none';
-      history = [];
       showToast('Trading Execution Started ✦', 'Your live performance graph is active and compounding.');
       return loadState(lastInvestmentId);
     }).catch(function (err) {
@@ -527,12 +577,17 @@
       var finalVal = sim.initialAmount * (1 + (gainSteps * 0.0032) + 0.004);
       var gained = finalVal - sim.initialAmount;
       saveLocalSimTrade(null);
+      history = [];
       showToast('Trade Closed & Profit Locked ✦', 'Gained ' + money(gained) + ' returned to your wallet balance.');
       busy = false;
       if (button) {
         button.disabled = false;
         button.textContent = 'Stop Trade & Lock Profit';
       }
+      api('/api/investments/' + encodeURIComponent(lastInvestmentId) + '/trading/stop', {
+        method: 'POST',
+        body: JSON.stringify({})
+      }).catch(function () {});
       return loadState(lastInvestmentId);
     }
 
@@ -541,6 +596,7 @@
       body: JSON.stringify({})
     }).then(function (data) {
       history = [];
+      saveLocalSimTrade(null);
       showToast('Trade Closed & Profit Locked ✦', 'Your final return has been credited to your portfolio.');
       return loadState(lastInvestmentId);
     }).catch(function (err) {

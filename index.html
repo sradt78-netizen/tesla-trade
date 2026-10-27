@@ -4497,10 +4497,10 @@
         if (status === 'create') return buildCreateAccountScreen();
         if (status === 'created') return buildPlanChooserScreen();
         if (status === 'status_error') return buildStatusErrorScreen();
-        var isApproved = (status === 'approved' || status === 'verified');
+        var isApproved = (status === 'approved' || status === 'verified' || status === 'active');
         var isPending  = (status === 'pending_approval' || status === 'pending');
         var isDeclined = (status === 'declined' || status === 'rejected' || status === 'cancelled');
-        if (isApproved) return buildDepositScreen();
+        if (isApproved) return null;
         if (!isPending && !isDeclined) return null;
 
         var icon  = isPending ? '⏳' : '❌';
@@ -4592,21 +4592,34 @@
       // ── poll /api/my-status ────────────────────────────────────
       function getEffectiveStatus(d) {
         var s = (d && (d.investmentStatus || d.status)) ? (d.investmentStatus || d.status) : 'none';
-        var hasActive = (d && d.hasActiveInvestment) || s === 'active';
+        var hasActive = (d && d.hasActiveInvestment) || s === 'active' || s === 'approved' || s === 'verified';
         if (hasActive) {
           try {
             localStorage.removeItem('ttinc_deposit_status');
             localStorage.removeItem('ttinc_payment_status');
+            var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+            meta.status = 'active';
+            localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
+            if (location.search && location.search.indexOf('payment=pending') !== -1) {
+              history.replaceState(null, '', location.pathname);
+            }
           } catch (e) {}
           return 'active';
         }
 
         var isDepPending = false;
         try {
-          isDepPending = localStorage.getItem('ttinc_deposit_status') === 'pending_approval' ||
-                         localStorage.getItem('ttinc_payment_status') === 'pending_approval' ||
-                         Boolean(localStorage.getItem('ttinc_investment_id')) ||
-                         (location.search && location.search.indexOf('payment=pending') !== -1);
+          var dep = localStorage.getItem('ttinc_deposit_status');
+          var pay = localStorage.getItem('ttinc_payment_status');
+          var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+          if (meta.status === 'active' || meta.status === 'approved') {
+            isDepPending = false;
+          } else {
+            isDepPending = dep === 'pending_approval' ||
+                           pay === 'pending_approval' ||
+                           meta.status === 'pending_approval' ||
+                           (location.search && location.search.indexOf('payment=pending') !== -1);
+          }
         } catch (e) {}
 
         if (isDepPending && (s === 'none' || s === 'created' || !s)) {
@@ -4631,7 +4644,7 @@
             var s = getEffectiveStatus(d);
             var isPendingState = (s === 'pending_approval' || s === 'pending');
 
-            if (s === 'active' || (d && d.hasActiveInvestment)) {
+            if (s === 'active' || (d && d.hasActiveInvestment) || s === 'approved') {
               _lastStatus = 'active';
               removeOverlay();
               stopPoll();
@@ -4657,9 +4670,11 @@
             if (isPendingState) {
               showOverlay('pending_approval');
               if (!_pollTimer) _pollTimer = setInterval(checkStatus, POLL_MS);
-            } else if (s === 'approved' || s === 'verified') {
-              showOverlay('approved');
+            } else if (s === 'approved' || s === 'verified' || s === 'active') {
+              _lastStatus = 'active';
+              removeOverlay();
               stopPoll();
+              return;
             } else if (s === 'declined' || s === 'rejected' || s === 'cancelled') {
               showOverlay('declined');
               stopPoll();

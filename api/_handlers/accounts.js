@@ -75,14 +75,33 @@ export default async function handler(req, res) {
       await conn.end();
     } catch (dbErr) {}
 
-    // 2. Always check & merge in-memory deposits & mockStore
+    // 2. Always check & merge persistent disk deposits, in-memory deposits & mockStore
     try {
-      const { inMemoryDeposits } = await import('./payment-submit.js');
-      const memDeposits = inMemoryDeposits.filter(d => d.user_email && d.user_email.toLowerCase() === email);
-      for (const md of memDeposits) {
-        hasAccount = true;
-        if (!userInvestments.some(inv => String(inv.id) === String(md.id))) {
-          userInvestments.unshift(md);
+      const { inMemoryDeposits, loadPersistentDeposits } = await import('./payment-submit.js');
+      if (typeof loadPersistentDeposits === 'function') {
+        const diskDeposits = loadPersistentDeposits();
+        const userDisk = diskDeposits.filter(d => d.user_email && d.user_email.toLowerCase() === email);
+        for (const dd of userDisk) {
+          hasAccount = true;
+          const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(dd.id));
+          if (exIdx >= 0) {
+            userInvestments[exIdx] = { ...userInvestments[exIdx], ...dd };
+          } else {
+            userInvestments.unshift(dd);
+          }
+        }
+      }
+
+      if (Array.isArray(inMemoryDeposits)) {
+        const memDeposits = inMemoryDeposits.filter(d => d.user_email && d.user_email.toLowerCase() === email);
+        for (const md of memDeposits) {
+          hasAccount = true;
+          const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(md.id));
+          if (exIdx >= 0) {
+            userInvestments[exIdx] = { ...userInvestments[exIdx], ...md };
+          } else {
+            userInvestments.unshift(md);
+          }
         }
       }
 
@@ -95,7 +114,10 @@ export default async function handler(req, res) {
       const mockInvs = mockStore.investments.filter(i => i.user_email && i.user_email.toLowerCase() === email);
       for (const mi of mockInvs) {
         hasAccount = true;
-        if (!userInvestments.some(inv => String(inv.id) === String(mi.id))) {
+        const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(mi.id));
+        if (exIdx >= 0) {
+          userInvestments[exIdx] = { ...userInvestments[exIdx], ...mi };
+        } else {
           userInvestments.unshift(mi);
         }
       }
@@ -111,8 +133,8 @@ export default async function handler(req, res) {
     let pendingDepositTotal = 0;
     const pendingPayments = [];
 
-    // Check for active investment
-    const activeInv = userInvestments.find(inv => inv.status === 'active');
+    // Check for active or approved investment first
+    const activeInv = userInvestments.find(inv => inv.status === 'active' || inv.status === 'approved');
     if (activeInv) {
       status = 'active';
       activeInvestmentId = activeInv.id;
@@ -122,7 +144,9 @@ export default async function handler(req, res) {
     for (const inv of userInvestments) {
       if (inv.status === 'pending_approval' || inv.status === 'pending') {
         const amt = parseFloat(inv.total || '0');
-        pendingDepositTotal += amt;
+        if (status !== 'active') {
+          pendingDepositTotal += amt;
+        }
         pendingPayments.push({
           id: inv.id,
           status: inv.status,

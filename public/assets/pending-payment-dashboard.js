@@ -30,12 +30,19 @@
 
   function isDepositPendingLocal() {
     try {
+      var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+      if (meta.status === 'active' || meta.status === 'approved') return false;
       var dep = localStorage.getItem('ttinc_deposit_status');
       var pay = localStorage.getItem('ttinc_payment_status');
-      var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-      return dep === 'pending_approval' || pay === 'pending_approval' ||
-        meta.status === 'pending_approval' || meta.status === 'pending' ||
-        (location.search && location.search.indexOf('payment=pending') !== -1);
+      if (dep === 'active' || pay === 'active' || dep === 'approved' || pay === 'approved') return false;
+      if (dep === 'pending_approval' || pay === 'pending_approval' ||
+        meta.status === 'pending_approval' || meta.status === 'pending') {
+        return true;
+      }
+      if (location.search && location.search.indexOf('payment=pending') !== -1) {
+        return true;
+      }
+      return false;
     } catch (e) {
       return false;
     }
@@ -64,6 +71,9 @@
     var origReplace = window.history.replaceState;
     function shouldBlock(targetUrl) {
       if (!isDepositPendingLocal()) return false;
+      var meta = {};
+      try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
+      if (meta.status === 'active' || meta.status === 'approved') return false;
       var str = String(targetUrl || '').toLowerCase();
       return (str.indexOf('/invest') !== -1 || str.indexOf('/payment') !== -1) &&
         str.indexOf('approved') === -1;
@@ -211,11 +221,24 @@
     try {
       localStorage.removeItem('ttinc_deposit_status');
       localStorage.removeItem('ttinc_payment_status');
+      var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+      meta.status = 'active';
+      localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
+      if (window.location.search && window.location.search.indexOf('payment=pending') !== -1) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     } catch (e) {}
 
     setTimeout(function () {
       removeLock();
-      window.location.reload();
+      removeBanner();
+      var overlay1 = document.getElementById('ttinc-account-status-overlay');
+      if (overlay1) overlay1.remove();
+      if (window.location.pathname !== '/overview' || (window.location.search && window.location.search.indexOf('payment=pending') !== -1)) {
+        window.location.replace('/overview');
+      } else {
+        window.location.reload();
+      }
     }, 1200);
   }
 
@@ -245,17 +268,30 @@
       .then(function (data) {
         if (!data) return;
 
-        var hasActive = data.hasActiveInvestment || data.status === 'active' || data.investmentStatus === 'active';
+        var hasActive = data.hasActiveInvestment || data.status === 'active' || data.investmentStatus === 'active' || data.status === 'approved' || data.investmentStatus === 'approved';
         var isPending = data.status === 'pending_approval' || data.investmentStatus === 'pending_approval' ||
-          (Array.isArray(data.pendingPayments) && data.pendingPayments.length > 0);
+          (!hasActive && Array.isArray(data.pendingPayments) && data.pendingPayments.length > 0);
 
         if (hasActive) {
+          try {
+            localStorage.removeItem('ttinc_deposit_status');
+            localStorage.removeItem('ttinc_payment_status');
+            var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+            meta.status = 'active';
+            localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
+            if (window.location.search && window.location.search.indexOf('payment=pending') !== -1) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+          } catch (e) {}
+
           // If we were previously locked, celebrate and unlock!
           if (document.getElementById(LOCK_OVERLAY_ID)) {
             celebrateAndUnlock();
             return;
           }
           removeLock();
+          var overlay1 = document.getElementById('ttinc-account-status-overlay');
+          if (overlay1) overlay1.remove();
 
           // If there is an additional follow-up deposit pending review for an already active investor:
           if (Array.isArray(data.pendingPayments) && data.pendingPayments.length) {

@@ -275,6 +275,28 @@ function computeTradeValue(inv: any, now: number) {
   const pnl = Number((tradeValue - amount).toFixed(2));
   const pnlPercent = amount > 0 ? Number(((pnl / amount) * 100).toFixed(2)) : 0;
 
+  // Generate 20+ data points for smooth, fluctuating graph display from the moment of execution
+  const history: any[] = [];
+  const pointsCount = 20;
+  for (let k = pointsCount; k >= 0; k--) {
+    const secOffset = elapsed - (k * 1.5);
+    const s = Math.max(0, Math.floor(secOffset));
+    const sInCycle = cycle > 0 ? (s % cycle) : 0;
+    const sIsProfit = sInCycle < serverTradingSettings.profitIntervalSeconds;
+    const jitter = (Math.sin(k * 0.7) * 0.0035) + ((pointsCount - k) * 0.001);
+    const pointVal = sIsProfit
+      ? amount * (1 + jitter + (serverTradingSettings.profitRatePercent / 100))
+      : amount * (1 + jitter - (serverTradingSettings.lossRatePercent / 100));
+    history.push({
+      timestamp: (Number(inv.tradingStartedAt) + secOffset) * 1000,
+      value: Math.max(0.01, Number(pointVal.toFixed(2))),
+      trend: sIsProfit ? 'profit' : 'loss'
+    });
+  }
+  if (history.length > 0) {
+    history[history.length - 1].value = tradeValue;
+  }
+
   return {
     status: 'active',
     availableBalance: Math.max(0, Number((balance - amount).toFixed(2))),
@@ -282,11 +304,7 @@ function computeTradeValue(inv: any, now: number) {
     pnl,
     pnlPercent,
     phase,
-    history: [
-      { timestamp: now - 3000, value: amount },
-      { timestamp: now - 1500, value: isProfit ? amount * 1.01 : amount * 0.99 },
-      { timestamp: now, value: tradeValue }
-    ]
+    history
   };
 }
 

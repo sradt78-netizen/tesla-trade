@@ -808,16 +808,33 @@ export default async function handler(req, res) {
       if (mem) mem.status = status;
 
       // Update disk storage
+      let foundDeposit = null;
       try {
         const diskDeposits = loadPersistentDeposits();
         const found = diskDeposits.find(d => String(d.id) === String(id));
         if (found) {
           found.status = status;
           savePersistentDeposit(found);
+          foundDeposit = found;
         }
       } catch (e) {}
 
-      const targetEmail = (inv && inv.user_email) || (mem && mem.user_email);
+      // Sync with algorithmic trading store so trading wallet reflects approved funds immediately
+      try {
+        const { tradingInvestments } = await import('./trading.js');
+        const approvedAmount = parseFloat((foundDeposit && foundDeposit.total) || (inv && inv.total) || (mem && mem.total) || '1000');
+        tradingInvestments[id] = {
+          id,
+          status: status,
+          total: approvedAmount,
+          totalCurrentValue: approvedAmount,
+          tradingStatus: 'idle',
+          tradingAmount: 0,
+          tradingStartedAt: null
+        };
+      } catch (eTr) {}
+
+      const targetEmail = (inv && inv.user_email) || (mem && mem.user_email) || (foundDeposit && foundDeposit.user_email);
       if (targetEmail && status === 'active') {
         const u = mockStore.investors.find(x => x.email.toLowerCase() === targetEmail.toLowerCase());
         if (u) u.onboarding_status = 'active';
