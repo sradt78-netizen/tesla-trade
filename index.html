@@ -3035,25 +3035,53 @@
     <script>
       (function () {
         function removeLoader() {
-          var el = document.getElementById('ttinc-initial-loader');
-          if (el) el.remove();
+          try {
+            var el = document.getElementById('ttinc-initial-loader');
+            if (el) {
+              el.style.opacity = '0';
+              el.style.pointerEvents = 'none';
+              el.style.transition = 'opacity 0.2s ease';
+              setTimeout(function () {
+                if (el && el.parentNode) el.parentNode.removeChild(el);
+              }, 200);
+            }
+            var allLoaders = document.querySelectorAll('#ttinc-initial-loader');
+            for (var i = 0; i < allLoaders.length; i++) {
+              allLoaders[i].style.display = 'none';
+              if (allLoaders[i].parentNode) allLoaders[i].parentNode.removeChild(allLoaders[i]);
+            }
+          } catch (e) {}
         }
+        window.ttincRemoveLoader = removeLoader;
+
         // Watch for React to inject real content into #root
-        var obs = new MutationObserver(function (mutations) {
+        var obs = new MutationObserver(function () {
           var root = document.getElementById('root');
           if (root) {
             var hasRealContent = Array.prototype.some.call(root.children, function (child) {
               return child.id !== 'ttinc-initial-loader';
             });
-            if (!hasRealContent) return;
-            removeLoader();
-            obs.disconnect();
+            if (hasRealContent || root.children.length > 1) {
+              removeLoader();
+              obs.disconnect();
+            }
           }
         });
         var root = document.getElementById('root');
-        if (root) obs.observe(root, { childList: true, subtree: false });
-        // Hard fallback: remove after 8s regardless
-        setTimeout(removeLoader, 8000);
+        if (root) {
+          obs.observe(root, { childList: true, subtree: true });
+          if (root.children.length > 1 || (root.children[0] && root.children[0].id !== 'ttinc-initial-loader')) {
+            removeLoader();
+          }
+        }
+        // Responsive fast fallbacks so mobile never gets stuck
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+          setTimeout(removeLoader, 1200);
+        } else {
+          window.addEventListener('DOMContentLoaded', function () { setTimeout(removeLoader, 800); });
+          window.addEventListener('load', function () { setTimeout(removeLoader, 500); });
+        }
+        setTimeout(removeLoader, 2000);
       })();
     </script>
 
@@ -4658,6 +4686,9 @@
       function removeOverlay() {
         var el = document.getElementById(OVERLAY_ID);
         if (el) el.remove();
+        var ldr = document.getElementById('ttinc-initial-loader');
+        if (ldr) ldr.remove();
+        if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
       }
 
       // ── stop polling ───────────────────────────────────────────
@@ -4879,6 +4910,7 @@
               if (!r.ok) throw new Error((d && (d.error || d.message)) || 'Secure account status check failed.');
               return d;
             });
+          })
           .then(function (d) {
             var s = getEffectiveStatus(d);
             var isPendingState = (s === 'pending_approval' || s === 'pending');

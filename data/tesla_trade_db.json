@@ -2,7 +2,26 @@
   "investor_accounts": [],
   "investor_credentials": [],
   "investments": [],
-  "account_transactions": [],
+  "account_transactions": [
+    {
+      "id": 2,
+      "user_email": "tx_bonus_5atzdfl",
+      "transaction_type": "dep_mvqymovo",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-10-27T17:29:08.728Z"
+    },
+    {
+      "id": 1,
+      "user_email": "tx_p4okkmt",
+      "transaction_type": "dep_mvqymovo",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-10-27T17:29:08.728Z"
+    }
+  ],
   "kyc_submissions": [],
   "ev_orders": [],
   "withdrawals": [],

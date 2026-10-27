@@ -94,6 +94,9 @@
       return null;
     }).then(function (row) {
       investmentLookup = null;
+      if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
+      var ldr = document.getElementById('ttinc-initial-loader');
+      if (ldr) ldr.remove();
       return row;
     });
     return investmentLookup;
@@ -110,21 +113,24 @@
       heldNavigation = null;
       next();
     }
+    if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
+    var ldr = document.getElementById('ttinc-initial-loader');
+    if (ldr) ldr.remove();
   }
 
   function holdDashboardRedirect() {
     if (location.pathname !== '/dashboard') return;
     var previousId = localStorage.getItem('ttinc_investment_id') || '';
     heldDashboard = true;
-    releaseTimer = setTimeout(releaseHeldDashboard, 6000);
+    releaseTimer = setTimeout(releaseHeldDashboard, 1500);
     findInvestment().then(function (row) {
       if (row && setInvestment(row)) {
-        // Reload only when the compiled dashboard needs a different ID. This
-        // also repairs browsers that still point at a newly submitted
-        // pending deposit instead of the returning investor's wallet.
-        if (previousId !== row.id) window.location.reload();
-        else releaseHeldDashboard();
-        return;
+        var reloadKey = 'ttinc_dashboard_synced_' + row.id;
+        if (previousId && previousId !== row.id && !sessionStorage.getItem(reloadKey)) {
+          sessionStorage.setItem(reloadKey, '1');
+          window.location.reload();
+          return;
+        }
       }
       releaseHeldDashboard();
     });
@@ -153,12 +159,17 @@
     var previousId = localStorage.getItem('ttinc_investment_id') || '';
     findInvestment().then(function (row) {
       if (!row || !setInvestment(row)) return;
-      if (location.pathname === '/overview' && previousId !== row.id) {
-        // vpe() only reads the ID during its first effect. Reload after the
-        // lookup so the compiled overview receives the recovered investment
-        // on its initial render instead of staying at a zero balance.
-        window.location.reload();
+      if (location.pathname === '/overview' && previousId && previousId !== row.id) {
+        var reloadKey = 'ttinc_overview_synced_' + row.id;
+        if (!sessionStorage.getItem(reloadKey)) {
+          sessionStorage.setItem(reloadKey, '1');
+          window.location.reload();
+          return;
+        }
       }
+      if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
+      var ldr = document.getElementById('ttinc-initial-loader');
+      if (ldr) ldr.remove();
     });
   }
 

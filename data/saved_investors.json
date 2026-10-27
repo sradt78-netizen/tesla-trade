@@ -1,5 +1,13 @@
 [
   {
+    "id": "u_mvqymovp",
+    "name": "Investor",
+    "email": "test@example.com",
+    "phone": "—",
+    "onboarding_status": "active",
+    "registered_at": "2026-10-27T17:29:08.725Z"
+  },
+  {
     "id": "u_mvqv73n8",
     "name": "Flow Tester",
     "email": "flow_test_1793116382361@example.com",

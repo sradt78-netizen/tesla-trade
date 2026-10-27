@@ -85,7 +85,7 @@
       // If active, prevent kicking back to /invest or /waiting
       if (isActive) {
         if (str.indexOf('/invest') !== -1 || str.indexOf('/waiting') !== -1) {
-          if (window.location.pathname !== '/overview') {
+          if (window.location.pathname !== '/overview' && window.location.pathname !== '/dashboard') {
             window.location.replace('/overview');
           }
           return true;
@@ -280,18 +280,27 @@
     if (ov1) ov1.remove();
     var ov2 = document.getElementById('ttinc-pending-overlay');
     if (ov2) ov2.remove();
+    var ldr = document.getElementById('ttinc-initial-loader');
+    if (ldr) ldr.remove();
+    if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
 
     setTimeout(function () {
       removeLock();
       removeBanner();
       if (ov1) ov1.remove();
       if (ov2) ov2.remove();
-      if (window.location.pathname !== '/overview') {
+      var ldr2 = document.getElementById('ttinc-initial-loader');
+      if (ldr2) ldr2.remove();
+      if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
+
+      window.dispatchEvent(new CustomEvent('ttinc_account_activated', { detail: data }));
+      window.dispatchEvent(new Event('storage'));
+
+      var p = (window.location.pathname || '').toLowerCase();
+      if (p !== '/overview' && p !== '/dashboard') {
         window.location.replace('/overview');
-      } else {
-        window.location.reload();
       }
-    }, 600);
+    }, 400);
   }
 
   function checkAccountStatus() {
@@ -365,10 +374,16 @@
           if (overlay1) overlay1.remove();
           var overlay2 = document.getElementById('ttinc-pending-overlay');
           if (overlay2) overlay2.remove();
+          var initLdr = document.getElementById('ttinc-initial-loader');
+          if (initLdr) initLdr.remove();
+          if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
 
-          // If current route is /waiting or /invest, route to /overview
+          window.dispatchEvent(new CustomEvent('ttinc_account_activated', { detail: data }));
+          window.dispatchEvent(new Event('storage'));
+
+          // If current route is /waiting or /invest, route straight to /overview
           var currentPath = (window.location.pathname || '').toLowerCase();
-          if (currentPath === '/waiting' || currentPath === '/invest') {
+          if (currentPath === '/waiting' || currentPath === '/invest' || currentPath === '/payment') {
             window.location.replace('/overview');
             return;
           }

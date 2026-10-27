@@ -707,6 +707,9 @@
       }
       arrangeDashboard(root, host);
       moveMobileMenuToRight(root);
+      if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
+      var ldr = document.getElementById('ttinc-initial-loader');
+      if (ldr) ldr.remove();
       var shell = document.getElementById(shellId);
       if (!shell) {
         shell = document.createElement('section');

@@ -30,6 +30,10 @@
   }
 
   function patchVisibleWalletDom(principal, current, bonus) {
+    if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
+    var initLdr = document.getElementById('ttinc-initial-loader');
+    if (initLdr) initLdr.remove();
+
     // 1. Directly patch rendered React elements if they are at 0 or missing bonus
     var allElements = document.querySelectorAll('*');
     for (var i = 0; i < allElements.length; i++) {

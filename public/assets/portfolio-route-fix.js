@@ -182,15 +182,20 @@
         // remains on the full-screen loader while this compatibility card is
         // rendered below it. Reload once with the validated ID so the real
         // portfolio screen renders in the first viewport.
-        if (cachedId !== plan.id && typeof window.location.reload === 'function') {
+        if (cachedId && cachedId !== plan.id && typeof window.location.reload === 'function' && !sessionStorage.getItem('ttinc_pf_reloaded_' + plan.id)) {
+          sessionStorage.setItem('ttinc_pf_reloaded_' + plan.id, '1');
           window.location.reload();
           return;
         }
+        if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
+        var ldr = document.getElementById('ttinc-initial-loader');
+        if (ldr) ldr.remove();
         renderFocus(plan);
       })
       .catch(function () {
-        // Keep the dashboard visible. The existing app will show its own
-        // account error state instead of leaving the user on a blank screen.
+        if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
+        var ldr = document.getElementById('ttinc-initial-loader');
+        if (ldr) ldr.remove();
       });
   }
 
