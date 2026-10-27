@@ -1,4 +1,4 @@
-import { getDbConnection } from './dbcheck.js';
+import { getDbConnection } from '../db.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -215,8 +215,14 @@ export default async function handler(req, res) {
       activeInvestmentId = activeInv.id;
     }
 
+    if (status === 'active') {
+      // An active investor should not have their dashboard blocked by older pending submissions
+      pendingPayments.length = 0;
+      pendingDepositTotal = 0;
+    }
+
     const activeTotal = activeInv ? parseFloat(activeInv.total || '1000') : 0;
-    const activeVal = activeInv ? parseFloat(activeInv.totalCurrentValue || (activeTotal * 2)) : 0;
+    const activeVal = activeInv ? parseFloat(activeInv.totalCurrentValue || activeInv.total_current_value || (activeTotal * 2)) : 0;
 
     return res.status(200).json({
       success: true,
@@ -230,6 +236,8 @@ export default async function handler(req, res) {
       total: activeTotal,
       totalCurrentValue: activeVal,
       total_current_value: activeVal,
+      bonus: activeTotal,
+      planName: (activeInv && (activeInv.plan_name || activeInv.plan_label)) || 'Explorer',
       pendingDepositTotal,
       pendingPayments,
       investments: formattedInvestments

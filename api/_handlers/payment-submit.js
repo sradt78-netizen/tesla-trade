@@ -1,4 +1,4 @@
-import { getDbConnection } from './dbcheck.js';
+import { getDbConnection } from '../db.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -46,7 +46,7 @@ export function loadPersistentDeposits() {
 export function savePersistentDeposit(deposit) {
   try {
     const current = loadPersistentDeposits();
-    const idx = current.findIndex(x => String(x.id) === String(deposit.id) || (x.user_email && deposit.user_email && x.user_email.toLowerCase() === deposit.user_email.toLowerCase()));
+    const idx = current.findIndex(x => String(x.id) === String(deposit.id) || ((x.user_email || x.email) && (deposit.user_email || deposit.email) && (x.user_email || x.email).toLowerCase() === (deposit.user_email || deposit.email).toLowerCase()));
     if (idx >= 0) {
       current[idx] = { ...current[idx], ...deposit };
     } else {
@@ -59,6 +59,13 @@ export function savePersistentDeposit(deposit) {
     try {
       fs.writeFileSync('/tmp/tesla_saved_deposits.json', json, 'utf8');
     } catch (e) {}
+
+    // Keep inMemoryDeposits in sync
+    if (Array.isArray(inMemoryDeposits)) {
+      const mIdx = inMemoryDeposits.findIndex(x => String(x.id) === String(deposit.id) || ((x.user_email || x.email) && (deposit.user_email || deposit.email) && (x.user_email || x.email).toLowerCase() === (deposit.user_email || deposit.email).toLowerCase()));
+      if (mIdx >= 0) inMemoryDeposits[mIdx] = { ...inMemoryDeposits[mIdx], ...deposit };
+      else inMemoryDeposits.unshift(deposit);
+    }
   } catch (e) {}
 }
 

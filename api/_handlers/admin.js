@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { getDbConnection } from './dbcheck.js';
+import { getDbConnection } from '../db.js';
 import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
 
 const INVESTORS_FILE = path.join(process.cwd(), 'data', 'saved_investors.json');
@@ -554,9 +554,12 @@ export default async function handler(req, res) {
         if (Array.isArray(diskDeposits) && diskDeposits.length > 0) {
           const mergedInvs = [...investments];
           for (const dep of diskDeposits) {
-            const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (x.user_email && dep.user_email && x.user_email.toLowerCase() === dep.user_email.toLowerCase()));
+            const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || ((x.user_email || x.email) && (dep.user_email || dep.email) && (x.user_email || x.email).toLowerCase() === (dep.user_email || dep.email).toLowerCase()));
             if (idx >= 0) {
-              mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
+              const currentSt = mergedInvs[idx].status;
+              const nextSt = dep.status;
+              const resolvedSt = (currentSt === 'active' || nextSt === 'active' || currentSt === 'approved' || nextSt === 'approved') ? 'active' : (nextSt || currentSt);
+              mergedInvs[idx] = { ...mergedInvs[idx], ...dep, status: resolvedSt };
             } else {
               mergedInvs.unshift(dep);
             }
@@ -569,9 +572,12 @@ export default async function handler(req, res) {
       if (Array.isArray(inMemoryDeposits) && inMemoryDeposits.length > 0) {
         const mergedInvs = [...investments];
         for (const dep of inMemoryDeposits) {
-          const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (x.user_email && dep.user_email && x.user_email.toLowerCase() === dep.user_email.toLowerCase()));
+          const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || ((x.user_email || x.email) && (dep.user_email || dep.email) && (x.user_email || x.email).toLowerCase() === (dep.user_email || dep.email).toLowerCase()));
           if (idx >= 0) {
-            mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
+            const currentSt = mergedInvs[idx].status;
+            const nextSt = dep.status;
+            const resolvedSt = (currentSt === 'active' || nextSt === 'active' || currentSt === 'approved' || nextSt === 'approved') ? 'active' : (nextSt || currentSt);
+            mergedInvs[idx] = { ...mergedInvs[idx], ...dep, status: resolvedSt };
           } else {
             mergedInvs.unshift(dep);
           }

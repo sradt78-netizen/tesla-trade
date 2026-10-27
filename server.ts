@@ -24,24 +24,7 @@ const PORT = 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Helper to get MySQL connection using environment variables
-async function getDbConnection() {
-  const host = process.env.DB_HOST || process.env.TT_DB_HOST || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com';
-  const port = parseInt(process.env.DB_PORT || process.env.TT_DB_PORT || '28487', 10);
-  const user = process.env.DB_USER || process.env.TT_DB_USER || 'avnadmin';
-  const password = process.env.DB_PASSWORD || process.env.TT_DB_PASS || 'AVNS_eN3hQrUWcOL7PRQXP_i';
-  const database = process.env.DB_NAME || process.env.TT_DB_NAME || 'defaultdb';
-
-  return await mysql.createConnection({
-    host,
-    port,
-    user,
-    password,
-    database,
-    ssl: { rejectUnauthorized: false },
-    connectTimeout: 2500
-  });
-}
+import { getDbConnection } from './api/db.js';
 
 function getAdminPassword() {
   return process.env.ADMIN_PASSWORD || process.env.TT_ADMIN_PASSWORD || 'Heartofwisdom101@$';

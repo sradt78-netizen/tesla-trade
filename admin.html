@@ -1454,15 +1454,35 @@
       var activeCount = 0;
       var depReceiptsList = [];
 
+      var seenDepIds = {};
       investments.forEach(function(inv) {
         var em = (inv.user_email || inv.email || inv.user_id || inv.userId || '').toLowerCase();
-        if (em && (!invMap[em] || (!invMap[em].payment_proof_path && inv.payment_proof_path))) {
-          invMap[em] = inv;
+        if (em) {
+          var curBest = invMap[em];
+          if (!curBest) {
+            invMap[em] = inv;
+          } else {
+            var curIsActive = (curBest.status === 'active' || curBest.status === 'approved');
+            var newIsActive = (inv.status === 'active' || inv.status === 'approved');
+            if (newIsActive && !curIsActive) {
+              invMap[em] = inv;
+            } else if (newIsActive === curIsActive) {
+              var curTotal = parseFloat(curBest.total || '0');
+              var newTotal = parseFloat(inv.total || '0');
+              if (newTotal > curTotal) {
+                invMap[em] = inv;
+              } else if (!curBest.payment_proof_path && inv.payment_proof_path) {
+                invMap[em] = inv;
+              }
+            }
+          }
         }
         totalVol += parseFloat(inv.total || '0');
         if (inv.status === 'active' || inv.status === 'approved') activeCount++;
         // Include in Deposit Receipts list if proof is attached, OR pending approval, OR reference provided, OR amount > 0
-        if (inv.payment_proof_path || inv.payment_proof_name || inv.payment_reference || inv.status === 'pending_approval' || (inv.total && parseFloat(inv.total) > 0)) {
+        var depKey = String(inv.id || '') + '_' + em;
+        if (!seenDepIds[depKey] && (inv.payment_proof_path || inv.payment_proof_name || inv.payment_reference || inv.status === 'pending_approval' || (inv.total && parseFloat(inv.total) > 0))) {
+          seenDepIds[depKey] = true;
           depReceiptsList.push(inv);
         }
       });
@@ -2046,6 +2066,11 @@
     function approveInvestorPayment(email, id) {
       if (!confirm('Approve payment for ' + (email || 'this investor') + '?\n\nThis will immediately unlock their investor dashboard and apply the 100% deposit match bonus.')) return;
       showToast('Approving payment & unlocking dashboard…');
+      var depFilter = document.getElementById('depStatusFilter');
+      if (depFilter && depFilter.value === 'pending') depFilter.value = 'all';
+      var invFilter = document.getElementById('investorStatusFilter');
+      if (invFilter && invFilter.value === 'pending') invFilter.value = 'all';
+
       adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2070,6 +2095,11 @@
     }
 
     function depositAction(id, act, email) {
+      var depFilter = document.getElementById('depStatusFilter');
+      if (depFilter && depFilter.value === 'pending') depFilter.value = 'all';
+      var invFilter = document.getElementById('investorStatusFilter');
+      if (invFilter && invFilter.value === 'pending') invFilter.value = 'all';
+
       adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

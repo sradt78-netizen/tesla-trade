@@ -74,10 +74,12 @@
     function shouldBlock(targetUrl) {
       var meta = {};
       try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
+      var curAuth = auth() || {};
+      var isAuthActive = (curAuth.onboardingState === 'completed' || curAuth.onboarding_status === 'verified' || curAuth.onboarding_status === 'active');
       var dep = localStorage.getItem('ttinc_deposit_status');
       var pay = localStorage.getItem('ttinc_payment_status');
-      var isActive = (meta.status === 'active' || meta.status === 'approved' || dep === 'active' || pay === 'active');
-      var isPending = (dep === 'pending_approval' || pay === 'pending_approval' || meta.status === 'pending_approval' || meta.status === 'pending');
+      var isActive = (isAuthActive || meta.status === 'active' || meta.status === 'approved' || dep === 'active' || pay === 'active');
+      var isPending = !isActive && (dep === 'pending_approval' || pay === 'pending_approval' || meta.status === 'pending_approval' || meta.status === 'pending');
       var str = String(targetUrl || '').toLowerCase();
 
       // If active, prevent kicking back to /invest or /waiting

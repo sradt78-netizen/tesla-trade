@@ -70,7 +70,24 @@
       return response.ok ? response.json() : [];
     }).then(function (rows) {
       cachedInvestmentValidated = true;
-      return choosePrimaryInvestment(rows);
+      var chosen = choosePrimaryInvestment(rows);
+      if (chosen) return chosen;
+      // Fallback: check /api/account-status for active investment ID
+      return fetch('/api/account-status?email=' + encodeURIComponent(current.email), {
+        credentials: 'same-origin',
+        cache: 'no-store'
+      }).then(function (r) { return r.ok ? r.json() : null; }).then(function (acc) {
+        if (acc && (acc.hasActiveInvestment || acc.status === 'active') && acc.activeInvestmentId) {
+          return {
+            id: acc.activeInvestmentId,
+            total: acc.total || 1000,
+            totalCurrentValue: acc.totalCurrentValue || 2000,
+            status: 'active',
+            planName: acc.planName || 'Explorer'
+          };
+        }
+        return null;
+      });
     }).catch(function () {
       return null;
     }).then(function (row) {
