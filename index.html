@@ -2594,7 +2594,7 @@
             var raw = _origGet.call(localStorage, 'ttinc_auth');
             if (!raw) return '';
             var auth = JSON.parse(raw);
-            return auth && auth.email ? '__' + auth.email : '';
+            return auth && auth.email ? '__' + String(auth.email).trim().toLowerCase() : '';
           } catch (e) { return ''; }
         }
 
@@ -2605,13 +2605,56 @@
         }
 
         Storage.prototype.setItem = function (key, value) {
-          return _origSet.call(this, resolveKey(key), value);
+          if (PER_USER_KEYS.indexOf(key) !== -1) {
+            _origSet.call(this, key, value);
+            var suffix = userSuffix();
+            if (suffix) {
+              _origSet.call(this, key + suffix, value);
+            }
+            return;
+          }
+          return _origSet.call(this, key, value);
         };
+
         Storage.prototype.getItem = function (key) {
-          return _origGet.call(this, resolveKey(key));
+          if (PER_USER_KEYS.indexOf(key) !== -1) {
+            var suffix = userSuffix();
+            var val = suffix ? _origGet.call(this, key + suffix) : null;
+            if (val != null && val !== '') return val;
+            var plain = _origGet.call(this, key);
+            if (plain != null && plain !== '') return plain;
+            try {
+              var rawAuth = _origGet.call(localStorage, 'ttinc_auth');
+              if (rawAuth) {
+                var a = JSON.parse(rawAuth);
+                if (a && a.email) {
+                  var rawVal = _origGet.call(this, key + '__' + a.email);
+                  if (rawVal != null && rawVal !== '') return rawVal;
+                }
+              }
+            } catch (e) {}
+            try {
+              for (var i = 0; i < this.length; i++) {
+                var k = this.key(i);
+                if (k && k.indexOf(key + '__') === 0) {
+                  var candidate = _origGet.call(this, k);
+                  if (candidate) return candidate;
+                }
+              }
+            } catch (e) {}
+            return null;
+          }
+          return _origGet.call(this, key);
         };
+
         Storage.prototype.removeItem = function (key) {
-          return _origRemove.call(this, resolveKey(key));
+          if (PER_USER_KEYS.indexOf(key) !== -1) {
+            _origRemove.call(this, key);
+            var suffix = userSuffix();
+            if (suffix) _origRemove.call(this, key + suffix);
+            return;
+          }
+          return _origRemove.call(this, key);
         };
       })();
     </script>
@@ -4673,12 +4716,23 @@
             }
 
             var localPending = false;
+            var localActive = false;
             try {
               var dep = localStorage.getItem('ttinc_deposit_status');
               var pay = localStorage.getItem('ttinc_payment_status');
               var m = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-              localPending = dep === 'pending_approval' || pay === 'pending_approval' || m.status === 'pending_approval';
+              var invId = localStorage.getItem('ttinc_investment_id');
+              var cAuth = getAuth() || {};
+              localActive = m.status === 'active' || m.status === 'approved' || Boolean(invId) || cAuth.onboardingState === 'completed' || cAuth.onboarding_status === 'verified' || cAuth.onboarding_status === 'active';
+              localPending = !localActive && (dep === 'pending_approval' || pay === 'pending_approval' || m.status === 'pending_approval');
             } catch(e) {}
+
+            if (localActive) {
+              _lastStatus = 'active';
+              removeOverlay();
+              stopPoll();
+              return;
+            }
 
             if (!d || (!d.account && !isPendingState && !localPending)) {
               _lastStatus = 'create';
@@ -4792,13 +4846,20 @@
               if (!r.ok) throw new Error((d && (d.error || d.message)) || 'Secure account status check failed.');
               return d;
             });
-          })
           .then(function (d) {
             var s = getEffectiveStatus(d);
             var isPendingState = (s === 'pending_approval' || s === 'pending');
             _lastStatus = s;
 
-            if (s === 'active' || (d && d.hasActiveInvestment)) {
+            var localActive = false;
+            try {
+              var m = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+              var invId = localStorage.getItem('ttinc_investment_id');
+              var cAuth = getAuth() || {};
+              localActive = m.status === 'active' || m.status === 'approved' || Boolean(invId) || cAuth.onboardingState === 'completed' || cAuth.onboarding_status === 'verified' || cAuth.onboarding_status === 'active';
+            } catch(e) {}
+
+            if (s === 'active' || (d && d.hasActiveInvestment) || localActive) {
               removeOverlay();
               stopPoll();
               return;
@@ -4807,7 +4868,7 @@
             if (!d || (!d.account && !isPendingState)) {
               showOverlay('create');
               stopPoll();
-            } else if (s === 'none' && !isPendingState) {
+            } else if (s === 'none' && !isPendingState && !localActive) {
               showOverlay('created');
               stopPoll();
             } else if (isPendingState) {
@@ -4895,7 +4956,15 @@
               var isPendingState = (s === 'pending_approval' || s === 'pending');
               _lastStatus = s;
 
-              if (s === 'active' || (d && d.hasActiveInvestment)) {
+              var localActive = false;
+              try {
+                var m = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+                var invId = localStorage.getItem('ttinc_investment_id');
+                var cAuth = getAuth() || {};
+                localActive = m.status === 'active' || m.status === 'approved' || Boolean(invId) || cAuth.onboardingState === 'completed' || cAuth.onboarding_status === 'verified' || cAuth.onboarding_status === 'active';
+              } catch(e) {}
+
+              if (s === 'active' || (d && d.hasActiveInvestment) || localActive) {
                 try {
                   localStorage.removeItem('ttinc_deposit_status');
                   localStorage.removeItem('ttinc_payment_status');
@@ -4908,7 +4977,7 @@
               if (!d || (!d.account && !isPendingState)) {
                 showOverlay('create');
                 stopPoll();
-              } else if (s === 'none' && !isPendingState) {
+              } else if (s === 'none' && !isPendingState && !localActive) {
                 showOverlay('created');
                 stopPoll();
               } else if (isPendingState) {

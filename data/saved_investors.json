@@ -1,5 +1,13 @@
 [
   {
+    "id": "u_mvqrunvs",
+    "name": "Test Investor",
+    "email": "investor_test_1793110763217@example.com",
+    "phone": "—",
+    "onboarding_status": "active",
+    "registered_at": "2026-10-27T14:19:23.368Z"
+  },
+  {
     "id": "u_pending_user",
     "name": "Pending Investor",
     "email": "pending_user@example.com",

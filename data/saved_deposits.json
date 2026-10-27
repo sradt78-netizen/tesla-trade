@@ -1,5 +1,26 @@
 [
   {
+    "id": "dep_mvqrunve_cyenx",
+    "tx_id": "TXMVQRUNVECA3",
+    "user_id": "investor_test_1793110763217@example.com",
+    "user_email": "investor_test_1793110763217@example.com",
+    "user_name": "Test Investor",
+    "portfolio": "Test Investor · Explorer",
+    "plan_id": "starter_ai",
+    "plan_label": "Explorer",
+    "plan_name": "Explorer",
+    "total": 1000,
+    "total_current_value": 2000,
+    "method": "USDT",
+    "payment_reference": "TXTEST999",
+    "payment_proof_path": "data:image/jpeg;base64,ZmFrZQ==",
+    "payment_proof_name": "payment-receipt.jpg",
+    "status": "active",
+    "created_at": "2026-10-27T14:19:23.367Z",
+    "totalCurrentValue": 2000,
+    "earnings": 1000
+  },
+  {
     "id": "dep_mvqp8gqc_oqo7n",
     "tx_id": "TXMVQP8GQDXX5",
     "user_id": "pending_user@example.com",

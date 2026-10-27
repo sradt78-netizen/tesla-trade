@@ -597,8 +597,9 @@ export default async function handler(req, res) {
 
       // Ensure investors list includes any depositor and reflects their active/pending status accurately
       for (const inv of investments) {
-        const em = (inv.user_email || '').toLowerCase();
+        const em = (inv.user_email || inv.email || inv.user_id || inv.userId || '').toLowerCase();
         if (!em) continue;
+        if (!inv.user_email) inv.user_email = em;
         const existingIdx = investors.findIndex(u => (u.email || '').toLowerCase() === em);
         const isActive = inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed';
         if (existingIdx >= 0) {
@@ -616,7 +617,7 @@ export default async function handler(req, res) {
       }
 
       const unfundedCount = investors.filter(inv => {
-        const matching = investments.filter(i => (i.user_email || '').toLowerCase() === (inv.email || '').toLowerCase());
+        const matching = investments.filter(i => (i.user_email || i.email || i.user_id || '').toLowerCase() === (inv.email || '').toLowerCase());
         const totalVol = matching.reduce((acc, curr) => acc + parseFloat(curr.total || '0'), 0);
         return totalVol <= 0;
       }).length;
@@ -992,7 +993,7 @@ export default async function handler(req, res) {
       // 1. Check disk persistent deposits
       try {
         const diskDeposits = loadPersistentDeposits();
-        const found = diskDeposits.find(d => (id && String(d.id) === String(id)) || (targetEmail && (d.user_email || '').toLowerCase() === targetEmail));
+        const found = diskDeposits.find(d => (id && String(d.id) === String(id)) || (targetEmail && ((d.user_email || d.email || d.user_id || d.userId || '').toLowerCase() === targetEmail)));
         if (found) {
           foundDeposit = found;
           if (!approvedDepositAmount) approvedDepositAmount = parseFloat(found.total || '1000');
@@ -1010,7 +1011,7 @@ export default async function handler(req, res) {
       } catch (e) {}
 
       // 2. Check memory deposits
-      const mem = inMemoryDeposits.find(i => (id && String(i.id) === String(id)) || (targetEmail && (i.user_email || '').toLowerCase() === targetEmail));
+      const mem = inMemoryDeposits.find(i => (id && String(i.id) === String(id)) || (targetEmail && ((i.user_email || i.email || i.user_id || i.userId || '').toLowerCase() === targetEmail)));
       if (mem) {
         if (!approvedDepositAmount) approvedDepositAmount = parseFloat(mem.total || '1000');
         mem.status = status;
@@ -1025,7 +1026,7 @@ export default async function handler(req, res) {
       }
 
       // 3. Check mockStore
-      const inv = mockStore.investments.find(i => (id && String(i.id) === String(id)) || (targetEmail && (i.user_email || '').toLowerCase() === targetEmail));
+      const inv = mockStore.investments.find(i => (id && String(i.id) === String(id)) || (targetEmail && ((i.user_email || i.email || i.user_id || i.userId || '').toLowerCase() === targetEmail)));
       if (inv) {
         if (!approvedDepositAmount) approvedDepositAmount = parseFloat(inv.total || '1000');
         inv.status = status;
@@ -1043,9 +1044,58 @@ export default async function handler(req, res) {
       const bonusMatch = approvedDepositAmount;
       const totalBalanceWithBonus = approvedDepositAmount * 2;
 
-      // If no deposit was found on disk or memory yet, create an approved record now
-      const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || (inv && inv.user_email) || (mem && mem.user_email);
+      // Extract effective email and effective id
+      const effectiveEmail = targetEmail || (foundDeposit && (foundDeposit.user_email || foundDeposit.email || foundDeposit.user_id || foundDeposit.userId)) || (inv && (inv.user_email || inv.email || inv.user_id)) || (mem && (mem.user_email || mem.email || mem.user_id));
       const effectiveId = id || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
+
+      // Synchronize all deposits belonging to this user or ID
+      if (effectiveEmail || id) {
+        try {
+          const diskDeps = loadPersistentDeposits();
+          for (const d of diskDeps) {
+            const em = (d.user_email || d.email || d.user_id || d.userId || '').toLowerCase();
+            if ((effectiveEmail && em === effectiveEmail.toLowerCase()) || (id && String(d.id) === String(id))) {
+              d.status = status;
+              if (status === 'active') {
+                const amt = parseFloat(d.total || approvedDepositAmount || '1000');
+                d.total = amt;
+                d.total_current_value = amt * 2;
+                d.totalCurrentValue = amt * 2;
+                d.earnings = amt;
+              }
+              savePersistentDeposit(d);
+            }
+          }
+        } catch (e) {}
+
+        for (const d of inMemoryDeposits) {
+          const em = (d.user_email || d.email || d.user_id || d.userId || '').toLowerCase();
+          if ((effectiveEmail && em === effectiveEmail.toLowerCase()) || (id && String(d.id) === String(id))) {
+            d.status = status;
+            if (status === 'active') {
+              const amt = parseFloat(d.total || approvedDepositAmount || '1000');
+              d.total = amt;
+              d.total_current_value = amt * 2;
+              d.totalCurrentValue = amt * 2;
+              d.earnings = amt;
+            }
+          }
+        }
+
+        for (const d of mockStore.investments) {
+          const em = (d.user_email || d.email || d.user_id || d.userId || '').toLowerCase();
+          if ((effectiveEmail && em === effectiveEmail.toLowerCase()) || (id && String(d.id) === String(id))) {
+            d.status = status;
+            if (status === 'active') {
+              const amt = parseFloat(d.total || approvedDepositAmount || '1000');
+              d.total = amt;
+              d.total_current_value = amt * 2;
+              d.totalCurrentValue = amt * 2;
+              d.earnings = amt;
+            }
+          }
+        }
+      }
 
       if (!foundDeposit && effectiveEmail && status === 'active') {
         const freshDep = {

@@ -1455,12 +1455,12 @@
       var depReceiptsList = [];
 
       investments.forEach(function(inv) {
-        var em = (inv.user_email || '').toLowerCase();
-        if (!invMap[em] || (!invMap[em].payment_proof_path && inv.payment_proof_path)) {
+        var em = (inv.user_email || inv.email || inv.user_id || inv.userId || '').toLowerCase();
+        if (em && (!invMap[em] || (!invMap[em].payment_proof_path && inv.payment_proof_path))) {
           invMap[em] = inv;
         }
         totalVol += parseFloat(inv.total || '0');
-        if (inv.status === 'active') activeCount++;
+        if (inv.status === 'active' || inv.status === 'approved') activeCount++;
         // Include in Deposit Receipts list if proof is attached, OR pending approval, OR reference provided, OR amount > 0
         if (inv.payment_proof_path || inv.payment_proof_name || inv.payment_reference || inv.status === 'pending_approval' || (inv.total && parseFloat(inv.total) > 0)) {
           depReceiptsList.push(inv);
@@ -1487,12 +1487,12 @@
           var em = (u.email || '').toLowerCase();
           var inv = invMap[em] || {};
           var bal = parseFloat(inv.total || '0');
-          var cur = parseFloat(inv.total_current_value || inv.total || '0');
-          var isApproved = (inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed' || u.onboarding_status === 'verified');
+          var cur = parseFloat(inv.total_current_value || inv.totalCurrentValue || (bal > 0 ? bal * 2 : 0));
+          var isApproved = (inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed' || u.onboarding_status === 'verified' || u.onboarding_status === 'active');
           var isPending = !isApproved && (inv.status === 'pending_approval' || u.onboarding_status === 'pending_deposit' || inv.payment_proof_path || inv.payment_reference || bal > 0);
 
           var statusBadge = isApproved
-            ? '<span class="badge green">✓ Approved (100% Bonus)</span>'
+            ? '<span class="badge green">✓ Active &amp; Approved (100% Bonus)</span>'
             : (isPending
                 ? '<span class="badge amber">⏳ Pending Approval</span>'
                 : '<span class="badge amber">' + (u.onboarding_status || 'Registered') + '</span>');
@@ -1541,11 +1541,12 @@
       } else {
         var dRows = '';
         depReceiptsList.forEach(function(inv) {
+          var userEm = inv.user_email || inv.email || inv.user_id || '';
           var proofSrc = inv.payment_proof_path || '';
           if (proofSrc) {
             window.__proofCache['dep_' + inv.id] = proofSrc;
             window.__proofCache[String(inv.id)] = proofSrc;
-            if (inv.user_email) window.__proofCache['user_' + inv.user_email.toLowerCase()] = proofSrc;
+            if (userEm) window.__proofCache['user_' + userEm.toLowerCase()] = proofSrc;
           }
 
           var proofCell = '';
@@ -1558,17 +1559,17 @@
             proofCell = '<button type="button" style="padding: 4px 8px; font-size: 11px; background:#181e29; color:#93c5fd; border:1px solid #2b3952;" onclick="viewDepositReceipt(\'' + inv.id + '\')">📄 ' + (inv.payment_reference ? 'Ref: ' + inv.payment_reference : 'View Details') + '</button>';
           }
 
-          var statusBadge = inv.status === 'active'
+          var statusBadge = (inv.status === 'active' || inv.status === 'approved')
             ? '<span class="badge green">Active / Approved</span>'
             : (inv.status === 'declined' ? '<span class="badge red">Declined</span>' : '<span class="badge amber">⏳ Pending Approval</span>');
 
-          var approveBtn = inv.status === 'active'
+          var approveBtn = (inv.status === 'active' || inv.status === 'approved')
             ? '<span style="color:#4ade80;font-size:11px;font-weight:700;">✓ Approved</span>'
-            : '<button type="button" class="success" style="padding: 5px 10px; font-size: 11px; font-weight: 700; margin-right: 4px;" onclick="depositAction(\'' + inv.id + '\', \'approve_deposit\')">✅ Approve Deposit</button>' +
-              '<button type="button" style="padding: 5px 8px; font-size: 11px; color: #fca5a5;" onclick="depositAction(\'' + inv.id + '\', \'reject_deposit\')">❌ Decline</button>';
+            : '<button type="button" class="success" style="padding: 5px 10px; font-size: 11px; font-weight: 700; margin-right: 4px;" onclick="depositAction(\'' + inv.id + '\', \'approve_deposit\', \'' + userEm + '\')">✅ Approve Deposit</button>' +
+              '<button type="button" style="padding: 5px 8px; font-size: 11px; color: #fca5a5;" onclick="depositAction(\'' + inv.id + '\', \'reject_deposit\', \'' + userEm + '\')">❌ Decline</button>';
 
           dRows += '<tr>' +
-            '<td style="font-family: monospace; font-weight: 500;">' + (inv.user_email || '—') + '</td>' +
+            '<td style="font-family: monospace; font-weight: 500;">' + (userEm || '—') + '</td>' +
             '<td>' + (inv.plan_label || inv.plan_name || 'Standard') + '</td>' +
             '<td style="color: #4ade80; font-weight: 600;">$' + Number(inv.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
             '<td>' + (inv.method || 'Crypto') + '</td>' +
@@ -1968,8 +1969,8 @@
         var text = r.textContent.toLowerCase();
         var matchesQuery = !query || text.indexOf(query) !== -1;
         var matchesStatus = true;
-        if (status === 'verified') matchesStatus = text.indexOf('verified') !== -1;
-        if (status === 'active') matchesStatus = text.indexOf('active') !== -1;
+        if (status === 'verified') matchesStatus = text.indexOf('verified') !== -1 || text.indexOf('approved') !== -1 || text.indexOf('active') !== -1;
+        if (status === 'active') matchesStatus = text.indexOf('active') !== -1 || text.indexOf('approved') !== -1 || text.indexOf('verified') !== -1;
 
         r.style.display = (matchesQuery && matchesStatus) ? '' : 'none';
       });
@@ -2068,15 +2069,15 @@
       });
     }
 
-    function depositAction(id, act) {
+    function depositAction(id, act, email) {
       adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: act, id: id })
+        body: JSON.stringify({ action: act, id: id, email: email || '' })
       })
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        showToast(d.message || 'Deposit status updated');
+        showToast(d.message || (act === 'approve_deposit' ? 'Deposit approved and 100% bonus activated!' : 'Deposit status updated'));
         loadDashboardData();
       });
     }
@@ -2269,11 +2270,11 @@
 
         // Connect action buttons
         document.getElementById('depModalApproveBtn').onclick = function() {
-          depositAction(record.id, 'approve_deposit');
+          depositAction(record.id, 'approve_deposit', record.user_email || record.email || record.user_id || '');
           closeDepositReceiptModal();
         };
         document.getElementById('depModalDeclineBtn').onclick = function() {
-          depositAction(record.id, 'reject_deposit');
+          depositAction(record.id, 'reject_deposit', record.user_email || record.email || record.user_id || '');
           closeDepositReceiptModal();
         };
 

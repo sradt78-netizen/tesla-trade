@@ -43,7 +43,7 @@
 
   function choosePrimaryInvestment(rows) {
     if (!Array.isArray(rows) || !rows.length) return null;
-    var active = rows.filter(function (row) { return row.status === 'active'; });
+    var active = rows.filter(function (row) { return row.status === 'active' || row.status === 'approved'; });
     if (!active.length) return rows[0];
     // A returning investor's original wallet is the oldest active row.
     // Approved follow-up deposits are linked with depositParentId and should

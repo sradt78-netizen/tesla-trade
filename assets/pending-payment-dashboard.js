@@ -32,6 +32,8 @@
     try {
       var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
       if (meta.status === 'active' || meta.status === 'approved') return false;
+      var curAuth = auth() || {};
+      if (curAuth.onboardingState === 'completed' || curAuth.onboarding_status === 'verified' || curAuth.onboarding_status === 'active') return false;
       var dep = localStorage.getItem('ttinc_deposit_status');
       var pay = localStorage.getItem('ttinc_payment_status');
       if (dep === 'active' || pay === 'active' || dep === 'approved' || pay === 'approved') return false;
@@ -253,6 +255,11 @@
 
       if (data && data.activeInvestmentId) {
         localStorage.setItem('ttinc_investment_id', String(data.activeInvestmentId));
+      } else {
+        var existingInvId = localStorage.getItem('ttinc_investment_id');
+        if (!existingInvId) {
+          localStorage.setItem('ttinc_investment_id', (data && data.investments && data.investments[0] && data.investments[0].id) || ('dep_' + Date.now().toString(36)));
+        }
       }
 
       var curAuth = auth() || {};
@@ -265,19 +272,24 @@
       }
     } catch (e) {}
 
+    removeLock();
+    removeBanner();
+    var ov1 = document.getElementById('ttinc-account-status-overlay');
+    if (ov1) ov1.remove();
+    var ov2 = document.getElementById('ttinc-pending-overlay');
+    if (ov2) ov2.remove();
+
     setTimeout(function () {
       removeLock();
       removeBanner();
-      var overlay1 = document.getElementById('ttinc-account-status-overlay');
-      if (overlay1) overlay1.remove();
-      var overlay2 = document.getElementById('ttinc-pending-overlay');
-      if (overlay2) overlay2.remove();
-      if (window.location.pathname !== '/overview' || (window.location.search && window.location.search.indexOf('payment=pending') !== -1)) {
+      if (ov1) ov1.remove();
+      if (ov2) ov2.remove();
+      if (window.location.pathname !== '/overview') {
         window.location.replace('/overview');
       } else {
         window.location.reload();
       }
-    }, 1200);
+    }, 600);
   }
 
   function checkAccountStatus() {
