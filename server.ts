@@ -223,17 +223,6 @@ app.all(
 );
 app.all(['/api/stocks', '/api/stocks.php'], (req, res) => stocksHandler(req, res));
 app.all(['/api/payment-settings', '/api/payment-settings.php'], (req, res) => paymentSettingsHandler(req, res));
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 }
-});
-
-app.all(
-  ['/api/payment-submit', '/api/payment-submit.php', '/api/payment-proof', '/api/payment-proof.php', '/api/investments', '/api/investments/*'],
-  upload.any(),
-  (req, res) => paymentSubmitHandler(req, res)
-);
-
 // ── In-Memory Trading Store & Handlers for Mock / Live Support ──
 const mockTradingInvestments: Record<string, any> = {
   'mock-funded': { id: 'mock-funded', status: 'active', total: 1000, totalCurrentValue: 1000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null },
@@ -379,6 +368,17 @@ app.post('/api/investments/:id/trading/stop', (req, res) => {
     trade: computeTradeValue(inv, now)
   });
 });
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }
+});
+
+app.all(
+  ['/api/payment-submit', '/api/payment-submit.php', '/api/payment-proof', '/api/payment-proof.php', '/api/investments', '/api/investments/*'],
+  upload.any(),
+  (req, res) => paymentSubmitHandler(req, res)
+);
 
 // ── 6. Direct Portal Routes (NO INVITATION REQUIRED) ─────────────
 app.get(['/admin', '/admin.php', '/admin.html'], (req, res) => {
