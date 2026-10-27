@@ -67,6 +67,19 @@
         var first = active[0] || (Array.isArray(rows) && rows[0]);
         if (first && first.id) {
           localStorage.setItem('ttinc_investment_id', first.id);
+          try {
+            var tot = Number(first.total || 1000);
+            var curVal = Number(first.totalCurrentValue || first.total_current_value || (tot * 2));
+            if (curVal <= tot && tot > 0) curVal = tot * 2;
+            localStorage.setItem('ttinc_inv_meta', JSON.stringify({
+              id: first.id,
+              total: tot,
+              totalCurrentValue: curVal,
+              bonus: tot,
+              status: first.status || 'active',
+              planName: first.planName || first.portfolio || 'Explorer'
+            }));
+          } catch (e) {}
           return first.id;
         }
         return 'sim_inv_1';
@@ -353,7 +366,16 @@
       }
     }
 
-    var available = Number(trade.availableBalance != null ? trade.availableBalance : 1000);
+    var metaVal = 2000;
+    try {
+      var metaObj = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+      if (metaObj.totalCurrentValue) metaVal = Number(metaObj.totalCurrentValue);
+      else if (metaObj.total) metaVal = Number(metaObj.total) * 2;
+    } catch (e) {}
+    var available = Number(trade.availableBalance != null ? trade.availableBalance : metaVal);
+    if (!trade.status && available < metaVal && metaVal > 0) {
+      available = metaVal;
+    }
     var active = trade.status === 'active';
     var phase = trade.phase === 'loss' ? 'loss' : 'profit';
     var pnl = Number(trade.pnl || 0);
@@ -408,8 +430,9 @@
           '<p class="ttinc-trade-copy">Deploy funds to Tesla Trade automated high-frequency order-routing. Capitalize on cross-market spreads and Tesla innovation ecosystem yield.</p>' +
         '</div>' +
         '<div class="ttinc-trade-balance">' +
-          '<span>Available Wallet</span>' +
+          '<span style="color:#d4af37;font-weight:700;">Available Wallet</span>' +
           '<strong>' + money(available) + '</strong>' +
+          '<div style="font-size:10px;color:#22c55e;font-weight:700;margin-top:3px;letter-spacing:0.5px;">✦ 100% Match Applied</div>' +
         '</div>' +
       '</div>';
 

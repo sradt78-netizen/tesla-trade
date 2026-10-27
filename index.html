@@ -2522,6 +2522,23 @@
 
           if (!isApiRoute) return _origFetch(url, opts);
 
+          // If fetching an investment with null, undefined, or empty ID, resolve to authenticated wallet
+          if (urlStr.indexOf('/api/investments/null') !== -1 || urlStr.indexOf('/api/investments/undefined') !== -1 || /\/api\/investments\/?(?:\?|$)/.test(urlStr)) {
+            try {
+              var rawAuth = localStorage.getItem('ttinc_auth');
+              var activeId = 'sim_inv_1';
+              if (rawAuth) {
+                var a = JSON.parse(rawAuth);
+                var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+                if (meta && meta.id) activeId = meta.id;
+                else if (localStorage.getItem('ttinc_investment_id')) activeId = localStorage.getItem('ttinc_investment_id');
+              }
+              if (urlStr.indexOf('/api/investments/null') !== -1 || urlStr.indexOf('/api/investments/undefined') !== -1) {
+                url = urlStr.replace(/\/api\/investments\/(null|undefined)/, '/api/investments/' + activeId);
+              }
+            } catch (e) {}
+          }
+
           return _origFetch(url, opts).then(function (resp) {
             var cloned = resp.clone();
             return cloned.json().then(
@@ -2642,6 +2659,22 @@
                 }
               }
             } catch (e) {}
+            if (key === 'ttinc_investment_id') {
+              try {
+                var rawAuthCheck = _origGet.call(localStorage, 'ttinc_auth');
+                if (rawAuthCheck) {
+                  var authObj = JSON.parse(rawAuthCheck);
+                  if (authObj && authObj.email) {
+                    var metaRaw = _origGet.call(this, 'ttinc_inv_meta' + suffix) || _origGet.call(this, 'ttinc_inv_meta');
+                    if (metaRaw) {
+                      var metaObj = JSON.parse(metaRaw);
+                      if (metaObj && metaObj.id) return metaObj.id;
+                    }
+                    return 'sim_inv_1';
+                  }
+                }
+              } catch (e) {}
+            }
             return null;
           }
           return _origGet.call(this, key);

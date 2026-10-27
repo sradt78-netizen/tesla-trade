@@ -5,20 +5,26 @@
     "user_id": "flow_test_1793116382361@example.com",
     "user_email": "flow_test_1793116382361@example.com",
     "user_name": "Flow Tester",
-    "portfolio": "Flow Tester · Pioneer",
+    "portfolio": [
+      { "id": "tsla", "name": "Tesla, Inc.", "ticker": "TSLA", "investedAmount": 1500 }
+    ],
     "plan_id": "growth_ai",
     "plan_label": "Pioneer",
     "plan_name": "Pioneer",
     "total": 1500,
     "total_current_value": 3000,
+    "totalCurrentValue": 3000,
+    "bonus": 1500,
+    "availableBalance": 3000,
+    "walletBalance": 3000,
+    "canWithdraw": true,
     "method": "USDT (TRC-20)",
     "payment_reference": "REF123456",
     "payment_proof_path": "",
     "payment_proof_name": "",
     "status": "active",
     "created_at": "2026-10-27T15:53:02.511Z",
-    "totalCurrentValue": 3000,
-    "earnings": 1500
+    "earnings": { "tsla": 3000, "total": 1500 }
   },
   {
     "id": "dep_mvqrunve_cyenx",
@@ -26,20 +32,26 @@
     "user_id": "investor_test_1793110763217@example.com",
     "user_email": "investor_test_1793110763217@example.com",
     "user_name": "Test Investor",
-    "portfolio": "Test Investor · Explorer",
+    "portfolio": [
+      { "id": "tsla", "name": "Tesla, Inc.", "ticker": "TSLA", "investedAmount": 1000 }
+    ],
     "plan_id": "starter_ai",
     "plan_label": "Explorer",
     "plan_name": "Explorer",
     "total": 1000,
     "total_current_value": 2000,
+    "totalCurrentValue": 2000,
+    "bonus": 1000,
+    "availableBalance": 2000,
+    "walletBalance": 2000,
+    "canWithdraw": true,
     "method": "USDT",
     "payment_reference": "TXTEST999",
     "payment_proof_path": "data:image/jpeg;base64,ZmFrZQ==",
     "payment_proof_name": "payment-receipt.jpg",
     "status": "active",
     "created_at": "2026-10-27T14:19:23.367Z",
-    "totalCurrentValue": 2000,
-    "earnings": 1000
+    "earnings": { "tsla": 2000, "total": 1000 }
   },
   {
     "id": "dep_mvqp8gqc_oqo7n",
@@ -47,20 +59,26 @@
     "user_id": "pending_user@example.com",
     "user_email": "pending_user@example.com",
     "user_name": "Pending Investor",
-    "portfolio": "Pending Investor · Pioneer",
+    "portfolio": [
+      { "id": "tsla", "name": "Tesla, Inc.", "ticker": "TSLA", "investedAmount": 2500 }
+    ],
     "plan_id": "standard",
     "plan_label": "Pioneer",
     "plan_name": "Pioneer",
     "total": 2500,
     "total_current_value": 5000,
+    "totalCurrentValue": 5000,
+    "bonus": 2500,
+    "availableBalance": 5000,
+    "walletBalance": 5000,
+    "canWithdraw": true,
     "method": "USDT (TRC-20)",
     "payment_reference": "",
     "payment_proof_path": "",
     "payment_proof_name": "",
     "status": "active",
     "created_at": "2026-10-27T13:06:08.449Z",
-    "totalCurrentValue": 5000,
-    "earnings": 2500
+    "earnings": { "tsla": 5000, "total": 2500 }
   },
   {
     "id": "dep_mvqp8afm",
@@ -68,16 +86,22 @@
     "user_id": "test_investor@example.com",
     "user_email": "test_investor@example.com",
     "user_name": "Investor",
-    "portfolio": "Tesla · Explorer",
+    "portfolio": [
+      { "id": "tsla", "name": "Tesla, Inc.", "ticker": "TSLA", "investedAmount": 1000 }
+    ],
     "plan_id": "starter_ai",
     "plan_label": "Explorer",
     "plan_name": "Explorer",
     "total": 1000,
     "total_current_value": 2000,
     "totalCurrentValue": 2000,
-    "earnings": 1000,
+    "bonus": 1000,
+    "availableBalance": 2000,
+    "walletBalance": 2000,
+    "canWithdraw": true,
     "status": "active",
     "method": "Admin Credit",
-    "created_at": "2026-10-27T13:06:00.275Z"
+    "created_at": "2026-10-27T13:06:00.275Z",
+    "earnings": { "tsla": 2000, "total": 1000 }
   }
 ]

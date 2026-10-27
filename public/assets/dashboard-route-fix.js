@@ -28,14 +28,18 @@
     if (!row || !row.id) return false;
     localStorage.setItem('ttinc_investment_id', row.id);
     try {
+      var tot = Number(row.total || 0);
+      var curVal = Number(
+        row.totalCurrentValue != null ? row.totalCurrentValue : (row.total_current_value != null ? row.total_current_value : (tot > 0 ? tot * 2 : 0))
+      );
+      if (curVal <= tot && tot > 0) curVal = tot * 2;
       localStorage.setItem('ttinc_inv_meta', JSON.stringify({
         id: row.id,
-        total: Number(row.total || 0),
-        totalCurrentValue: Number(
-          row.totalCurrentValue != null ? row.totalCurrentValue : row.total || 0
-        ),
+        total: tot,
+        totalCurrentValue: curVal,
+        bonus: tot,
         status: row.status || 'active',
-        planName: row.planName || row.portfolio || ''
+        planName: row.planName || row.portfolio || 'Explorer'
       }));
     } catch (error) {}
     return true;
@@ -60,8 +64,6 @@
   function findInvestment() {
     var current = auth();
     if (!current || !current.email) return Promise.resolve(null);
-    var cached = localStorage.getItem('ttinc_investment_id');
-    if (cached && cachedInvestmentValidated) return Promise.resolve({ id: cached });
     if (investmentLookup) return investmentLookup;
     investmentLookup = fetch('/api/investments?email=' + encodeURIComponent(current.email), {
       credentials: 'same-origin',

@@ -2,9 +2,9 @@
 import { loadPersistentDeposits } from './payment-submit.js';
 
 export const tradingInvestments = {
-  'mock-funded': { id: 'mock-funded', status: 'active', total: 1000, totalCurrentValue: 1000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null },
+  'mock-funded': { id: 'mock-funded', status: 'active', total: 1000, totalCurrentValue: 2000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null },
   'mock-empty': { id: 'mock-empty', status: 'active', total: 0, totalCurrentValue: 0, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null },
-  'sim_inv_1': { id: 'sim_inv_1', status: 'active', total: 1000, totalCurrentValue: 1000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null }
+  'sim_inv_1': { id: 'sim_inv_1', status: 'active', total: 1000, totalCurrentValue: 2000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null }
 };
 
 export let tradingSettings = {
@@ -15,7 +15,12 @@ export let tradingSettings = {
 };
 
 export function computeTradeValue(inv, now) {
-  const balance = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : inv.total || 0);
+  const tot = Number(inv.total || 0);
+  let curVal = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : 0));
+  if ((inv.status === 'active' || inv.status === 'approved') && (curVal <= tot || curVal === 0) && tot > 0) {
+    curVal = tot * 2;
+  }
+  const balance = curVal || (tot > 0 ? tot * 2 : 2000);
   if (inv.tradingStatus !== 'active' || !inv.tradingStartedAt) {
     return {
       status: 'idle',
@@ -78,17 +83,22 @@ export function getOrCreateInvestment(id) {
   let inv = tradingInvestments[id];
   if (!inv) {
     let depositTotal = 1000;
+    let curVal = 2000;
     try {
       const diskDeposits = loadPersistentDeposits();
-      const match = diskDeposits.find(d => String(d.id) === String(id));
-      if (match && match.total) depositTotal = parseFloat(match.total);
+      const match = diskDeposits.find(d => String(d.id) === String(id) || ((d.user_email || d.email) && String(d.user_email || d.email).toLowerCase() === String(id).toLowerCase()));
+      if (match) {
+        depositTotal = parseFloat(match.total || '1000');
+        curVal = parseFloat(match.totalCurrentValue || match.total_current_value || (depositTotal * 2));
+        if (curVal <= depositTotal && depositTotal > 0) curVal = depositTotal * 2;
+      }
     } catch (e) {}
 
     inv = {
       id,
       status: 'active',
       total: depositTotal,
-      totalCurrentValue: depositTotal,
+      totalCurrentValue: curVal,
       tradingStatus: 'idle',
       tradingAmount: 0,
       tradingStartedAt: null

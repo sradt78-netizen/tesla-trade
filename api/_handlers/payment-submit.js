@@ -241,13 +241,25 @@ export default async function handler(req, res) {
         if ((st === 'active' || st === 'approved' || st === 'completed') && (curVal <= tot || curVal === 0) && tot > 0) {
           curVal = tot * 2;
         }
+        const bonusAmt = (st === 'active' || st === 'approved' || st === 'completed') ? tot : 0;
+        const portfolioArr = Array.isArray(found.portfolio) && found.portfolio.length
+          ? found.portfolio
+          : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot }];
         return res.status(200).json({
           ...found,
           status: (st === 'active' || st === 'approved') ? 'active' : st,
           total: tot,
           totalCurrentValue: curVal,
           total_current_value: curVal,
-          bonus: (st === 'active' || st === 'approved' || st === 'completed') ? tot : 0
+          bonus: bonusAmt,
+          availableBalance: curVal,
+          walletBalance: curVal,
+          canWithdraw: true,
+          withdrawalMessage: `Your full wallet balance of $${curVal.toLocaleString('en-US', { minimumFractionDigits: 2 })} (including $${bonusAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} match bonus) is available.`,
+          portfolio: portfolioArr,
+          earnings: (typeof found.earnings === 'object' && found.earnings !== null && !Array.isArray(found.earnings))
+            ? found.earnings
+            : { tsla: curVal, total: bonusAmt }
         });
       }
       return res.status(200).json({
@@ -257,8 +269,12 @@ export default async function handler(req, res) {
         totalCurrentValue: 2000,
         total_current_value: 2000,
         bonus: 1000,
+        availableBalance: 2000,
+        walletBalance: 2000,
+        canWithdraw: true,
         planName: 'Explorer',
-        portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: 1000 }]
+        portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: 1000 }],
+        earnings: { tsla: 2000, total: 1000 }
       });
     }
 
@@ -273,13 +289,24 @@ export default async function handler(req, res) {
       if ((st === 'active' || st === 'approved' || st === 'completed') && (curVal <= tot || curVal === 0) && tot > 0) {
         curVal = tot * 2;
       }
+      const bonusAmt = (st === 'active' || st === 'approved' || st === 'completed') ? tot : 0;
+      const portfolioArr = Array.isArray(item.portfolio) && item.portfolio.length
+        ? item.portfolio
+        : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot || 1000 }];
       return {
         ...item,
         status: (st === 'active' || st === 'approved') ? 'active' : st,
         total: tot,
         totalCurrentValue: curVal || tot,
         total_current_value: curVal || tot,
-        bonus: (st === 'active' || st === 'approved' || st === 'completed') ? tot : 0
+        bonus: bonusAmt,
+        availableBalance: curVal || tot,
+        walletBalance: curVal || tot,
+        canWithdraw: true,
+        portfolio: portfolioArr,
+        earnings: (typeof item.earnings === 'object' && item.earnings !== null && !Array.isArray(item.earnings))
+          ? item.earnings
+          : { tsla: curVal || tot, total: bonusAmt }
       };
     });
 

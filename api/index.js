@@ -89,11 +89,12 @@ export default async function handler(req, res) {
     return await paymentSettingsHandler(req, res);
   }
 
-  // 8. Payment & Deposit submission / receipts
+  // 8. Payment & Deposit submission / receipts & Investment detail
   if (
     normalizedPath === '/payment-submit' ||
     normalizedPath === '/payment-proof' ||
-    normalizedPath === '/investments'
+    normalizedPath === '/investments' ||
+    (normalizedPath.startsWith('/investments/') && !normalizedPath.includes('/trading'))
   ) {
     return await paymentSubmitHandler(req, res);
   }
