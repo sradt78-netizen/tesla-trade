@@ -89,12 +89,15 @@ export default async function handler(req, res) {
     return await paymentSettingsHandler(req, res);
   }
 
-  // 8. Payment & Deposit submission / receipts & Investment detail
+  // 8. Payment & Deposit submission / receipts
   if (
     normalizedPath === '/payment-submit' ||
     normalizedPath === '/payment-proof' ||
     normalizedPath === '/investments' ||
-    (normalizedPath.startsWith('/investments/') && !normalizedPath.includes('/trading'))
+    // GET /api/investments/:id is what the waiting page, dashboard and
+    // overview poll for status + balance. Trading sub-routes are matched
+    // further down, so only a single id segment is handled here.
+    /^\/investments\/[^/]+$/.test(normalizedPath)
   ) {
     return await paymentSubmitHandler(req, res);
   }

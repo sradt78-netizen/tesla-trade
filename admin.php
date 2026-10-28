@@ -10,8 +10,33 @@ if (file_exists(__DIR__ . '/api/config.php')) {
 }
 session_start();
 
-// ── Admin auth (direct access enabled, no password screen) ───
-$is_auth = true;
+// ── Admin auth ────────────────────────────────────────────────
+// Only a hash of the password lives in the source. To change the password,
+// set TT_ADMIN_PASSWORD_HASH (output of password_hash() or `openssl passwd -6`)
+// in the server environment; that overrides the built-in hash below.
+$admin_hash = getenv('TT_ADMIN_PASSWORD_HASH') ?: '$6$PmICaJRW12bdjA.l$v3EyvcDyY.ap4tZJqU5CuDs9HPwUE4LrySRWv.GHpSntOuR3l28UI8WPnysh40RcJMB.ATV8jpcPB8nUKAs6s.';
+
+if (isset($_POST['admin_logout'])) {
+    unset($_SESSION['tt_admin_ok']);
+    session_regenerate_id(true);
+    header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
+    exit;
+}
+
+$auth_error = '';
+if (isset($_POST['admin_password'])) {
+    if (password_verify((string)$_POST['admin_password'], $admin_hash)) {
+        session_regenerate_id(true);
+        $_SESSION['tt_admin_ok'] = true;
+        // Redirect so a page refresh does not re-submit the login form.
+        header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
+        exit;
+    }
+    sleep(1); // slow down password guessing
+    $auth_error = 'Incorrect password.';
+}
+
+$is_auth = !empty($_SESSION['tt_admin_ok']);
 
 // ── Fetch helpers ──────────────────────────────────────────────
 function api_db_investments(): array {

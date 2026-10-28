@@ -1,4 +1,4 @@
-import { getDbConnection } from '../db.js';
+import { getDbConnection } from './dbcheck.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -46,7 +46,7 @@ export function loadPersistentDeposits() {
 export function savePersistentDeposit(deposit) {
   try {
     const current = loadPersistentDeposits();
-    const idx = current.findIndex(x => String(x.id) === String(deposit.id) || ((x.user_email || x.email) && (deposit.user_email || deposit.email) && (x.user_email || x.email).toLowerCase() === (deposit.user_email || deposit.email).toLowerCase()));
+    const idx = current.findIndex(x => String(x.id) === String(deposit.id) || (x.user_email && deposit.user_email && x.user_email.toLowerCase() === deposit.user_email.toLowerCase()));
     if (idx >= 0) {
       current[idx] = { ...current[idx], ...deposit };
     } else {
@@ -59,13 +59,6 @@ export function savePersistentDeposit(deposit) {
     try {
       fs.writeFileSync('/tmp/tesla_saved_deposits.json', json, 'utf8');
     } catch (e) {}
-
-    // Keep inMemoryDeposits in sync
-    if (Array.isArray(inMemoryDeposits)) {
-      const mIdx = inMemoryDeposits.findIndex(x => String(x.id) === String(deposit.id) || ((x.user_email || x.email) && (deposit.user_email || deposit.email) && (x.user_email || x.email).toLowerCase() === (deposit.user_email || deposit.email).toLowerCase()));
-      if (mIdx >= 0) inMemoryDeposits[mIdx] = { ...inMemoryDeposits[mIdx], ...deposit };
-      else inMemoryDeposits.unshift(deposit);
-    }
   } catch (e) {}
 }
 
@@ -222,64 +215,35 @@ export default async function handler(req, res) {
       }
     } catch (e) {}
 
-    if (idMatch || (qId && qId !== 'all')) {
-      let found = (qId && qId !== 'null' && qId !== 'undefined') ? all.find(x => String(x.id) === String(qId)) : null;
-      if (!found && qEmail) {
-        found = all.find(x => (x.user_email || x.email || x.user_id || x.userId || '').toLowerCase() === qEmail && (x.status === 'active' || x.status === 'approved'));
-        if (!found) {
-          found = all.find(x => (x.user_email || x.email || x.user_id || x.userId || '').toLowerCase() === qEmail);
-        }
-      }
-      if (!found) {
-        const anyActive = all.find(x => x.status === 'active' || x.status === 'approved');
-        if (anyActive) found = anyActive;
-      }
+    if (qId) {
+      const found = all.find(x => String(x.id) === String(qId));
       if (found) {
         const st = (found.status || '').toLowerCase();
-        const tot = Number(found.total || found.amount || 1000);
-        let curVal = Number(found.totalCurrentValue || found.total_current_value || (st === 'active' || st === 'approved' ? tot * 2 : tot));
+        const tot = Number(found.total || found.amount || 0);
+        let curVal = Number(found.totalCurrentValue || found.total_current_value || 0);
         if ((st === 'active' || st === 'approved' || st === 'completed') && (curVal <= tot || curVal === 0) && tot > 0) {
           curVal = tot * 2;
         }
-        const bonusAmt = (st === 'active' || st === 'approved' || st === 'completed') ? tot : 0;
-        const portfolioArr = Array.isArray(found.portfolio) && found.portfolio.length
-          ? found.portfolio
-          : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot }];
         return res.status(200).json({
           ...found,
-          status: (st === 'active' || st === 'approved') ? 'active' : st,
+          // The compiled portfolio screen calls portfolio.map(); DB rows store
+          // a plain text label, so always expose an array.
+          portfolio: Array.isArray(found.portfolio)
+            ? found.portfolio
+            : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot }],
+          planName: found.planName || found.plan_name || found.plan_label || null,
+          txId: found.txId || found.tx_id || null,
+          canWithdraw: found.canWithdraw != null ? !!found.canWithdraw : !!found.can_withdraw,
           total: tot,
-          totalCurrentValue: curVal,
-          total_current_value: curVal,
-          bonus: bonusAmt,
-          availableBalance: curVal,
-          walletBalance: curVal,
-          canWithdraw: true,
-          withdrawalMessage: `Your full wallet balance of $${curVal.toLocaleString('en-US', { minimumFractionDigits: 2 })} (including $${bonusAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })} match bonus) is available.`,
-          portfolio: portfolioArr,
-          earnings: (typeof found.earnings === 'object' && found.earnings !== null && !Array.isArray(found.earnings))
-            ? found.earnings
-            : { tsla: curVal, total: bonusAmt }
+          totalCurrentValue: curVal || tot,
+          bonus: (st === 'active' || st === 'approved' || st === 'completed') ? tot : 0
         });
       }
-      return res.status(200).json({
-        id: qId,
-        status: 'active',
-        total: 1000,
-        totalCurrentValue: 2000,
-        total_current_value: 2000,
-        bonus: 1000,
-        availableBalance: 2000,
-        walletBalance: 2000,
-        canWithdraw: true,
-        planName: 'Explorer',
-        portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: 1000 }],
-        earnings: { tsla: 2000, total: 1000 }
-      });
+      return res.status(404).json({ error: 'Investment not found' });
     }
 
     if (qEmail) {
-      all = all.filter(x => (x.user_email || x.email || x.user_id || x.userId || '').toLowerCase() === qEmail);
+      all = all.filter(x => (x.user_email || x.email || '').toLowerCase() === qEmail);
     }
 
     all = all.map(item => {
@@ -289,24 +253,11 @@ export default async function handler(req, res) {
       if ((st === 'active' || st === 'approved' || st === 'completed') && (curVal <= tot || curVal === 0) && tot > 0) {
         curVal = tot * 2;
       }
-      const bonusAmt = (st === 'active' || st === 'approved' || st === 'completed') ? tot : 0;
-      const portfolioArr = Array.isArray(item.portfolio) && item.portfolio.length
-        ? item.portfolio
-        : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot || 1000 }];
       return {
         ...item,
-        status: (st === 'active' || st === 'approved') ? 'active' : st,
         total: tot,
         totalCurrentValue: curVal || tot,
-        total_current_value: curVal || tot,
-        bonus: bonusAmt,
-        availableBalance: curVal || tot,
-        walletBalance: curVal || tot,
-        canWithdraw: true,
-        portfolio: portfolioArr,
-        earnings: (typeof item.earnings === 'object' && item.earnings !== null && !Array.isArray(item.earnings))
-          ? item.earnings
-          : { tsla: curVal || tot, total: bonusAmt }
+        bonus: (st === 'active' || st === 'approved' || st === 'completed') ? tot : 0
       };
     });
 

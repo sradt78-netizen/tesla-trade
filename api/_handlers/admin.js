@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { getDbConnection } from '../db.js';
+import { getDbConnection } from './dbcheck.js';
 import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
 
 const INVESTORS_FILE = path.join(process.cwd(), 'data', 'saved_investors.json');
@@ -521,30 +521,25 @@ export default async function handler(req, res) {
       let settings = { ...mockStore.settings };
 
       if (isDbConnected && conn) {
-        try {
-          const [inv] = await conn.query('SELECT * FROM investor_accounts ORDER BY registered_at DESC');
-          const [inments] = await conn.query('SELECT * FROM investments ORDER BY id DESC');
-          const [k] = await conn.query('SELECT * FROM kyc_submissions ORDER BY created_at DESC');
-          const [o] = await conn.query('SELECT * FROM ev_orders ORDER BY created_at DESC LIMIT 100');
-          const [w] = await conn.query('SELECT * FROM withdrawals ORDER BY created_at DESC');
-          const [f] = await conn.query('SELECT * FROM financing_applications ORDER BY created_at DESC');
-          const [c] = await conn.query('SELECT * FROM invitation_codes ORDER BY created_at DESC');
-          const [cl] = await conn.query('SELECT * FROM analytics_clicks ORDER BY id DESC LIMIT 50');
-          const [ml] = await conn.query('SELECT * FROM marketing_emails_log ORDER BY created_at DESC LIMIT 60');
-
-          investors = inv;
-          investments = inments;
-          kyc = k;
-          orders = o;
-          withdrawals = w;
-          financing = f;
-          codes = c;
-          clicks = cl;
-          marketingLogs = ml;
-
-          const [sRows] = await conn.query('SELECT `key`, `value` FROM app_settings');
-          for (const row of sRows) settings[row.key] = row.value;
-        } catch (e) {}
+        // Run each query on its own: previously one failing query (e.g. a
+        // table that does not exist yet) threw away every result and the
+        // admin fell back to the empty in-memory store, so investors
+        // "disappeared" right after an approval.
+        const safeQuery = async (sql, fallback) => {
+          try { const [rows] = await conn.query(sql); return rows; }
+          catch (e) { console.error('[admin all_data] query failed:', sql.slice(0, 60), e.message); return fallback; }
+        };
+        investors = await safeQuery('SELECT * FROM investor_accounts ORDER BY registered_at DESC', investors);
+        investments = await safeQuery('SELECT * FROM investments ORDER BY id DESC', investments);
+        kyc = await safeQuery('SELECT * FROM kyc_submissions ORDER BY created_at DESC', kyc);
+        orders = await safeQuery('SELECT * FROM ev_orders ORDER BY created_at DESC LIMIT 100', orders);
+        withdrawals = await safeQuery('SELECT * FROM withdrawals ORDER BY created_at DESC', withdrawals);
+        financing = await safeQuery('SELECT * FROM financing_applications ORDER BY created_at DESC', financing);
+        codes = await safeQuery('SELECT * FROM invitation_codes ORDER BY created_at DESC', codes);
+        clicks = await safeQuery('SELECT * FROM analytics_clicks ORDER BY id DESC LIMIT 50', clicks);
+        marketingLogs = await safeQuery('SELECT * FROM marketing_emails_log ORDER BY created_at DESC LIMIT 60', marketingLogs);
+        const sRows = await safeQuery('SELECT `key`, `value` FROM app_settings', []);
+        for (const row of sRows) settings[row.key] = row.value;
         await conn.end();
       }
 
@@ -554,12 +549,9 @@ export default async function handler(req, res) {
         if (Array.isArray(diskDeposits) && diskDeposits.length > 0) {
           const mergedInvs = [...investments];
           for (const dep of diskDeposits) {
-            const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || ((x.user_email || x.email) && (dep.user_email || dep.email) && (x.user_email || x.email).toLowerCase() === (dep.user_email || dep.email).toLowerCase()));
+            const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (x.user_email && dep.user_email && x.user_email.toLowerCase() === dep.user_email.toLowerCase()));
             if (idx >= 0) {
-              const currentSt = mergedInvs[idx].status;
-              const nextSt = dep.status;
-              const resolvedSt = (currentSt === 'active' || nextSt === 'active' || currentSt === 'approved' || nextSt === 'approved') ? 'active' : (nextSt || currentSt);
-              mergedInvs[idx] = { ...mergedInvs[idx], ...dep, status: resolvedSt };
+              mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
             } else {
               mergedInvs.unshift(dep);
             }
@@ -572,12 +564,9 @@ export default async function handler(req, res) {
       if (Array.isArray(inMemoryDeposits) && inMemoryDeposits.length > 0) {
         const mergedInvs = [...investments];
         for (const dep of inMemoryDeposits) {
-          const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || ((x.user_email || x.email) && (dep.user_email || dep.email) && (x.user_email || x.email).toLowerCase() === (dep.user_email || dep.email).toLowerCase()));
+          const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (x.user_email && dep.user_email && x.user_email.toLowerCase() === dep.user_email.toLowerCase()));
           if (idx >= 0) {
-            const currentSt = mergedInvs[idx].status;
-            const nextSt = dep.status;
-            const resolvedSt = (currentSt === 'active' || nextSt === 'active' || currentSt === 'approved' || nextSt === 'approved') ? 'active' : (nextSt || currentSt);
-            mergedInvs[idx] = { ...mergedInvs[idx], ...dep, status: resolvedSt };
+            mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
           } else {
             mergedInvs.unshift(dep);
           }
@@ -603,9 +592,8 @@ export default async function handler(req, res) {
 
       // Ensure investors list includes any depositor and reflects their active/pending status accurately
       for (const inv of investments) {
-        const em = (inv.user_email || inv.email || inv.user_id || inv.userId || '').toLowerCase();
+        const em = (inv.user_email || '').toLowerCase();
         if (!em) continue;
-        if (!inv.user_email) inv.user_email = em;
         const existingIdx = investors.findIndex(u => (u.email || '').toLowerCase() === em);
         const isActive = inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed';
         if (existingIdx >= 0) {
@@ -623,7 +611,7 @@ export default async function handler(req, res) {
       }
 
       const unfundedCount = investors.filter(inv => {
-        const matching = investments.filter(i => (i.user_email || i.email || i.user_id || '').toLowerCase() === (inv.email || '').toLowerCase());
+        const matching = investments.filter(i => (i.user_email || '').toLowerCase() === (inv.email || '').toLowerCase());
         const totalVol = matching.reduce((acc, curr) => acc + parseFloat(curr.total || '0'), 0);
         return totalVol <= 0;
       }).length;
@@ -999,7 +987,7 @@ export default async function handler(req, res) {
       // 1. Check disk persistent deposits
       try {
         const diskDeposits = loadPersistentDeposits();
-        const found = diskDeposits.find(d => (id && String(d.id) === String(id)) || (targetEmail && ((d.user_email || d.email || d.user_id || d.userId || '').toLowerCase() === targetEmail)));
+        const found = diskDeposits.find(d => (id && String(d.id) === String(id)) || (targetEmail && (d.user_email || '').toLowerCase() === targetEmail));
         if (found) {
           foundDeposit = found;
           if (!approvedDepositAmount) approvedDepositAmount = parseFloat(found.total || '1000');
@@ -1017,7 +1005,7 @@ export default async function handler(req, res) {
       } catch (e) {}
 
       // 2. Check memory deposits
-      const mem = inMemoryDeposits.find(i => (id && String(i.id) === String(id)) || (targetEmail && ((i.user_email || i.email || i.user_id || i.userId || '').toLowerCase() === targetEmail)));
+      const mem = inMemoryDeposits.find(i => (id && String(i.id) === String(id)) || (targetEmail && (i.user_email || '').toLowerCase() === targetEmail));
       if (mem) {
         if (!approvedDepositAmount) approvedDepositAmount = parseFloat(mem.total || '1000');
         mem.status = status;
@@ -1032,7 +1020,7 @@ export default async function handler(req, res) {
       }
 
       // 3. Check mockStore
-      const inv = mockStore.investments.find(i => (id && String(i.id) === String(id)) || (targetEmail && ((i.user_email || i.email || i.user_id || i.userId || '').toLowerCase() === targetEmail)));
+      const inv = mockStore.investments.find(i => (id && String(i.id) === String(id)) || (targetEmail && (i.user_email || '').toLowerCase() === targetEmail));
       if (inv) {
         if (!approvedDepositAmount) approvedDepositAmount = parseFloat(inv.total || '1000');
         inv.status = status;
@@ -1050,58 +1038,9 @@ export default async function handler(req, res) {
       const bonusMatch = approvedDepositAmount;
       const totalBalanceWithBonus = approvedDepositAmount * 2;
 
-      // Extract effective email and effective id
-      const effectiveEmail = targetEmail || (foundDeposit && (foundDeposit.user_email || foundDeposit.email || foundDeposit.user_id || foundDeposit.userId)) || (inv && (inv.user_email || inv.email || inv.user_id)) || (mem && (mem.user_email || mem.email || mem.user_id));
+      // If no deposit was found on disk or memory yet, create an approved record now
+      const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || (inv && inv.user_email) || (mem && mem.user_email);
       const effectiveId = id || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
-
-      // Synchronize all deposits belonging to this user or ID
-      if (effectiveEmail || id) {
-        try {
-          const diskDeps = loadPersistentDeposits();
-          for (const d of diskDeps) {
-            const em = (d.user_email || d.email || d.user_id || d.userId || '').toLowerCase();
-            if ((effectiveEmail && em === effectiveEmail.toLowerCase()) || (id && String(d.id) === String(id))) {
-              d.status = status;
-              if (status === 'active') {
-                const amt = parseFloat(d.total || approvedDepositAmount || '1000');
-                d.total = amt;
-                d.total_current_value = amt * 2;
-                d.totalCurrentValue = amt * 2;
-                d.earnings = amt;
-              }
-              savePersistentDeposit(d);
-            }
-          }
-        } catch (e) {}
-
-        for (const d of inMemoryDeposits) {
-          const em = (d.user_email || d.email || d.user_id || d.userId || '').toLowerCase();
-          if ((effectiveEmail && em === effectiveEmail.toLowerCase()) || (id && String(d.id) === String(id))) {
-            d.status = status;
-            if (status === 'active') {
-              const amt = parseFloat(d.total || approvedDepositAmount || '1000');
-              d.total = amt;
-              d.total_current_value = amt * 2;
-              d.totalCurrentValue = amt * 2;
-              d.earnings = amt;
-            }
-          }
-        }
-
-        for (const d of mockStore.investments) {
-          const em = (d.user_email || d.email || d.user_id || d.userId || '').toLowerCase();
-          if ((effectiveEmail && em === effectiveEmail.toLowerCase()) || (id && String(d.id) === String(id))) {
-            d.status = status;
-            if (status === 'active') {
-              const amt = parseFloat(d.total || approvedDepositAmount || '1000');
-              d.total = amt;
-              d.total_current_value = amt * 2;
-              d.totalCurrentValue = amt * 2;
-              d.earnings = amt;
-            }
-          }
-        }
-      }
 
       if (!foundDeposit && effectiveEmail && status === 'active') {
         const freshDep = {
@@ -1164,32 +1103,48 @@ export default async function handler(req, res) {
       } catch (eTr) {}
 
       // 6. Update MySQL Database if available
+      let dbSaved = false;
+      let dbError = null;
       if (isDbConnected && conn) {
         try {
+          // Only touch the deposit that was approved. The old email-wide
+          // UPDATE rewrote status/total on every investment the investor had.
+          let result = null;
           if (id) {
-            await conn.query('UPDATE investments SET status=?, total=?, total_current_value=?, earnings=? WHERE id=?', [status, approvedDepositAmount, totalBalanceWithBonus, bonusMatch, id]);
+            [result] = await conn.query('UPDATE investments SET status=?, total=?, total_current_value=?, earnings=? WHERE id=?', [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, status === 'active' ? bonusMatch : 0, id]);
           }
-          if (effectiveEmail) {
-            await conn.query('UPDATE investments SET status=?, total=?, total_current_value=?, earnings=? WHERE LOWER(user_email)=?', [status, approvedDepositAmount, totalBalanceWithBonus, bonusMatch, effectiveEmail]);
-            if (status === 'active') {
-              await conn.query('UPDATE investor_accounts SET onboarding_status="active", deposit_match_eligible=1 WHERE LOWER(email)=?', [effectiveEmail]);
-
-              const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
-              const txBonId = 'tx_bonus_' + Math.random().toString(36).substring(2, 9);
-              try {
-                await conn.query(
-                  'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "processed", "Investment deposit approved", NOW())',
-                  [txDepId, effectiveId, effectiveEmail, approvedDepositAmount]
-                );
-                await conn.query(
-                  'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "bonus", ?, "processed", "100% First Deposit Match Bonus", NOW())',
-                  [txBonId, effectiveId, effectiveEmail, bonusMatch]
-                );
-              } catch (eTx) {}
-            }
+          if ((!result || !result.affectedRows) && effectiveEmail) {
+            // No id match: fall back to the investor's most recent pending deposit only.
+            [result] = await conn.query('UPDATE investments SET status=?, total=?, total_current_value=?, earnings=? WHERE LOWER(user_email)=? AND status IN ("pending_approval","pending") ORDER BY created_at DESC LIMIT 1', [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, status === 'active' ? bonusMatch : 0, effectiveEmail]);
+          }
+          dbSaved = !!(result && result.affectedRows);
+          if (effectiveEmail && status === 'active') {
+            await conn.query('UPDATE investor_accounts SET onboarding_status="active", deposit_match_eligible=1 WHERE LOWER(email)=?', [effectiveEmail]);
+            const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
+            const txBonId = 'tx_bonus_' + Math.random().toString(36).substring(2, 9);
+            try {
+              await conn.query(
+                'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "processed", "Investment deposit approved", NOW())',
+                [txDepId, effectiveId, effectiveEmail, approvedDepositAmount]
+              );
+              await conn.query(
+                'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "bonus", ?, "processed", "100% First Deposit Match Bonus", NOW())',
+                [txBonId, effectiveId, effectiveEmail, bonusMatch]
+              );
+            } catch (eTx) { console.error('[admin approve] ledger insert failed:', eTx.message); }
           }
           await conn.end();
-        } catch (e) {}
+        } catch (e) {
+          dbError = e.message;
+          console.error('[admin approve] database update failed:', e.message);
+        }
+      }
+      if (isDbConnected && !dbSaved) {
+        return res.status(500).json({
+          success: false,
+          error: 'Approval was NOT saved to the database' + (dbError ? ': ' + dbError : ' (no matching deposit row).'),
+          message: 'Approval was NOT saved to the database. Please retry; the investor still sees their payment as pending.'
+        });
       }
 
       return res.status(200).json({

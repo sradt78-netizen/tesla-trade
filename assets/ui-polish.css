@@ -1,0 +1,93 @@
+/*
+ * UI polish layer. Purely presentational: no colours, copy or layout
+ * structure are changed. It adds depth, spacing, motion and chart
+ * refinements on top of the existing design.
+ * Remove the <link> to this file in index.html to turn it all off.
+ */
+
+/* ---- Cards: soft depth + gentle entrance --------------------------------- */
+[class*="bg-[#111]"][class*="rounded-xl"] {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+@media (hover: hover) {
+  [class*="bg-[#111]"][class*="rounded-xl"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 14px 32px -14px rgba(0, 0, 0, 0.75);
+  }
+}
+
+@keyframes ttinc-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  [class*="bg-[#111]"][class*="rounded-xl"] {
+    animation: ttinc-rise 0.45s ease both;
+  }
+  .grid > [class*="rounded-xl"]:nth-child(2) { animation-delay: 0.05s; }
+  .grid > [class*="rounded-xl"]:nth-child(3) { animation-delay: 0.10s; }
+  .grid > [class*="rounded-xl"]:nth-child(4) { animation-delay: 0.15s; }
+}
+
+/* ---- Placement: roomier dashboard on larger screens ---------------------- */
+@media (min-width: 1280px) {
+  .max-w-5xl.mx-auto { max-width: 68rem; }
+}
+@media (min-width: 640px) {
+  .max-w-5xl.mx-auto.space-y-5 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.5rem; }
+  .max-w-5xl.mx-auto .grid.gap-3 { gap: 0.9rem; }
+  .max-w-5xl.mx-auto .grid.gap-4 { gap: 1.1rem; }
+}
+
+/* ---- Numbers: steady digits so balances don't jitter --------------------- */
+.font-mono, [class*="tracking-tight"] {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ---- Charts (Recharts) ---------------------------------------------------- */
+.recharts-responsive-container { min-height: 120px; }
+.recharts-cartesian-grid line {
+  stroke-dasharray: 3 5;
+  stroke-opacity: 0.35;
+}
+.recharts-cartesian-axis-tick-value { font-size: 10px; letter-spacing: 0.04em; }
+.recharts-area-area { fill-opacity: 0.22; }
+.recharts-line-curve, .recharts-area-curve {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+}
+.recharts-active-dot circle { stroke-width: 2; filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.35)); }
+.recharts-pie-sector { stroke-width: 2; }
+.recharts-tooltip-wrapper > div {
+  border-radius: 10px !important;
+  box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.8) !important;
+  backdrop-filter: blur(6px);
+}
+@media (min-width: 1024px) {
+  .h-36 > .recharts-responsive-container,
+  .h-36:has(> .recharts-responsive-container) { min-height: 168px; }
+}
+
+/* ---- Tables, buttons, scrollbars, focus ---------------------------------- */
+table tbody tr { transition: background-color 0.15s ease; }
+@media (hover: hover) {
+  table tbody tr:hover { background-color: rgba(255, 255, 255, 0.025); }
+}
+button, a { transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease, opacity 0.2s ease; }
+button:not(:disabled):active { transform: scale(0.98); }
+:focus-visible { outline: 2px solid rgba(227, 25, 55, 0.7); outline-offset: 2px; border-radius: 4px; }
+
+* { scrollbar-width: thin; scrollbar-color: #2a2a2a transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+
+/* Status dot already pulses; make the "Live" label breathe with it */
+.animate-pulse { animation-duration: 2.4s; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
