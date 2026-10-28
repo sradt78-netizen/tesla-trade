@@ -32,34 +32,6 @@
             } catch (err) {}
           }
         };
-
-        window.ttincRemoveLoader = function () {
-          try {
-            var el = document.getElementById('ttinc-initial-loader');
-            if (el) {
-              el.style.opacity = '0';
-              el.style.pointerEvents = 'none';
-              el.style.transition = 'opacity 0.2s ease';
-              setTimeout(function () {
-                if (el && el.parentNode) el.parentNode.removeChild(el);
-              }, 200);
-            }
-            var all = document.querySelectorAll('#ttinc-initial-loader');
-            for (var i = 0; i < all.length; i++) {
-              all[i].style.display = 'none';
-              if (all[i].parentNode) all[i].parentNode.removeChild(all[i]);
-            }
-          } catch (e) {}
-        };
-
-        setTimeout(window.ttincRemoveLoader, 1500);
-        setTimeout(window.ttincRemoveLoader, 3000);
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-          setTimeout(window.ttincRemoveLoader, 800);
-        } else {
-          window.addEventListener('DOMContentLoaded', function () { setTimeout(window.ttincRemoveLoader, 800); });
-          window.addEventListener('load', function () { setTimeout(window.ttincRemoveLoader, 400); });
-        }
       })();
     </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -517,190 +489,65 @@
       }
 
       /* ── Investment chart ── */
-      /* ── Investment Real-Time Performance & Projected Growth Widget ── */
       #ttinc-chart-card {
         display: none;
-        background: linear-gradient(145deg, #121212 0%, #0a0a0a 100%);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 18px;
-        padding: 22px;
-        margin: 18px 0;
-        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-        position: relative;
-        overflow: hidden;
-      }
-      #ttinc-chart-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: linear-gradient(90deg, #e31937, #d4af37, #22c55e);
+        background: #111;
+        border: 1px solid #1e1e1e;
+        border-radius: 16px;
+        padding: 20px;
+        margin: 16px 0;
       }
       #ttinc-chart-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 12px;
+        margin-bottom: 4px;
         flex-wrap: wrap;
-        gap: 12px;
-      }
-      .ttinc-chart-title-area {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
+        gap: 8px;
       }
       #ttinc-chart-title {
-        font-size: 15px !important;
-        font-weight: 800;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
+        font-size: 14px !important;
+        font-weight: 700;
         color: #fff;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-      #ttinc-chart-subtitle {
-        font-size: 12px !important;
-        color: #94a3b8;
-        margin: 0;
-      }
-      .ttinc-chart-controls {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
       }
       #ttinc-chart-badge {
+        font-size: 12px !important;
+        font-weight: 700;
+        padding: 3px 12px;
+        border-radius: 20px;
+      }
+      #ttinc-chart-subtitle {
         font-size: 11px !important;
-        font-weight: 700;
-        padding: 4px 12px;
-        border-radius: 9999px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        letter-spacing: 0.03em;
-      }
-      .ttinc-pulse-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: #22c55e;
-        box-shadow: 0 0 8px #22c55e;
-        animation: ttinc-pulse 1.8s infinite;
-      }
-      .ttinc-timeframe-bar {
-        display: inline-flex;
-        background: #181818;
-        border: 1px solid #2a2a2a;
-        border-radius: 9px;
-        padding: 2px;
-        gap: 2px;
-      }
-      .ttinc-tf-btn {
-        background: transparent;
-        border: 0;
-        color: #888;
-        font-size: 10px !important;
-        font-weight: 700;
-        letter-spacing: 0.05em;
-        padding: 5px 9px;
-        border-radius: 6px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-      }
-      .ttinc-tf-btn:hover {
-        color: #fff;
-        background: rgba(255, 255, 255, 0.06);
-      }
-      .ttinc-tf-btn.active {
-        background: #262626;
-        color: #22c55e;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-      }
-      #ttinc-chart-stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 10px;
+        color: #555;
         margin-bottom: 16px;
       }
+      #ttinc-chart-wrap { position: relative; height: 200px; }
+      #ttinc-perf-canvas { width: 100% !important; height: 100% !important; }
+      #ttinc-chart-stats {
+        display: flex;
+        gap: 12px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
       .ttinc-stat-pill {
-        background: rgba(0, 0, 0, 0.4);
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 12px;
-        padding: 12px 14px;
-        position: relative;
-        overflow: hidden;
+        flex: 1;
+        min-width: 80px;
+        background: #1a1a1a;
+        border: 1px solid #222;
+        border-radius: 10px;
+        padding: 10px 12px;
       }
       .ttinc-stat-pill-label {
         font-size: 10px !important;
-        color: #94a3b8;
+        color: #555;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: .5px;
         margin-bottom: 4px;
-        font-weight: 600;
       }
       .ttinc-stat-pill-val {
-        font-family: monospace;
-        font-size: 19px !important;
-        font-weight: 800;
+        font-size: 15px !important;
+        font-weight: 700;
         color: #fff;
-        line-height: 1.2;
-      }
-      .ttinc-stat-pill-sub {
-        font-size: 11px !important;
-        margin-top: 4px;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-      #ttinc-chart-wrap {
-        position: relative;
-        height: 230px;
-        width: 100%;
-        margin-bottom: 12px;
-      }
-      #ttinc-perf-canvas {
-        width: 100% !important;
-        height: 100% !important;
-      }
-      #ttinc-chart-legend {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 16px;
-        margin-top: 6px;
-        font-size: 11px;
-        color: #888;
-        flex-wrap: wrap;
-      }
-      .ttinc-legend-item {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .ttinc-legend-line {
-        width: 16px;
-        height: 3px;
-        border-radius: 2px;
-      }
-      .ttinc-legend-dashed {
-        width: 16px;
-        height: 0px;
-        border-top: 2px dashed #d4af37;
-      }
-      #ttinc-chart-footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-top: 14px;
-        padding-top: 12px;
-        border-top: 1px solid rgba(255, 255, 255, 0.06);
-        font-size: 11px;
-        color: #64748b;
-        flex-wrap: wrap;
-        gap: 8px;
       }
 
       /* Static plan summary: rendered before the app bundle so it remains
@@ -2643,32 +2490,11 @@
 
     <div id="root" tabindex="-1">
       <!-- Loading fallback shown while React bundle hydrates (especially important on Android) -->
-      <div id="ttinc-initial-loader" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0a0a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:9999;transition:opacity 0.25s ease;">
+      <div id="ttinc-initial-loader" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0a0a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:9999;">
         <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="animation:ttinc-spin 1s linear infinite"><circle cx="24" cy="24" r="20" stroke="#2a2a2a" stroke-width="4"/><path d="M44 24a20 20 0 0 0-20-20" stroke="#e31937" stroke-width="4" stroke-linecap="round"/></svg>
         <span style="color:#555;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.5px">Loading Tesla Trade Inc…</span>
       </div>
-      <style>
-        @keyframes ttinc-spin{to{transform:rotate(360deg)}}
-        #ttinc-initial-loader.ttinc-hidden{opacity:0!important;pointer-events:none!important;visibility:hidden!important;}
-      </style>
-      <script>
-        (function() {
-          function hideLdr() {
-            var l = document.getElementById('ttinc-initial-loader');
-            if (l) {
-              l.classList.add('ttinc-hidden');
-              setTimeout(function() { if (l && l.parentNode) l.parentNode.removeChild(l); }, 250);
-            }
-          }
-          setTimeout(hideLdr, 1200);
-          setTimeout(hideLdr, 2500);
-          if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            setTimeout(hideLdr, 400);
-          } else {
-            window.addEventListener('DOMContentLoaded', function() { setTimeout(hideLdr, 400); });
-          }
-        })();
-      </script>
+      <style>@keyframes ttinc-spin{to{transform:rotate(360deg)}}</style>
     </div>
 
     <!-- Toast container (always visible, injected here) -->
@@ -2769,77 +2595,24 @@
             var raw = _origGet.call(localStorage, 'ttinc_auth');
             if (!raw) return '';
             var auth = JSON.parse(raw);
-            return auth && auth.email ? '__' + String(auth.email).trim().toLowerCase() : '';
+            return auth && auth.email ? '__' + auth.email : '';
           } catch (e) { return ''; }
         }
 
+        function resolveKey(key) {
+          if (PER_USER_KEYS.indexOf(key) === -1) return key;
+          var suffix = userSuffix();
+          return suffix ? key + suffix : key;
+        }
+
         Storage.prototype.setItem = function (key, value) {
-          if (PER_USER_KEYS.indexOf(key) !== -1) {
-            _origSet.call(this, key, value);
-            var suffix = userSuffix();
-            if (suffix) {
-              _origSet.call(this, key + suffix, value);
-            }
-            return;
-          }
-          return _origSet.call(this, key, value);
+          return _origSet.call(this, resolveKey(key), value);
         };
-
         Storage.prototype.getItem = function (key) {
-          if (PER_USER_KEYS.indexOf(key) !== -1) {
-            var suffix = userSuffix();
-            var val = suffix ? _origGet.call(this, key + suffix) : null;
-            if (val != null && val !== '') return val;
-            var plain = _origGet.call(this, key);
-            if (plain != null && plain !== '') return plain;
-            try {
-              var rawAuth = _origGet.call(localStorage, 'ttinc_auth');
-              if (rawAuth) {
-                var a = JSON.parse(rawAuth);
-                if (a && a.email) {
-                  var rawVal = _origGet.call(this, key + '__' + a.email);
-                  if (rawVal != null && rawVal !== '') return rawVal;
-                }
-              }
-            } catch (e) {}
-            try {
-              for (var i = 0; i < this.length; i++) {
-                var k = this.key(i);
-                if (k && k.indexOf(key + '__') === 0) {
-                  var candidate = _origGet.call(this, k);
-                  if (candidate) return candidate;
-                }
-              }
-            } catch (e) {}
-            if (key === 'ttinc_investment_id') {
-              try {
-                var rawAuthCheck = _origGet.call(localStorage, 'ttinc_auth');
-                if (rawAuthCheck) {
-                  var authObj = JSON.parse(rawAuthCheck);
-                  if (authObj && authObj.email) {
-                    var metaRaw = _origGet.call(this, 'ttinc_inv_meta' + suffix) || _origGet.call(this, 'ttinc_inv_meta');
-                    if (metaRaw) {
-                      var metaObj = JSON.parse(metaRaw);
-                      if (metaObj && metaObj.id) return metaObj.id;
-                    }
-                    return 'sim_inv_1';
-                  }
-                }
-              } catch (e) {}
-            }
-            return null;
-          }
-          return _origGet.call(this, key);
+          return _origGet.call(this, resolveKey(key));
         };
-
         Storage.prototype.removeItem = function (key) {
-          if (PER_USER_KEYS.indexOf(key) !== -1) {
-            _origRemove.call(this, key);
-            var suffix = userSuffix();
-            if (suffix) _origRemove.call(this, key + suffix);
-            return;
-          }
-          return _origRemove.call(this, key);
+          return _origRemove.call(this, resolveKey(key));
         };
       })();
     </script>
@@ -3976,454 +3749,207 @@
         setTimeout(function() { sync(); if (isLoggedIn() && !_sd) loadStocks(); }, 5000);
       })();
 
-      // ── Investment Real-Time Performance & Projected Growth Widget ──
+      // ── Investment performance chart ──────────────────────
       var _chartRendered    = false;
       var _lastInvestmentId = null;
       var _chartInstance    = null;
-      var _currentTimeframe = '30d';
-      var _currentChartData = null;
-      var _chartTickTimer   = null;
-      var _lastRenderTime   = 0;
-      var _lastHref         = (typeof window !== 'undefined' && window.location) ? window.location.href : '';
-
-      function ensureChartJs(callback) {
-        if (typeof window.Chart !== 'undefined') {
-          return callback(window.Chart);
-        }
-        var script = document.querySelector('script[src*="chart.js"], script[src*="chart.umd"]');
-        if (!script) {
-          script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
-          document.head.appendChild(script);
-        }
-        var count = 0;
-        var interval = setInterval(function () {
-          count++;
-          if (typeof window.Chart !== 'undefined') {
-            clearInterval(interval);
-            callback(window.Chart);
-          } else if (count > 60) {
-            clearInterval(interval);
-          }
-        }, 80);
-      }
-
-      function getAuthEmail() {
-        try {
-          var raw = localStorage.getItem('ttinc_auth');
-          if (raw) {
-            var a = JSON.parse(raw);
-            return (a && a.email) ? String(a.email).trim().toLowerCase() : '';
-          }
-        } catch (e) {}
-        return '';
-      }
 
       function getInvestmentIdFromStorage() {
-        try {
-          var directId = localStorage.getItem('ttinc_investment_id');
-          if (directId && typeof directId === 'string' && directId.trim() && directId !== 'null' && directId !== 'undefined') {
-            return directId.trim();
-          }
-        } catch (e) {}
-        try {
-          var rawMeta = localStorage.getItem('ttinc_inv_meta');
-          if (rawMeta) {
-            var meta = JSON.parse(rawMeta);
-            if (meta && meta.id) return meta.id;
-          }
-        } catch (e) {}
+        // The compiled app stores account data in localStorage under various keys
         var keys = ['ttinc_account', 'ttinc_user', 'tesla_account', 'account', 'user', 'investment'];
         for (var i = 0; i < keys.length; i++) {
           try {
             var raw = localStorage.getItem(keys[i]);
             if (!raw) continue;
             var obj = JSON.parse(raw);
-            if (obj && obj.id && typeof obj.id === 'string' && obj.id.length > 5) return obj.id;
+            // Could be { id, investmentId } or nested
+            if (obj && obj.id && typeof obj.id === 'string' && obj.id.length > 10) return obj.id;
             if (obj && obj.investmentId) return obj.investmentId;
           } catch (e) {}
         }
-        return 'sim_inv_1';
+        // Scan ALL localStorage keys for something that looks like an investment ID
+        try {
+          for (var k = 0; k < localStorage.length; k++) {
+            var key = localStorage.key(k);
+            var raw = localStorage.getItem(key);
+            if (!raw) continue;
+            var obj = JSON.parse(raw);
+            if (obj && typeof obj === 'object') {
+              var id = obj.id || obj.investmentId || obj.investment_id;
+              if (id && typeof id === 'string' && id.match(/^[0-9a-f-]{36}$/i)) return id;
+            }
+          }
+        } catch (e) {}
+        return null;
       }
 
-      function formatUSD(num) {
-        return '$' + Number(num || 0).toLocaleString('en-US', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        });
-      }
+      function renderChart(investmentId) {
+        if (!investmentId || investmentId === _lastInvestmentId) return;
+        _lastInvestmentId = investmentId;
 
-      function renderChart(investmentId, timeframe, force) {
-        var tf = timeframe || _currentTimeframe || '30d';
-        var invId = investmentId || getInvestmentIdFromStorage() || 'sim_inv_1';
-        var email = getAuthEmail();
-
-        var url = '/api/investments/' + encodeURIComponent(invId) + '/chart-data?timeframe=' + encodeURIComponent(tf) + '&email=' + encodeURIComponent(email) + '&t=' + Date.now();
-
-        fetch(url, { credentials: 'same-origin', cache: 'no-store' })
-          .then(function (r) {
-            if (!r.ok) throw new Error('API unavailable');
-            return r.json();
-          })
+        fetch('/api/investments/' + investmentId + '/chart-data')
+          .then(function (r) { return r.json(); })
           .then(function (data) {
-            if (!data || !data.points || data.points.length < 2) throw new Error('Invalid points');
-            _currentChartData = data;
-            _lastInvestmentId = invId;
-            _currentTimeframe = tf;
+            if (!data || !data.points || data.points.length < 2) return;
             injectChartCard(data);
           })
-          .catch(function () {
-            // High-fidelity fallback calculation if server is temporarily unreachable
-            var fallbackPrincipal = 1000;
-            var fallbackCurrent = 2000;
-            try {
-              var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-              if (meta.total) fallbackPrincipal = Number(meta.total);
-              if (meta.totalCurrentValue) fallbackCurrent = Number(meta.totalCurrentValue);
-              else if (fallbackPrincipal > 0) fallbackCurrent = fallbackPrincipal * 2;
-            } catch (e) {}
-
-            var fallbackData = {
-              investmentId: invId,
-              planName: 'Tesla · Explorer',
-              principal: fallbackPrincipal,
-              bonus: fallbackPrincipal,
-              currentValue: fallbackCurrent,
-              roi: 70,
-              timeframe: tf,
-              summary: {
-                startValue: fallbackPrincipal,
-                currentValue: fallbackCurrent,
-                gainLoss: fallbackCurrent - fallbackPrincipal,
-                gainPct: fallbackPrincipal > 0 ? ((fallbackCurrent - fallbackPrincipal) / fallbackPrincipal) * 100 : 100,
-                isGain: true,
-                bonusMatch: fallbackPrincipal,
-                projectedEndValue: Number((fallbackCurrent * 1.70).toFixed(2)),
-                projectedGain: Number((fallbackCurrent * 0.70).toFixed(2)),
-                projectedRoiPct: 70,
-                dailyRate: 2.33
-              },
-              points: generateClientPoints(fallbackPrincipal, fallbackCurrent, 70, tf)
-            };
-            _currentChartData = fallbackData;
-            _lastInvestmentId = invId;
-            _currentTimeframe = tf;
-            injectChartCard(fallbackData);
-          });
-      }
-
-      function generateClientPoints(principal, current, roi, tf) {
-        var count = tf === '24h' ? 24 : (tf === '7d' ? 7 : (tf === '1y' ? 52 : 30));
-        var stepMs = tf === '24h' ? 3600000 : (tf === '1y' ? 7 * 86400000 : 86400000);
-        var histCount = Math.max(2, Math.floor(count * 0.65));
-        var projCount = count - histCount;
-        var now = Date.now();
-        var start = now - (histCount * stepMs);
-        var pts = [];
-
-        for (var i = 0; i <= histCount; i++) {
-          var t = start + (i * stepMs);
-          var progress = i / histCount;
-          var jitter = Math.sin(i * 1.9) * 0.006;
-          var val = i === histCount ? current : Number((principal + (current - principal) * Math.pow(progress, 1.2) * (1 + jitter)).toFixed(2));
-          var d = new Date(t);
-          var lbl = tf === '24h' ? (d.getHours() + ':00') : ((d.getMonth() + 1) + '/' + d.getDate());
-          pts.push({ date: lbl, timestamp: t, value: val, projected: val, isProjection: false });
-        }
-
-        var dailyRate = (roi / 100) / 30;
-        for (var j = 1; j <= projCount; j++) {
-          var tj = now + (j * stepMs);
-          var days = (j * stepMs) / 86400000;
-          var projVal = Number((current * Math.pow(1 + dailyRate, days)).toFixed(2));
-          var dj = new Date(tj);
-          var lblj = tf === '24h' ? ('+' + j + 'h') : ((dj.getMonth() + 1) + '/' + dj.getDate());
-          pts.push({ date: lblj, timestamp: tj, value: null, projected: projVal, isProjection: true });
-        }
-        return pts;
+          .catch(function () {});
       }
 
       function injectChartCard(data) {
-        var summary = data.summary || {};
-        var isGain = summary.isGain !== false;
-        var gainLoss = Number(summary.gainLoss || 0);
-        var gainPct = Number(summary.gainPct || 0);
-        var principal = Number(data.principal || data.total || summary.startValue || 1000);
-        var current = Number(summary.currentValue || (principal * 2));
-        var bonus = Number(data.bonus || summary.bonusMatch || principal);
-        var projEnd = Number(summary.projectedEndValue || (current * 1.7));
-        var projRoi = Number(summary.projectedRoiPct || data.roi || 70);
-        var dailyRate = Number(summary.dailyRate || (projRoi / 30));
-
-        var tf = _currentTimeframe || '30d';
-
-        var card = document.getElementById('ttinc-chart-card');
-        var isNewCard = !card;
-
-        if (!card) {
-          card = document.createElement('div');
-          card.id = 'ttinc-chart-card';
+        // Find a good place to inject: look for balance / overview section
+        var anchors = document.querySelectorAll('[class*="overview"],[class*="dashboard"],[class*="balance"],[class*="portfolio"],[class*="invest"]');
+        var host = null;
+        for (var i = 0; i < anchors.length; i++) {
+          if (anchors[i].offsetHeight > 50) { host = anchors[i]; break; }
         }
+        if (!host) {
+          // Fallback: inject after the first card-like element in the main content area
+          var cards = document.querySelectorAll('main [class*="card"], main [class*="panel"], main > div > div');
+          if (cards.length) host = cards[0];
+        }
+        if (!host) return;
 
+        // Remove any previous chart card
+        var old = document.getElementById('ttinc-chart-card');
+        if (old) old.remove();
+
+        var summary    = data.summary || {};
+        var isGain     = summary.isGain !== false;
+        var gainLoss   = summary.gainLoss || 0;
+        var gainPct    = summary.gainPct  || 0;
+        var color      = isGain ? '#22c55e' : '#ef4444';
+        var bgColor    = isGain ? '#002d12' : '#2d0000';
+        var arrowIcon  = isGain ? '↑' : '↓';
+        var badgeLabel = (isGain ? '+' : '') + gainPct.toFixed(2) + '%';
+
+        var card = document.createElement('div');
+        card.id = 'ttinc-chart-card';
         card.innerHTML = [
           '<div id="ttinc-chart-header">',
-            '<div class="ttinc-chart-title-area">',
-              '<div id="ttinc-chart-title">',
-                '<span>Real-Time Portfolio Performance</span>',
-                '<span style="font-size:11px;font-weight:600;color:#22c55e;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:999px;display:inline-flex;align-items:center;gap:4px;">',
-                  '<span class="ttinc-pulse-dot"></span>LIVE NAV',
-                '</span>',
-              '</div>',
-              '<p id="ttinc-chart-subtitle">Real-time NAV tracking, compounded investment returns, and projected growth trajectory</p>',
-            '</div>',
-            '<div class="ttinc-chart-controls">',
-              '<div class="ttinc-timeframe-bar">',
-                '<button type="button" class="ttinc-tf-btn' + (tf === '24h' ? ' active' : '') + '" data-tf="24h">24H</button>',
-                '<button type="button" class="ttinc-tf-btn' + (tf === '7d' ? ' active' : '') + '" data-tf="7d">7D</button>',
-                '<button type="button" class="ttinc-tf-btn' + (tf === '30d' ? ' active' : '') + '" data-tf="30d">30D</button>',
-                '<button type="button" class="ttinc-tf-btn' + (tf === '90d' ? ' active' : '') + '" data-tf="90d">90D</button>',
-                '<button type="button" class="ttinc-tf-btn' + (tf === '1y' ? ' active' : '') + '" data-tf="1y">1Y</button>',
-                '<button type="button" class="ttinc-tf-btn' + (tf === 'all' ? ' active' : '') + '" data-tf="all">ALL</button>',
-              '</div>',
-              '<div id="ttinc-chart-badge" style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);">' +
-                '↑ +' + gainPct.toFixed(2) + '%' +
-              '</div>',
+            '<div id="ttinc-chart-title">Portfolio Performance</div>',
+            '<div id="ttinc-chart-badge" style="background:' + bgColor + ';color:' + color + '">',
+              arrowIcon + ' ' + badgeLabel,
             '</div>',
           '</div>',
-
+          '<div id="ttinc-chart-subtitle">Interest gain &amp; loss since investment start</div>',
+          '<div id="ttinc-chart-wrap"><canvas id="ttinc-perf-canvas"></canvas></div>',
           '<div id="ttinc-chart-stats">',
             '<div class="ttinc-stat-pill">',
-              '<div class="ttinc-stat-pill-label">Current Portfolio NAV</div>',
-              '<div class="ttinc-stat-pill-val" data-metric="current" style="color:#22c55e;">' + formatUSD(current) + '</div>',
-              '<div class="ttinc-stat-pill-sub" style="color:#4ade80;">✦ Live Tradeable Balance</div>',
+              '<div class="ttinc-stat-pill-label">Principal</div>',
+              '<div class="ttinc-stat-pill-val">$' + (data.total || 0).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}) + '</div>',
             '</div>',
             '<div class="ttinc-stat-pill">',
-              '<div class="ttinc-stat-pill-label">Net Gain / Loss</div>',
-              '<div class="ttinc-stat-pill-val" data-metric="gain" style="color:#4ade80;">+' + formatUSD(gainLoss) + '</div>',
-              '<div class="ttinc-stat-pill-sub" style="color:#86efac;">+' + gainPct.toFixed(2) + '% Total Yield</div>',
-            '</div>',
-            '<div class="ttinc-stat-pill" style="border-color:rgba(212,175,55,0.3);background:linear-gradient(180deg,rgba(212,175,55,0.06) 0%,rgba(0,0,0,0.4) 100%);">',
-              '<div class="ttinc-stat-pill-label" style="color:#d4af37;">Projected Growth Target</div>',
-              '<div class="ttinc-stat-pill-val" data-metric="projected" style="color:#fde047;">' + formatUSD(projEnd) + '</div>',
-              '<div class="ttinc-stat-pill-sub" style="color:#fde047;">+' + projRoi.toFixed(0) + '% Compound Term Target</div>',
+              '<div class="ttinc-stat-pill-label">Current Value</div>',
+              '<div class="ttinc-stat-pill-val" style="color:' + color + '">$' + (summary.currentValue || 0).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}) + '</div>',
             '</div>',
             '<div class="ttinc-stat-pill">',
-              '<div class="ttinc-stat-pill-label">100% Match Bonus</div>',
-              '<div class="ttinc-stat-pill-val" data-metric="bonus" style="color:#fff;">+' + formatUSD(bonus) + '</div>',
-              '<div class="ttinc-stat-pill-sub" style="color:#94a3b8;">Principal: ' + formatUSD(principal) + '</div>',
+              '<div class="ttinc-stat-pill-label">Gain / Loss</div>',
+              '<div class="ttinc-stat-pill-val" style="color:' + color + '">' + (isGain ? '+' : '') + '$' + Math.abs(gainLoss).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}) + '</div>',
             '</div>',
           '</div>',
-
-          '<div id="ttinc-chart-wrap">',
-            '<canvas id="ttinc-perf-canvas"></canvas>',
-          '</div>',
-
-          '<div id="ttinc-chart-legend">',
-            '<div class="ttinc-legend-item">',
-              '<span class="ttinc-legend-line" style="background:#22c55e;"></span>',
-              '<span>Historical Valuation Curve</span>',
-            '</div>',
-            '<div class="ttinc-legend-item">',
-              '<span class="ttinc-legend-dashed"></span>',
-              '<span style="color:#d4af37;">Projected Growth Trajectory (+' + projRoi.toFixed(0) + '%)</span>',
-            '</div>',
-          '</div>',
-
-          '<div id="ttinc-chart-footer">',
-            '<div>Plan: <strong style="color:#fff;">' + (data.planName || 'Tesla · Explorer') + '</strong> · Daily Growth Rate: <strong style="color:#4ade80;">+' + dailyRate.toFixed(2) + '%/day</strong></div>',
-            '<div>Execution: <span style="color:#38bdf8;">Tesla High-Frequency Engine</span> · Status: <span style="color:#22c55e;">Online &amp; Active</span></div>',
-          '</div>'
         ].join('');
-
         card.style.display = 'block';
 
-        // Insert card into DOM if not attached
-        if (isNewCard || !card.parentNode) {
-          var targetHost = document.getElementById('ttinc-dashboard-addon-stack') ||
-                           document.getElementById('ttinc-investor-wallet-card')?.parentNode ||
-                           document.querySelector('.max-w-4xl, [class*="max-w-4xl"], main > div > div, main');
-          if (targetHost) {
-            var walletCard = document.getElementById('ttinc-investor-wallet-card');
-            if (walletCard && walletCard.nextSibling) {
-              walletCard.parentNode.insertBefore(card, walletCard.nextSibling);
-            } else if (targetHost.firstChild) {
-              targetHost.insertBefore(card, targetHost.firstChild);
-            } else {
-              targetHost.appendChild(card);
-            }
-          }
-        }
+        // Insert the chart card as the first child of the host section
+        host.insertBefore(card, host.firstChild);
 
-        // Attach Timeframe Button Listeners
-        var tfBtns = card.querySelectorAll('.ttinc-tf-btn');
-        Array.prototype.forEach.call(tfBtns, function (btn) {
-          btn.addEventListener('click', function (e) {
-            e.preventDefault();
-            var targetTf = btn.getAttribute('data-tf');
-            if (targetTf === _currentTimeframe) return;
-            Array.prototype.forEach.call(tfBtns, function (b) { b.classList.remove('active'); });
-            btn.classList.add('active');
-            _currentTimeframe = targetTf;
-            renderChart(data.investmentId, targetTf, true);
-          });
-        });
-
-        // Initialize Chart.js
-        ensureChartJs(function (Chart) {
+        // Render Chart.js after card is in the DOM
+        setTimeout(function () {
           var canvas = document.getElementById('ttinc-perf-canvas');
-          if (!canvas) return;
-          if (_chartInstance) {
-            try { _chartInstance.destroy(); } catch (e) {}
-          }
+          if (!canvas || typeof Chart === 'undefined') return;
+          if (_chartInstance) { try { _chartInstance.destroy(); } catch(e) {} }
 
           var labels = data.points.map(function (p) { return p.date; });
-          var histData = data.points.map(function (p) { return p.isProjection ? null : p.value; });
-          var projData = data.points.map(function (p) {
-            if (p.isProjection) return p.projected;
-            // Bridge the last historical point with the projection line for smooth continuity
-            var idx = data.points.indexOf(p);
-            var next = data.points[idx + 1];
-            if (next && next.isProjection) return p.value;
-            return null;
-          });
+          var values = data.points.map(function (p) { return p.value; });
 
+          // Create gradient fill
           var ctx = canvas.getContext('2d');
-          var gradHist = ctx.createLinearGradient(0, 0, 0, 220);
-          gradHist.addColorStop(0, 'rgba(34, 197, 94, 0.32)');
-          gradHist.addColorStop(1, 'rgba(34, 197, 94, 0.00)');
-
-          var gradProj = ctx.createLinearGradient(0, 0, 0, 220);
-          gradProj.addColorStop(0, 'rgba(212, 175, 55, 0.15)');
-          gradProj.addColorStop(1, 'rgba(212, 175, 55, 0.00)');
+          var grad = ctx.createLinearGradient(0, 0, 0, 200);
+          grad.addColorStop(0, isGain ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)');
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
 
           _chartInstance = new Chart(ctx, {
             type: 'line',
             data: {
               labels: labels,
-              datasets: [
-                {
-                  label: 'Portfolio Valuation',
-                  data: histData,
-                  borderColor: '#22c55e',
-                  backgroundColor: gradHist,
-                  borderWidth: 2.5,
-                  pointRadius: 0,
-                  pointHoverRadius: 6,
-                  pointHoverBackgroundColor: '#22c55e',
-                  pointHoverBorderColor: '#fff',
-                  pointHoverBorderWidth: 2,
-                  tension: 0.35,
-                  fill: true
-                },
-                {
-                  label: 'Projected Growth Trajectory',
-                  data: projData,
-                  borderColor: '#d4af37',
-                  backgroundColor: gradProj,
-                  borderWidth: 2,
-                  borderDash: [5, 4],
-                  pointRadius: 0,
-                  pointHoverRadius: 6,
-                  pointHoverBackgroundColor: '#d4af37',
-                  pointHoverBorderColor: '#fff',
-                  pointHoverBorderWidth: 2,
-                  tension: 0.35,
-                  fill: true
-                }
-              ]
+              datasets: [{
+                label: 'Portfolio Value',
+                data: values,
+                borderColor: color,
+                backgroundColor: grad,
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 5,
+                pointHoverBackgroundColor: color,
+                tension: 0.4,
+                fill: true,
+              }],
             },
             options: {
               responsive: true,
               maintainAspectRatio: false,
               interaction: { mode: 'index', intersect: false },
-              animation: { duration: 600, easing: 'easeOutQuart' },
               plugins: {
                 legend: { display: false },
                 tooltip: {
-                  backgroundColor: 'rgba(15, 15, 15, 0.95)',
-                  borderColor: 'rgba(255, 255, 255, 0.15)',
+                  backgroundColor: '#1a1a1a',
+                  borderColor: '#2a2a2a',
                   borderWidth: 1,
                   titleColor: '#fff',
-                  titleFont: { size: 12, weight: 'bold' },
-                  bodyColor: '#cbd5e1',
-                  bodyFont: { size: 12 },
-                  padding: 10,
-                  displayColors: true,
+                  bodyColor: '#aaa',
                   callbacks: {
                     label: function (ctx) {
-                      var val = ctx.parsed.y;
-                      if (val == null) return '';
-                      var isProj = ctx.datasetIndex === 1;
-                      var prefix = isProj ? '✦ Projected: ' : '● Actual NAV: ';
-                      return prefix + '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    }
-                  }
-                }
+                      return ' $' + ctx.parsed.y.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2});
+                    },
+                  },
+                },
               },
               scales: {
                 x: {
                   ticks: {
-                    color: '#64748b',
-                    maxTicksLimit: 7,
-                    font: { size: 10 }
+                    color: '#444',
+                    maxTicksLimit: 6,
+                    font: { size: 10 },
+                    callback: function (val, idx) {
+                      var d = labels[idx];
+                      if (!d) return '';
+                      var parts = d.split('-');
+                      return parts[1] + '/' + parts[2];
+                    },
                   },
-                  grid: { color: 'rgba(255, 255, 255, 0.04)' },
-                  border: { color: 'rgba(255, 255, 255, 0.08)' }
+                  grid: { color: '#1a1a1a' },
+                  border: { color: '#222' },
                 },
                 y: {
                   ticks: {
-                    color: '#64748b',
+                    color: '#444',
                     font: { size: 10 },
                     callback: function (v) {
-                      return '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 });
-                    }
+                      return '$' + v.toLocaleString('en-US', {maximumFractionDigits:0});
+                    },
                   },
-                  grid: { color: 'rgba(255, 255, 255, 0.04)' },
-                  border: { color: 'rgba(255, 255, 255, 0.08)' }
-                }
-              }
-            }
+                  grid: { color: '#1a1a1a' },
+                  border: { color: '#222' },
+                },
+              },
+            },
           });
-        });
-
-        // Start Live Micro-Drift Animation Ticks
-        if (_chartTickTimer) clearInterval(_chartTickTimer);
-        _chartTickTimer = setInterval(function () {
-          if (!isOnDashboard()) return;
-          var curCard = document.getElementById('ttinc-chart-card');
-          if (!curCard) return;
-
-          // Subtle realistic algorithmic positive tick
-          var microDrift = (Math.random() * 0.18 + 0.02);
-          var curValNode = curCard.querySelector('[data-metric="current"]');
-          var gainValNode = curCard.querySelector('[data-metric="gain"]');
-          if (curValNode && _currentChartData && _currentChartData.summary) {
-            _currentChartData.summary.currentValue = Number((_currentChartData.summary.currentValue + microDrift).toFixed(2));
-            _currentChartData.summary.gainLoss = Number((_currentChartData.summary.currentValue - _currentChartData.principal).toFixed(2));
-            curValNode.textContent = formatUSD(_currentChartData.summary.currentValue);
-            if (gainValNode) gainValNode.textContent = '+' + formatUSD(_currentChartData.summary.gainLoss);
-
-            // Update latest point on Chart.js without full redraw
-            if (_chartInstance && _chartInstance.data && _chartInstance.data.datasets[0]) {
-              var histArr = _chartInstance.data.datasets[0].data;
-              for (var k = histArr.length - 1; k >= 0; k--) {
-                if (histArr[k] != null) {
-                  histArr[k] = _currentChartData.summary.currentValue;
-                  break;
-                }
-              }
-              _chartInstance.update('none');
-            }
-          }
-        }, 2800);
+        }, 100);
       }
 
+      // ── Dashboard detection ───────────────────────────────
+      // Watch URL changes to know when the user is on the dashboard/overview page.
+      var _lastHref = location.href;
+      var _dashCheckInterval = null;
+
       function isOnDashboard() {
-        var path = (location.pathname + location.hash).toLowerCase();
+        var path = location.pathname + location.hash;
         return (
           path.indexOf('overview')  !== -1 ||
           path.indexOf('dashboard') !== -1 ||
           path.indexOf('portfolio') !== -1 ||
+          // Fallback: if logged in, the root path is the dashboard
           path === '/' || path === '#/' || path === ''
         );
       }
@@ -4431,21 +3957,19 @@
       function checkAndRenderChart() {
         if (!isOnDashboard()) return;
         var invId = getInvestmentIdFromStorage();
-        var card = document.getElementById('ttinc-chart-card');
-        var now = Date.now();
-        // Render if not yet rendered, or card was removed by React re-render
-        if (!card || !_chartInstance || (now - _lastRenderTime > 25000)) {
-          _lastRenderTime = now;
-          renderChart(invId, _currentTimeframe);
+        if (invId && invId !== _lastInvestmentId) {
+          renderChart(invId);
         }
       }
 
-      // Detect successful investment registration
+      // ── Registration success toast ────────────────────────
+      // Detect when the investment POST succeeds (user just registered)
       var _originalFetch = window.fetch;
       window.fetch = function (url, opts) {
         var urlStr = typeof url === 'string' ? url : '';
         var result = _originalFetch.apply(this, arguments);
 
+        // Watch for successful investment creation (registration)
         var investmentRoute = urlStr.split('?')[0].replace(/\/+$/, '');
         var isLegacyInvestmentCreation = investmentRoute === '/api/investments';
         if (isLegacyInvestmentCreation && opts && opts.method === 'POST') {
@@ -4471,31 +3995,36 @@
         return result;
       };
 
-      // Watch DOM for route or layout shifts
-      var _chartObserver = new MutationObserver(function () {
-        if (isOnDashboard() && !document.getElementById('ttinc-chart-card')) {
-          checkAndRenderChart();
-        }
+      // ── MutationObserver: watch for DOM changes ───────────
+      var _observer = new MutationObserver(function (mutations) {
+        // Try to render chart when dashboard appears
+        checkAndRenderChart();
       });
-      _chartObserver.observe(document.body, { childList: true, subtree: true });
 
-      // Poll route changes
+      _observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+
+      // Also poll for URL changes (React Router uses history API)
       setInterval(function () {
-        try {
-          var currentUrl = (typeof window !== 'undefined' && window.location) ? window.location.href : (typeof location !== 'undefined' ? location.href : '');
-          if (currentUrl && currentUrl !== _lastHref) {
-            _lastHref = currentUrl;
-            if (isOnDashboard()) {
-              setTimeout(checkAndRenderChart, 400);
-            }
+        if (location.href !== _lastHref) {
+          _lastHref = location.href;
+          // Route changed — reset dashboard add-ons on new pages
+          if (location.href.indexOf('overview') !== -1 || location.href.indexOf('dashboard') !== -1) {
+            _chartRendered = false;
           }
-        } catch (err) {}
-      }, 500);
+          setTimeout(function () {
+            checkAndRenderChart();
+          }, 500);
+        }
+      }, 400);
 
-      // Initial boot attempts
-      setTimeout(checkAndRenderChart, 800);
-      setTimeout(checkAndRenderChart, 2000);
-      setTimeout(checkAndRenderChart, 5000);
+      // Initial attempts after app boots
+      setTimeout(function () { checkAndRenderChart(); }, 1500);
+      setTimeout(function () { checkAndRenderChart(); }, 4000);
+      setTimeout(function () { checkAndRenderChart(); }, 8000);
+
     }());
     </script>
 
@@ -5053,9 +4582,6 @@
       function removeOverlay() {
         var el = document.getElementById(OVERLAY_ID);
         if (el) el.remove();
-        var ldr = document.getElementById('ttinc-initial-loader');
-        if (ldr) ldr.remove();
-        if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
       }
 
       // ── stop polling ───────────────────────────────────────────
@@ -5118,15 +4644,7 @@
             var s = getEffectiveStatus(d);
             var isPendingState = (s === 'pending_approval' || s === 'pending');
 
-            var localActive = false;
-            try {
-              var m = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-              var invId = localStorage.getItem('ttinc_investment_id');
-              var cAuth = getAuth() || {};
-              localActive = m.status === 'active' || m.status === 'approved' || Boolean(invId) || cAuth.onboardingState === 'completed' || cAuth.onboarding_status === 'verified' || cAuth.onboarding_status === 'active';
-            } catch(e) {}
-
-            if (s === 'active' || (d && d.hasActiveInvestment) || s === 'approved' || localActive) {
+            if (s === 'active' || (d && d.hasActiveInvestment) || s === 'approved') {
               _lastStatus = 'active';
               removeOverlay();
               stopPoll();
@@ -5135,17 +4653,17 @@
                 localStorage.removeItem('ttinc_payment_status');
                 var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
                 meta.status = 'active';
-                if (d && d.total) meta.total = Number(d.total);
-                if (d && d.totalCurrentValue) {
+                if (d.total) meta.total = Number(d.total);
+                if (d.totalCurrentValue) {
                   meta.totalCurrentValue = Number(d.totalCurrentValue);
                   meta.bonus = Number(d.bonus || d.total || 0);
                 } else if (meta.total) {
                   meta.totalCurrentValue = Number(meta.total) * 2;
                   meta.bonus = Number(meta.total);
                 }
-                if (d && d.planName) meta.planName = d.planName;
+                if (d.planName) meta.planName = d.planName;
                 localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
-                if (d && d.activeInvestmentId) localStorage.setItem('ttinc_investment_id', String(d.activeInvestmentId));
+                if (d.activeInvestmentId) localStorage.setItem('ttinc_investment_id', String(d.activeInvestmentId));
                 var cAuth = getAuth() || {};
                 cAuth.onboardingState = 'completed';
                 cAuth.onboarding_status = 'verified';
@@ -5159,7 +4677,7 @@
               var dep = localStorage.getItem('ttinc_deposit_status');
               var pay = localStorage.getItem('ttinc_payment_status');
               var m = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-              localPending = !localActive && (dep === 'pending_approval' || pay === 'pending_approval' || m.status === 'pending_approval');
+              localPending = dep === 'pending_approval' || pay === 'pending_approval' || m.status === 'pending_approval';
             } catch(e) {}
 
             if (!d || (!d.account && !isPendingState && !localPending)) {
@@ -5280,24 +4798,16 @@
             var isPendingState = (s === 'pending_approval' || s === 'pending');
             _lastStatus = s;
 
-            var localActive = false;
-            try {
-              var m = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-              var invId = localStorage.getItem('ttinc_investment_id');
-              var cAuth = getAuth() || {};
-              localActive = m.status === 'active' || m.status === 'approved' || Boolean(invId) || cAuth.onboardingState === 'completed' || cAuth.onboarding_status === 'verified' || cAuth.onboarding_status === 'active';
-            } catch(e) {}
-
-            if (s === 'active' || (d && d.hasActiveInvestment) || s === 'approved' || localActive) {
+            if (s === 'active' || (d && d.hasActiveInvestment)) {
               removeOverlay();
               stopPoll();
               return;
             }
 
-            if (!d || (!d.account && !isPendingState && !localActive)) {
+            if (!d || (!d.account && !isPendingState)) {
               showOverlay('create');
               stopPoll();
-            } else if (s === 'none' && !isPendingState && !localActive) {
+            } else if (s === 'none' && !isPendingState) {
               showOverlay('created');
               stopPoll();
             } else if (isPendingState) {
@@ -5436,16 +4946,13 @@
       setTimeout(onReady, 2500); // retry in case first fires too early
 
       // ── re-check on SPA route changes ─────────────────────────
-      var _approvalLastHref = (typeof window !== 'undefined' && window.location) ? window.location.href : '';
+      var _lastHref = location.href;
       setInterval(function () {
-        try {
-          var cur = (typeof window !== 'undefined' && window.location) ? window.location.href : (typeof location !== 'undefined' ? location.href : '');
-          if (cur && cur !== _approvalLastHref) {
-            _approvalLastHref = cur;
-            // Small delay to let React render the new route first
-            setTimeout(checkStatus, 350);
-          }
-        } catch (e) {}
+        if (location.href !== _lastHref) {
+          _lastHref = location.href;
+          // Small delay to let React render the new route first
+          setTimeout(checkStatus, 350);
+        }
       }, 400);
 
     }());

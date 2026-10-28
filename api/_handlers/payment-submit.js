@@ -1,5 +1,4 @@
 import { getDbConnection } from './dbcheck.js';
-import { generateChartData } from './chart-data.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -175,11 +174,9 @@ export default async function handler(req, res) {
 
   const parsedUrl = new URL(req.url || '/', 'http://localhost');
   if (req.method === 'GET') {
-    const isChartData = parsedUrl.pathname.includes('/chart-data') || (req.url && req.url.includes('/chart-data'));
     const qEmail = cleanString(req.query?.email || parsedUrl.searchParams.get('email')).toLowerCase();
     const idMatch = parsedUrl.pathname.match(/\/api\/investments\/([^/?]+)/);
-    let qId = idMatch ? idMatch[1] : (req.params?.id || parsedUrl.searchParams.get('id'));
-    if (qId === 'null' || qId === 'undefined') qId = null;
+    const qId = idMatch ? idMatch[1] : (req.params?.id || parsedUrl.searchParams.get('id'));
 
     let dbRows = [];
     try {
@@ -218,56 +215,31 @@ export default async function handler(req, res) {
       }
     } catch (e) {}
 
-    if (isChartData) {
-      const timeframe = (req.query?.timeframe || parsedUrl.searchParams.get('timeframe') || '30d').toLowerCase();
-      const chartInv = (qId ? all.find(x => String(x.id) === String(qId)) : null) ||
-        (qEmail ? all.find(x => (x.user_email || x.email || '').toLowerCase() === qEmail) : null) ||
-        all.find(x => x.status === 'active' || x.status === 'approved') ||
-        all[0] || { id: qId || 'sim_inv_1', total: 1000, totalCurrentValue: 2000, bonus: 1000, status: 'active', roi_percent: 70 };
-      return res.status(200).json(generateChartData(chartInv, timeframe));
-    }
-
     if (qId) {
-      const found = all.find(x => String(x.id) === String(qId)) ||
-        (qEmail ? all.find(x => (x.user_email || x.email || '').toLowerCase() === qEmail) : null) ||
-        all.find(x => x.status === 'active' || x.status === 'approved') ||
-        all[0];
-
+      const found = all.find(x => String(x.id) === String(qId));
       if (found) {
         const st = (found.status || '').toLowerCase();
-        const tot = Number(found.total || found.amount || 1000);
+        const tot = Number(found.total || found.amount || 0);
         let curVal = Number(found.totalCurrentValue || found.total_current_value || 0);
-        if ((st === 'active' || st === 'approved' || st === 'completed' || !st) && (curVal <= tot || curVal === 0) && tot > 0) {
+        if ((st === 'active' || st === 'approved' || st === 'completed') && (curVal <= tot || curVal === 0) && tot > 0) {
           curVal = tot * 2;
         }
         return res.status(200).json({
           ...found,
-          id: found.id || qId,
-          status: found.status || 'active',
+          // The compiled portfolio screen calls portfolio.map(); DB rows store
+          // a plain text label, so always expose an array.
           portfolio: Array.isArray(found.portfolio)
             ? found.portfolio
             : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot }],
-          planName: found.planName || found.plan_name || found.plan_label || 'Tesla · Explorer',
-          txId: found.txId || found.tx_id || ('TX' + Date.now().toString(36).toUpperCase()),
-          canWithdraw: found.canWithdraw != null ? !!found.canWithdraw : true,
+          planName: found.planName || found.plan_name || found.plan_label || null,
+          txId: found.txId || found.tx_id || null,
+          canWithdraw: found.canWithdraw != null ? !!found.canWithdraw : !!found.can_withdraw,
           total: tot,
-          totalCurrentValue: curVal || (tot * 2),
-          bonus: tot
+          totalCurrentValue: curVal || tot,
+          bonus: (st === 'active' || st === 'approved' || st === 'completed') ? tot : 0
         });
       }
-
-      // Safe fallback active investment so React dashboard never crashes or loops
-      return res.status(200).json({
-        id: qId,
-        status: 'active',
-        portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: 1000 }],
-        planName: 'Tesla · Explorer',
-        txId: 'TX' + Date.now().toString(36).toUpperCase(),
-        canWithdraw: true,
-        total: 1000,
-        totalCurrentValue: 2000,
-        bonus: 1000
-      });
+      return res.status(404).json({ error: 'Investment not found' });
     }
 
     if (qEmail) {
