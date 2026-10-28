@@ -511,6 +511,7 @@ export default async function handler(req, res) {
     if (action === 'all_data' || req.method === 'GET') {
       let investors = mockStore.investors;
       let investments = mockStore.investments;
+      let dbInvestmentsAuthoritative = false; // true when investments came from MySQL
       let kyc = mockStore.kyc;
       let orders = mockStore.orders;
       let withdrawals = mockStore.withdrawals;
@@ -530,7 +531,10 @@ export default async function handler(req, res) {
           catch (e) { console.error('[admin all_data] query failed:', sql.slice(0, 60), e.message); return fallback; }
         };
         investors = await safeQuery('SELECT * FROM investor_accounts ORDER BY registered_at DESC', investors);
-        investments = await safeQuery('SELECT * FROM investments ORDER BY id DESC', investments);
+        let investmentsFromDb = false;
+        try { const [rows] = await conn.query('SELECT * FROM investments ORDER BY id DESC'); investments = rows; investmentsFromDb = true; }
+        catch (e) { console.error('[admin all_data] investments query failed:', e.message); }
+        dbInvestmentsAuthoritative = investmentsFromDb;
         kyc = await safeQuery('SELECT * FROM kyc_submissions ORDER BY created_at DESC', kyc);
         orders = await safeQuery('SELECT * FROM ev_orders ORDER BY created_at DESC LIMIT 100', orders);
         withdrawals = await safeQuery('SELECT * FROM withdrawals ORDER BY created_at DESC', withdrawals);
@@ -549,9 +553,12 @@ export default async function handler(req, res) {
         if (Array.isArray(diskDeposits) && diskDeposits.length > 0) {
           const mergedInvs = [...investments];
           for (const dep of diskDeposits) {
-            const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (x.user_email && dep.user_email && x.user_email.toLowerCase() === dep.user_email.toLowerCase()));
+            // Match by deposit id only. Matching by email merged different
+            // deposits of the same investor into one row.
+            const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id));
             if (idx >= 0) {
-              mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
+              // Cached copies are stale; never override what MySQL holds.
+              if (!dbInvestmentsAuthoritative) mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
             } else {
               mergedInvs.unshift(dep);
             }
@@ -564,9 +571,9 @@ export default async function handler(req, res) {
       if (Array.isArray(inMemoryDeposits) && inMemoryDeposits.length > 0) {
         const mergedInvs = [...investments];
         for (const dep of inMemoryDeposits) {
-          const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (x.user_email && dep.user_email && x.user_email.toLowerCase() === dep.user_email.toLowerCase()));
+          const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id));
           if (idx >= 0) {
-            mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
+            if (!dbInvestmentsAuthoritative) mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
           } else {
             mergedInvs.unshift(dep);
           }

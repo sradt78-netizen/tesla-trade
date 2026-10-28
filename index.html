@@ -4013,7 +4013,6 @@
           // Route changed — reset dashboard add-ons on new pages
           if (location.href.indexOf('overview') !== -1 || location.href.indexOf('dashboard') !== -1) {
             _chartRendered = false;
-            _stockInjected = false; // re-inject stocks on each dashboard visit
           }
           setTimeout(function () {
             checkAndRenderChart();

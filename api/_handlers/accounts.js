@@ -1,4 +1,4 @@
-import { getDbConnection } from '../db.js';
+import { getDbConnection } from './dbcheck.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -51,6 +51,7 @@ export default async function handler(req, res) {
     let hasAccount = false;
     let investorName = 'Investor';
     let userInvestments = [];
+    let dbRead = false; // true once the database answered; its rows are authoritative
 
     // 1. Try MySQL Database
     try {
@@ -72,21 +73,24 @@ export default async function handler(req, res) {
           investorName = invRows[0].user_name;
         }
       }
+      dbRead = true;
       await conn.end();
     } catch (dbErr) {}
 
     // 2. Always check & merge persistent disk deposits, in-memory deposits & mockStore
     try {
       const { inMemoryDeposits, loadPersistentDeposits } = await import('./payment-submit.js');
-      let diskDeposits = [];
       if (typeof loadPersistentDeposits === 'function') {
-        diskDeposits = loadPersistentDeposits();
-        const userDisk = diskDeposits.filter(d => ((d.user_email || d.email || d.user_id || d.userId || '').toLowerCase() === email));
+        const diskDeposits = loadPersistentDeposits();
+        const userDisk = diskDeposits.filter(d => d.user_email && d.user_email.toLowerCase() === email);
         for (const dd of userDisk) {
           hasAccount = true;
           const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(dd.id));
           if (exIdx >= 0) {
-            userInvestments[exIdx] = { ...userInvestments[exIdx], ...dd };
+              // The database is the source of truth: a stale cached copy (disk or
+            // memory, which differ per serverless instance) must never overwrite
+            // an approval that is already saved there.
+            if (!dbRead) userInvestments[exIdx] = { ...userInvestments[exIdx], ...dd };
           } else {
             userInvestments.unshift(dd);
           }
@@ -94,46 +98,30 @@ export default async function handler(req, res) {
       }
 
       if (Array.isArray(inMemoryDeposits)) {
-        const memDeposits = inMemoryDeposits.filter(d => ((d.user_email || d.email || d.user_id || d.userId || '').toLowerCase() === email));
+        const memDeposits = inMemoryDeposits.filter(d => d.user_email && d.user_email.toLowerCase() === email);
         for (const md of memDeposits) {
           hasAccount = true;
           const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(md.id));
           if (exIdx >= 0) {
-            userInvestments[exIdx] = { ...userInvestments[exIdx], ...md };
+            if (!dbRead) userInvestments[exIdx] = { ...userInvestments[exIdx], ...md };
           } else {
             userInvestments.unshift(md);
           }
         }
       }
 
-      const { mockStore, loadPersistentInvestors } = await import('./admin.js');
-      let isInvestorActive = false;
-      if (typeof loadPersistentInvestors === 'function') {
-        const diskInvestors = loadPersistentInvestors();
-        const foundU = diskInvestors.find(u => (u.email || '').toLowerCase() === email);
-        if (foundU) {
-          hasAccount = true;
-          if (foundU.name) investorName = foundU.name;
-          if (foundU.onboarding_status === 'active' || foundU.onboarding_status === 'verified') {
-            isInvestorActive = true;
-          }
-        }
-      }
-
-      const mockUser = mockStore.investors.find(u => (u.email || '').toLowerCase() === email);
+      const { mockStore } = await import('./admin.js');
+      const mockUser = mockStore.investors.find(u => u.email.toLowerCase() === email);
       if (mockUser) {
         hasAccount = true;
         if (mockUser.name) investorName = mockUser.name;
-        if (mockUser.onboarding_status === 'active' || mockUser.onboarding_status === 'verified') {
-          isInvestorActive = true;
-        }
       }
-      const mockInvs = mockStore.investments.filter(i => ((i.user_email || i.email || i.user_id || i.userId || '').toLowerCase() === email));
+      const mockInvs = mockStore.investments.filter(i => i.user_email && i.user_email.toLowerCase() === email);
       for (const mi of mockInvs) {
         hasAccount = true;
         const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(mi.id));
         if (exIdx >= 0) {
-          userInvestments[exIdx] = { ...userInvestments[exIdx], ...mi };
+          if (!dbRead) userInvestments[exIdx] = { ...userInvestments[exIdx], ...mi };
         } else {
           userInvestments.unshift(mi);
         }
@@ -152,8 +140,8 @@ export default async function handler(req, res) {
 
     // Format all investments with proper values
     const formattedInvestments = userInvestments.map(inv => {
-      const depAmt = parseFloat(inv.total || inv.amount || '0');
-      const val = parseFloat(inv.total_current_value != null ? inv.total_current_value : (inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.status === 'active' || inv.status === 'approved' ? depAmt * 2 : depAmt)));
+      const depAmt = parseFloat(inv.total || '0');
+      const val = parseFloat(inv.total_current_value != null ? inv.total_current_value : (inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.status === 'active' ? depAmt * 2 : depAmt)));
       return {
         ...inv,
         total: depAmt,
@@ -164,7 +152,7 @@ export default async function handler(req, res) {
     });
 
     // Check for active or approved investment first
-    let activeInv = formattedInvestments.find(inv => inv.status === 'active' || inv.status === 'approved');
+    const activeInv = formattedInvestments.find(inv => inv.status === 'active' || inv.status === 'approved');
     if (activeInv) {
       status = 'active';
       activeInvestmentId = activeInv.id;
@@ -193,41 +181,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // If persistent records marked this investor active, ensure status is active
-    try {
-      const { loadPersistentInvestors } = await import('./admin.js');
-      const pi = loadPersistentInvestors();
-      const match = pi.find(u => (u.email || '').toLowerCase() === email);
-      if (match && (match.onboarding_status === 'active' || match.onboarding_status === 'verified')) {
-        status = 'active';
-      }
-    } catch (ePi) {}
-
-    if (status === 'active' && !activeInv) {
-      const fallbackDeposit = formattedInvestments[0] || {
-        id: 'dep_' + Date.now().toString(36),
-        total: 1000,
-        totalCurrentValue: 2000,
-        status: 'active',
-        plan_name: 'Explorer'
-      };
-      activeInv = fallbackDeposit;
-      activeInvestmentId = activeInv.id;
-    }
-
-    if (status === 'active') {
-      // An active investor should not have their dashboard blocked by older pending submissions
-      pendingPayments.length = 0;
-      pendingDepositTotal = 0;
-    }
-
-    const activeTotal = activeInv ? parseFloat(activeInv.total || '1000') : 1000;
-    let activeVal = activeInv ? parseFloat(activeInv.totalCurrentValue || activeInv.total_current_value || (activeTotal * 2)) : (activeTotal * 2);
-    if (activeVal <= activeTotal && activeTotal > 0) {
-      activeVal = activeTotal * 2;
-    }
-
-    const resolvedId = activeInvestmentId || (activeInv && activeInv.id) || ('dep_' + email.replace(/[^a-z0-9]/g, ''));
+    const activeTotal = activeInv ? parseFloat(activeInv.total || '0') : 0;
+    const activeVal = activeInv ? parseFloat(activeInv.totalCurrentValue || (activeTotal * 2)) : 0;
 
     return res.status(200).json({
       success: true,
@@ -235,17 +190,12 @@ export default async function handler(req, res) {
       name: investorName,
       investmentStatus: status,
       status: status,
-      id: resolvedId,
+      id: activeInvestmentId || (pendingPayments[0] ? pendingPayments[0].id : null),
       hasActiveInvestment: status === 'active',
-      activeInvestmentId: resolvedId,
+      activeInvestmentId: activeInvestmentId,
       total: activeTotal,
       totalCurrentValue: activeVal,
       total_current_value: activeVal,
-      bonus: activeTotal,
-      walletBalance: activeVal,
-      availableBalance: activeVal,
-      canWithdraw: true,
-      planName: (activeInv && (activeInv.plan_name || activeInv.plan_label)) || 'Explorer',
       pendingDepositTotal,
       pendingPayments,
       investments: formattedInvestments
@@ -255,43 +205,17 @@ export default async function handler(req, res) {
   // ── 2. GET /api/transactions ─────────────────────────────────────
   if (pathname === '/transactions') {
     if (!email) return res.status(200).json([]);
-    let txs = [];
     try {
       const conn = await getDbConnection();
-      const [rows] = await conn.query(
+      const [txs] = await conn.query(
         'SELECT * FROM account_transactions WHERE LOWER(user_email)=? ORDER BY id DESC LIMIT 100',
         [email]
       );
       await conn.end();
-      if (Array.isArray(rows) && rows.length > 0) txs = rows;
-    } catch (e) {}
-
-    if (txs.length === 0) {
-      const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      txs = [
-        {
-          id: 'tx_bonus_' + Date.now().toString(36),
-          investment_id: 'inv_bonus',
-          user_email: email,
-          type: 'bonus',
-          amount: 1000,
-          status: 'processed',
-          note: '100% First Deposit Match Bonus (Instant Credit)',
-          created_at: nowStr
-        },
-        {
-          id: 'tx_dep_' + Date.now().toString(36),
-          investment_id: 'inv_primary',
-          user_email: email,
-          type: 'deposit',
-          amount: 1000,
-          status: 'processed',
-          note: 'Initial Investment Deposit — USDT (TRC-20)',
-          created_at: nowStr
-        }
-      ];
+      return res.status(200).json(txs);
+    } catch (e) {
+      return res.status(200).json([]);
     }
-    return res.status(200).json(txs);
   }
 
   // ── 3. /api/accounts OR /api/profile ─────────────────────────────
