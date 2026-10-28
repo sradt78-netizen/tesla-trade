@@ -14,6 +14,7 @@ import authHandler from './api/_handlers/auth.js';
 import supabaseConfigHandler from './api/_handlers/supabase-config.js';
 import accountsHandler from './api/_handlers/accounts.js';
 import stocksHandler from './api/_handlers/stocks.js';
+import { generateChartData } from './api/_handlers/chart-data.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -401,6 +402,50 @@ app.get('/api/wallet', (req, res) => {
     bonus: total,
     availableBalance: totalCurrentValue
   });
+});
+
+app.get(['/api/investments/:id/chart-data', '/api/investments/chart-data', '/api/chart-data'], (req, res) => {
+  const id = req.params.id || (req.query.id as string) || '';
+  const email = String(req.query.email || '').toLowerCase().trim();
+  const timeframe = String(req.query.timeframe || '30d').toLowerCase();
+
+  let inv = mockTradingInvestments[id];
+  if (!inv) {
+    try {
+      const diskDeposits = loadPersistentDeposits();
+      const found = diskDeposits.find((d: any) =>
+        (id && String(d.id) === String(id)) ||
+        (email && (d.user_email || d.email || '').toLowerCase() === email)
+      );
+      if (found) {
+        const tot = Number(found.total || 1000);
+        let curVal = Number(found.totalCurrentValue || found.total_current_value || (tot * 2));
+        if (curVal <= tot && tot > 0) curVal = tot * 2;
+        inv = {
+          id: found.id || id,
+          status: found.status || 'active',
+          total: tot,
+          totalCurrentValue: curVal,
+          bonus: tot,
+          roi_percent: found.roi_percent || found.roiPercent || 70,
+          plan_name: found.plan_name || found.planName || found.portfolio || 'Tesla · Explorer',
+          created_at: found.created_at || found.createdAt
+        };
+      }
+    } catch (e) {}
+  }
+  if (!inv) {
+    inv = {
+      id: id || 'sim_inv_1',
+      status: 'active',
+      total: 1000,
+      totalCurrentValue: 2000,
+      bonus: 1000,
+      roi_percent: 70,
+      plan_name: 'Tesla · Explorer'
+    };
+  }
+  return res.json(generateChartData(inv, timeframe));
 });
 
 const upload = multer({
