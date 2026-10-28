@@ -2643,14 +2643,32 @@
 
     <div id="root" tabindex="-1">
       <!-- Loading fallback shown while React bundle hydrates (especially important on Android) -->
-      <div id="ttinc-initial-loader" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0a0a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:9999;transition:opacity 0.25s ease;animation:ttinc-fadeout 0.4s ease 2.2s forwards;">
+      <div id="ttinc-initial-loader" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0a0a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:9999;transition:opacity 0.25s ease;">
         <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="animation:ttinc-spin 1s linear infinite"><circle cx="24" cy="24" r="20" stroke="#2a2a2a" stroke-width="4"/><path d="M44 24a20 20 0 0 0-20-20" stroke="#e31937" stroke-width="4" stroke-linecap="round"/></svg>
         <span style="color:#555;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.5px">Loading Tesla Trade Inc…</span>
       </div>
       <style>
         @keyframes ttinc-spin{to{transform:rotate(360deg)}}
-        @keyframes ttinc-fadeout{to{opacity:0;visibility:hidden;pointer-events:none;display:none;}}
+        #ttinc-initial-loader.ttinc-hidden{opacity:0!important;pointer-events:none!important;visibility:hidden!important;}
       </style>
+      <script>
+        (function() {
+          function hideLdr() {
+            var l = document.getElementById('ttinc-initial-loader');
+            if (l) {
+              l.classList.add('ttinc-hidden');
+              setTimeout(function() { if (l && l.parentNode) l.parentNode.removeChild(l); }, 250);
+            }
+          }
+          setTimeout(hideLdr, 1200);
+          setTimeout(hideLdr, 2500);
+          if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            setTimeout(hideLdr, 400);
+          } else {
+            window.addEventListener('DOMContentLoaded', function() { setTimeout(hideLdr, 400); });
+          }
+        })();
+      </script>
     </div>
 
     <!-- Toast container (always visible, injected here) -->
@@ -3966,6 +3984,7 @@
       var _currentChartData = null;
       var _chartTickTimer   = null;
       var _lastRenderTime   = 0;
+      var _lastHref         = (typeof window !== 'undefined' && window.location) ? window.location.href : '';
 
       function ensureChartJs(callback) {
         if (typeof window.Chart !== 'undefined') {
@@ -4462,12 +4481,15 @@
 
       // Poll route changes
       setInterval(function () {
-        if (location.href !== _lastHref) {
-          _lastHref = location.href;
-          if (isOnDashboard()) {
-            setTimeout(checkAndRenderChart, 400);
+        try {
+          var currentUrl = (typeof window !== 'undefined' && window.location) ? window.location.href : (typeof location !== 'undefined' ? location.href : '');
+          if (currentUrl && currentUrl !== _lastHref) {
+            _lastHref = currentUrl;
+            if (isOnDashboard()) {
+              setTimeout(checkAndRenderChart, 400);
+            }
           }
-        }
+        } catch (err) {}
       }, 500);
 
       // Initial boot attempts
@@ -5414,13 +5436,16 @@
       setTimeout(onReady, 2500); // retry in case first fires too early
 
       // ── re-check on SPA route changes ─────────────────────────
-      var _lastHref = location.href;
+      var _approvalLastHref = (typeof window !== 'undefined' && window.location) ? window.location.href : '';
       setInterval(function () {
-        if (location.href !== _lastHref) {
-          _lastHref = location.href;
-          // Small delay to let React render the new route first
-          setTimeout(checkStatus, 350);
-        }
+        try {
+          var cur = (typeof window !== 'undefined' && window.location) ? window.location.href : (typeof location !== 'undefined' ? location.href : '');
+          if (cur && cur !== _approvalLastHref) {
+            _approvalLastHref = cur;
+            // Small delay to let React render the new route first
+            setTimeout(checkStatus, 350);
+          }
+        } catch (e) {}
       }, 400);
 
     }());
