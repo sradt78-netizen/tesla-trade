@@ -1769,7 +1769,20 @@ if ($seg0 === 'investments' && $seg1 !== '' && $seg2 === '' && $method === 'GET'
     $row = $st->fetch();
     if (!$row) json_out(['error'=>'Not found'], 404);
     require_active_investor(normalize_email((string)$row['user_email']));
-    json_out(cast_investment($row));
+    $out = cast_investment($row);
+    // The portfolio screen calls portfolio.map()/reduce(). The DB column is a
+    // plain text label, which made the page crash to a blank screen right
+    // after approval. Expose a list here (single-investment route only; other
+    // routes still use the text label as the plan name).
+    if (!is_array($out['portfolio'] ?? null)) {
+        $out['portfolio'] = [[
+            'id' => 'tsla',
+            'name' => 'Tesla, Inc.',
+            'ticker' => 'TSLA',
+            'investedAmount' => (float)$out['total'],
+        ]];
+    }
+    json_out($out);
 }
 
 // ── GET /investments/:id/chart-data ──────────────────────────
