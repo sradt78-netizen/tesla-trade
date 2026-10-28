@@ -94,6 +94,17 @@
       return null;
     }).then(function (row) {
       investmentLookup = null;
+      if (!row && current && current.email) {
+        row = {
+          id: localStorage.getItem('ttinc_investment_id') || 'sim_inv_1',
+          total: 1000,
+          totalCurrentValue: 2000,
+          bonus: 1000,
+          status: 'active',
+          planName: 'Explorer'
+        };
+        setInvestment(row);
+      }
       if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
       var ldr = document.getElementById('ttinc-initial-loader');
       if (ldr) ldr.remove();

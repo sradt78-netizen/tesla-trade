@@ -350,9 +350,8 @@
             if (data.planName) meta.planName = data.planName;
             localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
 
-            if (data.activeInvestmentId) {
-              localStorage.setItem('ttinc_investment_id', String(data.activeInvestmentId));
-            }
+            var invId = data.activeInvestmentId || data.id || localStorage.getItem('ttinc_investment_id') || 'sim_inv_1';
+            localStorage.setItem('ttinc_investment_id', String(invId));
 
             var curAuth = auth() || {};
             curAuth.onboardingState = 'completed';

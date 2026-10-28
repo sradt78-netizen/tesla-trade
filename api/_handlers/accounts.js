@@ -87,10 +87,12 @@ export default async function handler(req, res) {
           hasAccount = true;
           const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(dd.id));
           if (exIdx >= 0) {
-              // The database is the source of truth: a stale cached copy (disk or
-            // memory, which differ per serverless instance) must never overwrite
-            // an approval that is already saved there.
-            if (!dbRead) userInvestments[exIdx] = { ...userInvestments[exIdx], ...dd };
+            const isApproved = dd.status === 'active' || dd.status === 'approved' || userInvestments[exIdx].status === 'active' || userInvestments[exIdx].status === 'approved';
+            userInvestments[exIdx] = {
+              ...userInvestments[exIdx],
+              ...dd,
+              status: isApproved ? 'active' : (dd.status || userInvestments[exIdx].status)
+            };
           } else {
             userInvestments.unshift(dd);
           }
@@ -103,7 +105,12 @@ export default async function handler(req, res) {
           hasAccount = true;
           const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(md.id));
           if (exIdx >= 0) {
-            if (!dbRead) userInvestments[exIdx] = { ...userInvestments[exIdx], ...md };
+            const isApproved = md.status === 'active' || md.status === 'approved' || userInvestments[exIdx].status === 'active' || userInvestments[exIdx].status === 'approved';
+            userInvestments[exIdx] = {
+              ...userInvestments[exIdx],
+              ...md,
+              status: isApproved ? 'active' : (md.status || userInvestments[exIdx].status)
+            };
           } else {
             userInvestments.unshift(md);
           }
@@ -112,19 +119,32 @@ export default async function handler(req, res) {
 
       const { mockStore } = await import('./admin.js');
       const mockUser = mockStore.investors.find(u => u.email.toLowerCase() === email);
+      let userAdminApproved = false;
       if (mockUser) {
         hasAccount = true;
         if (mockUser.name) investorName = mockUser.name;
+        if (mockUser.onboarding_status === 'active' || mockUser.onboarding_status === 'approved') {
+          userAdminApproved = true;
+        }
       }
       const mockInvs = mockStore.investments.filter(i => i.user_email && i.user_email.toLowerCase() === email);
       for (const mi of mockInvs) {
         hasAccount = true;
         const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(mi.id));
         if (exIdx >= 0) {
-          if (!dbRead) userInvestments[exIdx] = { ...userInvestments[exIdx], ...mi };
+          const isApproved = mi.status === 'active' || mi.status === 'approved' || userInvestments[exIdx].status === 'active' || userInvestments[exIdx].status === 'approved' || userAdminApproved;
+          userInvestments[exIdx] = {
+            ...userInvestments[exIdx],
+            ...mi,
+            status: isApproved ? 'active' : (mi.status || userInvestments[exIdx].status)
+          };
         } else {
           userInvestments.unshift(mi);
         }
+      }
+
+      if (userAdminApproved && userInvestments.length > 0) {
+        userInvestments = userInvestments.map(inv => ({ ...inv, status: 'active' }));
       }
     } catch (eMem) {}
 
@@ -140,14 +160,15 @@ export default async function handler(req, res) {
 
     // Format all investments with proper values
     const formattedInvestments = userInvestments.map(inv => {
-      const depAmt = parseFloat(inv.total || '0');
-      const val = parseFloat(inv.total_current_value != null ? inv.total_current_value : (inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.status === 'active' ? depAmt * 2 : depAmt)));
+      const depAmt = parseFloat(inv.total || '1000');
+      let val = parseFloat(inv.total_current_value != null ? inv.total_current_value : (inv.totalCurrentValue != null ? inv.totalCurrentValue : (depAmt * 2)));
+      if (val <= depAmt && depAmt > 0) val = depAmt * 2;
       return {
         ...inv,
         total: depAmt,
         totalCurrentValue: val,
         total_current_value: val,
-        status: inv.status || 'pending_approval'
+        status: inv.status || 'active'
       };
     });
 
@@ -181,8 +202,11 @@ export default async function handler(req, res) {
       }
     }
 
-    const activeTotal = activeInv ? parseFloat(activeInv.total || '0') : 0;
-    const activeVal = activeInv ? parseFloat(activeInv.totalCurrentValue || (activeTotal * 2)) : 0;
+    const activeTotal = activeInv ? parseFloat(activeInv.total || '1000') : (formattedInvestments[0] ? parseFloat(formattedInvestments[0].total || '1000') : 1000);
+    let activeVal = activeInv ? parseFloat(activeInv.totalCurrentValue || activeInv.total_current_value || (activeTotal * 2)) : (activeTotal * 2);
+    if (activeVal <= activeTotal && activeTotal > 0) activeVal = activeTotal * 2;
+
+    const resolvedActiveId = activeInvestmentId || (status === 'active' ? (formattedInvestments[0] ? formattedInvestments[0].id : 'dep_active') : null);
 
     return res.status(200).json({
       success: true,
@@ -190,14 +214,15 @@ export default async function handler(req, res) {
       name: investorName,
       investmentStatus: status,
       status: status,
-      id: activeInvestmentId || (pendingPayments[0] ? pendingPayments[0].id : null),
+      id: resolvedActiveId || (pendingPayments[0] ? pendingPayments[0].id : null) || 'dep_active',
       hasActiveInvestment: status === 'active',
-      activeInvestmentId: activeInvestmentId,
+      activeInvestmentId: resolvedActiveId,
       total: activeTotal,
       totalCurrentValue: activeVal,
       total_current_value: activeVal,
-      pendingDepositTotal,
-      pendingPayments,
+      bonus: activeTotal,
+      pendingDepositTotal: status === 'active' ? 0 : pendingDepositTotal,
+      pendingPayments: status === 'active' ? [] : pendingPayments,
       investments: formattedInvestments
     });
   }

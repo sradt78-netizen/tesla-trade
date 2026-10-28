@@ -2490,11 +2490,38 @@
 
     <div id="root" tabindex="-1">
       <!-- Loading fallback shown while React bundle hydrates (especially important on Android) -->
-      <div id="ttinc-initial-loader" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0a0a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:9999;">
+      <div id="ttinc-initial-loader" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0a0a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:9999;transition:opacity .25s ease,visibility .25s ease;animation:ttinc-loader-fade .35s ease .7s forwards;">
         <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="animation:ttinc-spin 1s linear infinite"><circle cx="24" cy="24" r="20" stroke="#2a2a2a" stroke-width="4"/><path d="M44 24a20 20 0 0 0-20-20" stroke="#e31937" stroke-width="4" stroke-linecap="round"/></svg>
         <span style="color:#555;font-size:13px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.5px">Loading Tesla Trade Inc…</span>
       </div>
-      <style>@keyframes ttinc-spin{to{transform:rotate(360deg)}}</style>
+      <style>
+        @keyframes ttinc-spin{to{transform:rotate(360deg)}}
+        @keyframes ttinc-loader-fade{to{opacity:0;visibility:hidden;pointer-events:none}}
+      </style>
+      <script>
+        (function () {
+          function killInitialLoader() {
+            var el = document.getElementById('ttinc-initial-loader');
+            if (el) {
+              el.style.opacity = '0';
+              el.style.pointerEvents = 'none';
+              setTimeout(function () {
+                var cur = document.getElementById('ttinc-initial-loader');
+                if (cur && cur.parentNode) cur.parentNode.removeChild(cur);
+              }, 200);
+            }
+          }
+          window.ttincRemoveLoader = killInitialLoader;
+          if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            setTimeout(killInitialLoader, 250);
+          } else {
+            window.addEventListener('DOMContentLoaded', function () { setTimeout(killInitialLoader, 250); });
+            window.addEventListener('load', killInitialLoader);
+          }
+          setTimeout(killInitialLoader, 650);
+          setTimeout(killInitialLoader, 1200);
+        })();
+      </script>
     </div>
 
     <!-- Toast container (always visible, injected here) -->
@@ -2960,9 +2987,11 @@
     <script>
       (function () {
         function removeLoader() {
+          if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
           var el = document.getElementById('ttinc-initial-loader');
           if (el) el.remove();
         }
+        removeLoader();
         // Watch for React to inject real content into #root
         var obs = new MutationObserver(function (mutations) {
           var root = document.getElementById('root');
@@ -2977,8 +3006,8 @@
         });
         var root = document.getElementById('root');
         if (root) obs.observe(root, { childList: true, subtree: false });
-        // Hard fallback: remove after 8s regardless
-        setTimeout(removeLoader, 8000);
+        setTimeout(removeLoader, 400);
+        setTimeout(removeLoader, 1000);
       })();
     </script>
 

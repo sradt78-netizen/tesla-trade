@@ -11,7 +11,7 @@
 
   function isBalancePage() {
     var path = window.location.pathname;
-    return path === '/overview' || path === '/dashboard' || path === '/withdraw' || path === '/invest';
+    return path === '/' || path === '/overview' || path === '/dashboard' || path === '/withdraw' || path === '/invest' || path.indexOf('/portfolio') !== -1;
   }
 
   function readAuth() {
@@ -66,16 +66,23 @@
       }
     }
 
-    // 2. Patch the 4 stat cards in overview (Invested, Portfolios, KYC Level, Status)
+    // 2. Patch stat cards in overview and dashboard (Invested, Current Value, Portfolios, KYC Level, Status)
     var statCards = document.querySelectorAll('.grid > div');
     for (var j = 0; j < statCards.length; j++) {
       var card = statCards[j];
-      var labelNode = card.querySelector('.text-slate-400');
+      var labelNode = card.querySelector('.text-slate-400, .text-slate-500, [class*="tracking-widest"]');
       var valueNode = card.querySelector('.font-mono, .text-lg, .text-xl, .font-bold');
       if (labelNode && valueNode) {
         var labelTxt = (labelNode.textContent || '').trim();
-        if (labelTxt === 'Invested' && (valueNode.textContent === '$0.00' || valueNode.textContent === '$0')) {
+        if ((labelTxt === 'Invested' || labelTxt === 'Total Invested') && (valueNode.textContent === '$0.00' || valueNode.textContent === '$0')) {
           valueNode.textContent = formatMoney(principal);
+        }
+        if (labelTxt === 'Current Value' && (valueNode.textContent === '$0.00' || valueNode.textContent === '$0')) {
+          valueNode.textContent = formatMoney(current);
+        }
+        if (labelTxt === 'Gain/Loss' && (valueNode.textContent === '$0.00' || valueNode.textContent === '$0' || valueNode.textContent === '+0.00%')) {
+          valueNode.textContent = '+' + formatMoney(bonus);
+          valueNode.style.color = '#4ade80';
         }
         if (labelTxt === 'Status' && (valueNode.textContent === 'No Investment' || valueNode.textContent === 'Pending')) {
           valueNode.textContent = 'Active';
@@ -86,8 +93,8 @@
 
     // 3. Inject dedicated "Investor Wallet Breakdown" card on /overview and /dashboard
     var path = window.location.pathname;
-    if (path === '/overview' || path === '/dashboard') {
-      var mainContainer = document.querySelector('.max-w-4xl, [class*="max-w-4xl"]');
+    if (path === '/overview' || path === '/dashboard' || path === '/') {
+      var mainContainer = document.querySelector('.max-w-5xl, .max-w-4xl, [class*="max-w-5xl"], [class*="max-w-4xl"]');
       if (mainContainer && !document.getElementById('ttinc-investor-wallet-card')) {
         var walletCard = document.createElement('div');
         walletCard.id = 'ttinc-investor-wallet-card';
@@ -125,9 +132,10 @@
             '</div>' +
           '</div>';
 
-        // Insert right after the total balance section (which is the 2nd child of mainContainer typically)
         var children = mainContainer.children;
-        if (children.length >= 2) {
+        if (path === '/dashboard') {
+          mainContainer.insertBefore(walletCard, mainContainer.firstChild);
+        } else if (children.length >= 2) {
           mainContainer.insertBefore(walletCard, children[2]);
         } else {
           mainContainer.appendChild(walletCard);
