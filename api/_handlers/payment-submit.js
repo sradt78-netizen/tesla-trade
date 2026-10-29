@@ -194,6 +194,8 @@ export default async function handler(req, res) {
       await conn.end();
     } catch (e) {}
 
+    let all = Array.isArray(dbRows) ? [...dbRows] : [];
+
     // Merge persistent file storage and promote approved status
     try {
       const diskDeposits = loadPersistentDeposits();
@@ -302,6 +304,10 @@ export default async function handler(req, res) {
       return {
         ...item,
         status: (st === 'approved' || st === 'completed' || !st) ? 'active' : st,
+        portfolio: Array.isArray(item.portfolio) && item.portfolio.length > 0
+          ? item.portfolio
+          : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot }],
+        planName: item.planName || item.plan_name || item.plan_label || 'Pioneer',
         canWithdraw: true,
         total: tot,
         totalCurrentValue: curVal,

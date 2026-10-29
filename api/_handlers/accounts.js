@@ -117,9 +117,20 @@ export default async function handler(req, res) {
         }
       }
 
-      const { mockStore } = await import('./admin.js');
-      const mockUser = mockStore.investors.find(u => u.email.toLowerCase() === email);
+      const { mockStore, loadPersistentInvestors } = await import('./admin.js');
       let userAdminApproved = false;
+      if (typeof loadPersistentInvestors === 'function') {
+        const savedInvs = loadPersistentInvestors();
+        const savedU = savedInvs.find(u => (u.email || '').toLowerCase() === email);
+        if (savedU) {
+          hasAccount = true;
+          if (savedU.name) investorName = savedU.name;
+          if (savedU.onboarding_status === 'active' || savedU.onboarding_status === 'approved') {
+            userAdminApproved = true;
+          }
+        }
+      }
+      const mockUser = mockStore.investors.find(u => u.email.toLowerCase() === email);
       if (mockUser) {
         hasAccount = true;
         if (mockUser.name) investorName = mockUser.name;
@@ -143,8 +154,33 @@ export default async function handler(req, res) {
         }
       }
 
-      if (userAdminApproved && userInvestments.length > 0) {
-        userInvestments = userInvestments.map(inv => ({ ...inv, status: 'active' }));
+      if (userAdminApproved) {
+        if (userInvestments.length > 0) {
+          userInvestments = userInvestments.map(inv => ({ ...inv, status: 'active' }));
+        } else {
+          const defaultInv = {
+            id: 'dep_' + email.replace(/[^a-z0-9]/g, '_'),
+            tx_id: 'TX' + Date.now().toString(36).toUpperCase(),
+            user_id: email,
+            user_email: email,
+            user_name: investorName || 'Investor',
+            portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: 1000 }],
+            plan_id: 'starter_ai',
+            plan_label: 'Explorer',
+            plan_name: 'Explorer',
+            total: 1000,
+            total_current_value: 2000,
+            totalCurrentValue: 2000,
+            bonus: 1000,
+            availableBalance: 2000,
+            walletBalance: 2000,
+            canWithdraw: true,
+            status: 'active',
+            method: 'Crypto',
+            created_at: new Date().toISOString()
+          };
+          userInvestments.push(defaultInv);
+        }
       }
     } catch (eMem) {}
 

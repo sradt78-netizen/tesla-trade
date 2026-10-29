@@ -1,5 +1,37 @@
 [
   {
+    "id": "dep_dansaki_1",
+    "tx_id": "TXDANSAKI101",
+    "user_id": "dansaki234090@gmail.com",
+    "user_email": "dansaki234090@gmail.com",
+    "user_name": "Dansaki",
+    "portfolio": [
+      {
+        "id": "tsla",
+        "name": "Tesla, Inc.",
+        "ticker": "TSLA",
+        "investedAmount": 1000
+      }
+    ],
+    "plan_id": "starter_ai",
+    "plan_label": "Explorer",
+    "plan_name": "Explorer",
+    "total": 1000,
+    "total_current_value": 2000,
+    "totalCurrentValue": 2000,
+    "bonus": 1000,
+    "availableBalance": 2000,
+    "walletBalance": 2000,
+    "canWithdraw": true,
+    "status": "active",
+    "method": "Crypto",
+    "created_at": "2026-10-29T09:40:00.932Z",
+    "earnings": {
+      "tsla": 2000,
+      "total": 1000
+    }
+  },
+  {
     "id": "dep_mvqymovo",
     "tx_id": "TXMVQYMOVO",
     "user_id": "test@example.com",

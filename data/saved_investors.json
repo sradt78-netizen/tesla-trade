@@ -1,5 +1,13 @@
 [
   {
+    "id": "u_dansaki_1",
+    "name": "Dansaki",
+    "email": "dansaki234090@gmail.com",
+    "phone": "—",
+    "onboarding_status": "active",
+    "registered_at": "2026-10-29T09:40:00.933Z"
+  },
+  {
     "id": "u_mvqymovp",
     "name": "Investor",
     "email": "test@example.com",
