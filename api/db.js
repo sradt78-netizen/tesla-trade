@@ -259,6 +259,14 @@ class PersistentDbConnection {
     // ── INVESTOR ACCOUNTS ─────────────────────────────────────────
     if (cleanSql.includes('investor_accounts')) {
       if (upperSql.startsWith('SELECT')) {
+        if (cleanSql.includes('COUNT(*) as total_signups')) {
+          return [[{ total_signups: db.investor_accounts.length }], []];
+        }
+        if (cleanSql.includes('signups_today')) {
+          const today = new Date().toISOString().slice(0, 10);
+          const count = db.investor_accounts.filter(a => (a.registered_at || a.created_at || '').startsWith(today)).length;
+          return [[{ signups_today: count }], []];
+        }
         let rows = [...db.investor_accounts];
         if (cleanSql.includes('LOWER(email)=?') || cleanSql.includes('email=?') || cleanSql.includes('email = ?')) {
           const email = String(params[0] || '').toLowerCase().trim();
@@ -269,6 +277,9 @@ class PersistentDbConnection {
         }
         if (upperSql.includes('LIMIT 1')) {
           rows = rows.slice(0, 1);
+        }
+        if (cleanSql.includes('LIMIT 20')) {
+          rows = rows.slice(0, 20);
         }
         return [rows, []];
       }
@@ -340,6 +351,11 @@ class PersistentDbConnection {
     // ── INVESTMENTS / DEPOSITS ────────────────────────────────────
     if (cleanSql.includes('investments')) {
       if (upperSql.startsWith('SELECT')) {
+        if (cleanSql.includes('COUNT(*) as total_investments') || cleanSql.includes('investment_volume')) {
+          const total = db.investments.length;
+          const volume = db.investments.reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+          return [[{ total_investments: total, investment_volume: volume }], []];
+        }
         let rows = [...db.investments];
         if (cleanSql.includes('LOWER(user_email)=?') || cleanSql.includes('user_email=?')) {
           const email = String(params[0] || '').toLowerCase().trim();
@@ -605,7 +621,12 @@ class PersistentDbConnection {
 
     // ── EV ORDERS ─────────────────────────────────────────────────
     if (cleanSql.includes('ev_orders')) {
-      if (upperSql.startsWith('SELECT')) return [db.ev_orders, []];
+      if (upperSql.startsWith('SELECT')) {
+        if (cleanSql.includes('COUNT(*) as total_orders')) {
+          return [[{ total_orders: (db.ev_orders || []).length }], []];
+        }
+        return [db.ev_orders || [], []];
+      }
       if (upperSql.startsWith('UPDATE')) {
         const status = String(params[0] || 'approved');
         const id = String(params[1] || '');
@@ -664,7 +685,61 @@ class PersistentDbConnection {
 
     // ── ANALYTICS CLICKS ──────────────────────────────────────────
     if (cleanSql.includes('analytics_clicks')) {
-      if (upperSql.startsWith('SELECT')) return [db.analytics_clicks, []];
+      if (upperSql.startsWith('SELECT')) {
+        const clicks = db.analytics_clicks || [];
+        if (cleanSql.includes('COUNT(*) as total_clicks')) {
+          return [[{ total_clicks: clicks.length }], []];
+        }
+        if (cleanSql.includes('unique_visitors')) {
+          const uniqueIps = new Set(clicks.map(c => c.ip_address).filter(Boolean));
+          return [[{ unique_visitors: uniqueIps.size }], []];
+        }
+        if (cleanSql.includes('clicks_today')) {
+          const today = new Date().toISOString().slice(0, 10);
+          const count = clicks.filter(c => (c.created_at || '').startsWith(today)).length;
+          return [[{ clicks_today: count }], []];
+        }
+        if (cleanSql.includes('GROUP BY campaign_source')) {
+          const counts = {};
+          clicks.forEach(c => {
+            const src = c.campaign_source || 'direct';
+            counts[src] = (counts[src] || 0) + 1;
+          });
+          const rows = Object.entries(counts).map(([campaign_source, count]) => ({ campaign_source, count })).sort((a, b) => b.count - a.count);
+          return [rows.slice(0, 10), []];
+        }
+        if (cleanSql.includes('GROUP BY device_type')) {
+          const counts = {};
+          clicks.forEach(c => {
+            const dev = c.device_type || 'desktop';
+            counts[dev] = (counts[dev] || 0) + 1;
+          });
+          const rows = Object.entries(counts).map(([device_type, count]) => ({ device_type, count })).sort((a, b) => b.count - a.count);
+          return [rows, []];
+        }
+        return [clicks.slice(0, 50), []];
+      }
+      if (upperSql.startsWith('INSERT INTO')) {
+        const ip = params[0] || '';
+        const referrer = params[1] || '';
+        const landing = params[2] || '';
+        const source = params[3] || 'direct';
+        const device = params[4] || 'desktop';
+        const ua = params[5] || '';
+        if (!db.analytics_clicks) db.analytics_clicks = [];
+        db.analytics_clicks.unshift({
+          id: db.analytics_clicks.length + 1,
+          ip_address: ip,
+          referrer,
+          landing_page: landing,
+          campaign_source: source,
+          device_type: device,
+          user_agent: ua,
+          created_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
+        });
+        saveDatabaseSync();
+        return [{ affectedRows: 1, insertId: db.analytics_clicks.length }, []];
+      }
     }
 
     // Default fallback: return empty array

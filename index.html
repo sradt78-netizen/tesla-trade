@@ -77,11 +77,8 @@
       })();
     </script>
     <style>
-      /* Invitation-only public shell: keep the existing app hidden until the
-         invitation code has been verified by the server. */
-      html.ttinc-invitation-locked,
-      html.ttinc-invitation-locked body { background:#0a0a0a !important; }
-      html.ttinc-invitation-locked body > *:not(#ttinc-invitation-gate) {
+      /* Invitation-only access style: ensure public shell is never hidden */
+      html.ttinc-invitation-locked:not(.ttinc-home-route) body > *:not(#ttinc-invitation-gate):not(#root) {
         display:none !important;
       }
       #ttinc-invitation-gate {
@@ -174,7 +171,23 @@
     <script>
       (function() {
         var p = (window.location.pathname || '').toLowerCase();
-        if (p.indexOf('/admin') !== -1 || p.indexOf('/analytics') !== -1 || p.indexOf('/api') !== -1) {
+        if (
+          p === '/' ||
+          p === '' ||
+          p === '/index.html' ||
+          p.indexOf('/store') !== -1 ||
+          p.indexOf('/shop') !== -1 ||
+          p.indexOf('/cars') !== -1 ||
+          p.indexOf('/about') !== -1 ||
+          p.indexOf('/contact') !== -1 ||
+          p.indexOf('/faq') !== -1 ||
+          p.indexOf('/press') !== -1 ||
+          p.indexOf('/privacy') !== -1 ||
+          p.indexOf('/terms') !== -1 ||
+          p.indexOf('/admin') !== -1 ||
+          p.indexOf('/analytics') !== -1 ||
+          p.indexOf('/api') !== -1
+        ) {
           return;
         }
         var s = document.createElement('script');

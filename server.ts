@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import mysql from 'mysql2/promise';
 import multer from 'multer';
@@ -459,13 +460,32 @@ app.all(
   (req, res) => paymentSubmitHandler(req, res)
 );
 
-// ── 6. Direct Portal Routes (NO INVITATION REQUIRED) ─────────────
+// ── 6. Direct Portal & Content Routes ─────────────────────────────
 app.get(['/admin', '/admin.php', '/admin.html'], (req, res) => {
   res.sendFile(path.resolve(__dirname, 'admin.html'));
 });
 
 app.get(['/analytics', '/analytics.html', '/analytics.php'], (req, res) => {
   res.sendFile(path.resolve(__dirname, 'analytics.html'));
+});
+
+app.get(['/shop', '/cars'], (req, res) => {
+  res.redirect('/store/');
+});
+
+const phpPages = ['about', 'contact', 'faq', 'kyc', 'press', 'privacy', 'profile', 'terms'];
+phpPages.forEach(page => {
+  app.get([`/${page}`, `/${page}.php`], (req, res) => {
+    const filePath = path.resolve(__dirname, `${page}.php`);
+    try {
+      let content = fs.readFileSync(filePath, 'utf8');
+      content = content.replace(/<\?php[\s\S]*?\?>/gi, '');
+      content = content.replace(/<\?=\s*\$year\s*\?>/gi, '2026');
+      res.type('html').send(content);
+    } catch (e) {
+      res.status(404).send('Page not found');
+    }
+  });
 });
 
 // ── 7. Mount Vite in Dev ─────────────────────────────────────────

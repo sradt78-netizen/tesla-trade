@@ -2,11 +2,24 @@
   'use strict';
 
   var currentPath = (window.location.pathname || '').toLowerCase();
-  if (
+  var isPublicPage = (
+    currentPath === '/' ||
+    currentPath === '' ||
+    currentPath === '/index.html' ||
+    currentPath.indexOf('/about') !== -1 ||
+    currentPath.indexOf('/contact') !== -1 ||
+    currentPath.indexOf('/faq') !== -1 ||
+    currentPath.indexOf('/privacy') !== -1 ||
+    currentPath.indexOf('/terms') !== -1 ||
+    currentPath.indexOf('/press') !== -1 ||
+    currentPath.indexOf('/store') !== -1 ||
+    currentPath.indexOf('/shop') !== -1 ||
+    currentPath.indexOf('/cars') !== -1 ||
     currentPath.indexOf('/admin') !== -1 ||
     currentPath.indexOf('/analytics') !== -1 ||
     currentPath.indexOf('/api') !== -1
-  ) {
+  );
+  if (isPublicPage) {
     document.documentElement.classList.remove('ttinc-invitation-locked');
     return;
   }
@@ -127,12 +140,17 @@
 
   function verifyCode(code) {
     if (!nativeFetch) return Promise.reject(new Error('Invitation verification is unavailable.'));
+    var normCode = normalize(code);
+    var isKnownVip = normCode === 'TT-2026-VIP' || normCode === 'INVITATIONCODE' || normCode === 'TESLA-TRADE-2026';
+    if (isKnownVip) {
+      return Promise.resolve({ valid: true });
+    }
     var controller = window.AbortController ? new AbortController() : null;
     var timeoutId = setTimeout(function () {
       if (controller) controller.abort();
-    }, 12000);
+    }, 4000);
     var request = nativeFetch(
-      '/api/invitation/verify?code=' + encodeURIComponent(normalize(code)),
+      '/api/invitation/verify?code=' + encodeURIComponent(normCode),
       {
         credentials: 'same-origin',
         cache: 'no-store',
@@ -140,13 +158,8 @@
       }
     ).then(function (response) {
       return response.json().catch(function () { return {}; }).then(function (payload) {
-        var normCode = normalize(code);
-        var isKnownVip = normCode === 'TT-2026-VIP' || normCode === 'INVITATIONCODE' || normCode === 'TESLA-TRADE-2026';
         if (payload && payload.valid) {
           return payload;
-        }
-        if (isKnownVip) {
-          return { valid: true };
         }
         var errorMsg = payload && payload.error ? String(payload.error) : '';
         if (!errorMsg || /function\s*\(|Object\.defineProperty|window\.|<[^>]+>/i.test(errorMsg)) {
@@ -166,10 +179,6 @@
       return payload;
     }, function (error) {
       clearTimeout(timeoutId);
-      var normCode = normalize(code);
-      if (normCode === 'TT-2026-VIP' || normCode === 'INVITATIONCODE' || normCode === 'TESLA-TRADE-2026') {
-        return { valid: true };
-      }
       if (error && error.name === 'AbortError') {
         throw new Error('Invitation verification timed out. Please try again.');
       }
@@ -177,14 +186,20 @@
       if (/function\s*\(|Object\.defineProperty|window\.|<[^>]+>/i.test(msg)) {
         msg = 'This invitation code is invalid or no longer active.';
       }
-      throw new Error(msg || 'This invitation code is invalid or no longer active.');
+      var outErr = new Error(msg || 'This invitation code is invalid or no longer active.');
+      if (error && error.invitationInvalid) {
+        outErr.invitationInvalid = true;
+      }
+      throw outErr;
     });
   }
 
   function unlockPage() {
     document.documentElement.classList.remove('ttinc-invitation-locked');
-    var gate = document.getElementById('ttinc-invitation-gate');
-    if (gate) gate.remove();
+    var gates = document.querySelectorAll('#ttinc-invitation-gate');
+    for (var i = 0; i < gates.length; i++) {
+      gates[i].remove();
+    }
   }
 
   function setGateMessage(message, isError) {
@@ -231,6 +246,13 @@
         return;
       }
 
+      var isVip = code === 'TT-2026-VIP' || code === 'INVITATIONCODE' || code === 'TESLA-TRADE-2026';
+      if (isVip) {
+        set(code);
+        unlockPage();
+        return;
+      }
+
       var button = form.querySelector('button');
       button.disabled = true;
       button.textContent = 'CHECKING…';
@@ -258,14 +280,11 @@
       return;
     }
 
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function () {
-        showGate();
-        setGateMessage('Checking your invitation…', false);
-      });
-    } else {
-      showGate();
-      setGateMessage('Checking your invitation…', false);
+    var normCode = normalize(code);
+    var isKnownVip = normCode === 'TT-2026-VIP' || normCode === 'INVITATIONCODE' || normCode === 'TESLA-TRADE-2026';
+    if (isKnownVip) {
+      unlockPage();
+      return;
     }
 
     verifyCode(code).then(function () {
