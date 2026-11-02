@@ -99,10 +99,7 @@ export const mockStore = {
   orders: [],
   withdrawals: [],
   financing: [],
-  codes: [
-    { id: 1, code: 'TT-2026-VIP', status: 'active', source: 'admin', created_at: '2026-10-20 10:00:00' },
-    { id: 2, code: 'TESLA-TRADE-2026', status: 'active', source: 'admin', created_at: '2026-10-20 10:00:00' }
-  ],
+  codes: [],
   clicks: [],
   marketingLogs: [],
   settings: {
@@ -706,7 +703,7 @@ export default async function handler(req, res) {
 
       const resendApiKey = cleanString(process.env.RESEND_API_KEY || settings.resend_api_key);
       const fromEmail = cleanString(settings.resend_from_email || process.env.RESEND_FROM_EMAIL || 'no-reply@teslawealths.org');
-      const defaultCode = invCodes.length > 0 ? invCodes[0].code : 'TT-2026-VIP';
+      const defaultCode = invCodes.length > 0 ? invCodes[0].code : '';
 
       let targetList = [];
 
