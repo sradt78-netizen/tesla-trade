@@ -346,6 +346,31 @@ const MARKETING_TEMPLATES = {
   }
 };
 
+async function sendAccountStatusEmail(toEmail, toName, status) {
+  const apiKey = cleanString(process.env.RESEND_API_KEY || process.env.TT_RESEND_API_KEY);
+  const fromEmail = cleanString(process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM || 'onboarding@resend.dev');
+  if (!apiKey || !toEmail) return { sent: false, reason: 'Resend is not configured or recipient is missing.' };
+  const approved = status === 'active';
+  const subject = approved ? 'Your Tesla Trade deposit status has been updated' : 'Update about your Tesla Trade deposit';
+  const html = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;color:#222">' +
+    '<h2>' + (approved ? 'Deposit status updated' : 'Deposit status update') + '</h2>' +
+    '<p>Hello ' + String(toName || 'Investor').replace(/[&<>"]/g, '') + ',</p>' +
+    '<p>Your submitted deposit has been ' + (approved ? 'approved' : 'declined') + '.</p>' +
+    '<p>Please sign in to your account to review the current status and details.</p>' +
+    '<p><a href="https://teslawealths.org/overview">Open your account</a></p></div>';
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: 'Tesla Trade Inc <' + fromEmail + '>', to: [toEmail], subject, html })
+    });
+    const data = await response.json().catch(() => ({}));
+    return response.ok && data.id ? { sent: true, id: data.id } : { sent: false, reason: data.message || ('Resend HTTP ' + response.status) };
+  } catch (error) {
+    return { sent: false, reason: error.message || 'Email delivery failed.' };
+  }
+}
+
 async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subject, htmlBody) {
   const sender = fromEmail || 'no-reply@teslawealths.org';
 
@@ -1239,6 +1264,15 @@ export default async function handler(req, res) {
         }
       }
 
+      let notification = { sent: false, reason: 'No recipient email was resolved.' };
+      if (effectiveEmail) {
+        notification = await sendAccountStatusEmail(
+          effectiveEmail,
+          (foundDeposit && foundDeposit.user_name) || 'Investor',
+          status
+        );
+      }
+
       return res.status(200).json({
         success: true,
         message: status === 'active'
@@ -1246,7 +1280,8 @@ export default async function handler(req, res) {
           : `Deposit receipt updated to ${status}.`,
         status: status,
         total: approvedDepositAmount,
-        totalCurrentValue: totalBalanceWithBonus
+        totalCurrentValue: totalBalanceWithBonus,
+        emailNotification: notification
       });
     }
 
