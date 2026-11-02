@@ -163,7 +163,7 @@ export default async function handler(req, res) {
 
       // Upsert account
       await conn.query(
-        'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, "Investor", "active", NOW()) ON DUPLICATE KEY UPDATE onboarding_status="active"',
+        'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, "Investor", "pending_approval", NOW()) ON DUPLICATE KEY UPDATE email=VALUES(email)',
         [email]
       );
 
@@ -222,7 +222,7 @@ export default async function handler(req, res) {
     try {
       const conn = await getDbConnection();
       await conn.query(
-        'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "active", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name)), onboarding_status="active"',
+        'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_approval", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name))',
         [email, name]
       );
       await conn.end();
@@ -232,14 +232,14 @@ export default async function handler(req, res) {
         const found = mockStore.investors.find(u => u.email.toLowerCase() === email);
         if (found) {
           found.name = name;
-          found.onboarding_status = 'active';
+          found.onboarding_status = found.onboarding_status || 'pending_approval';
         } else {
           mockStore.investors.unshift({
             id: Date.now(),
             name,
             email,
             phone: '—',
-            onboarding_status: 'active',
+            onboarding_status: 'pending_approval',
             registered_at: new Date().toISOString()
           });
         }
