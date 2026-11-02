@@ -241,23 +241,10 @@ export default async function handler(req, res) {
              || all.find(x => (x.user_email || x.email || '').toLowerCase() === qEmail);
       }
       if (!found) {
-        // Fallback to active investment record so compiled React dashboard never 404s and hangs
-        found = {
-          id: qId,
-          user_email: qEmail || 'investor@teslatrade.com',
-          user_name: 'Investor',
-          status: 'active',
-          total: 1000,
-          totalCurrentValue: 2000,
-          total_current_value: 2000,
-          bonus: 1000,
-          plan_id: 'growth_ai',
-          planName: 'Pioneer',
-          portfolio: 'Tesla · Pioneer',
-          canWithdraw: true,
-          method: 'Crypto',
-          created_at: new Date().toISOString()
-        };
+        // Return an explicit not-found response instead of fabricating an active
+        // account/balance. The client can then show a recoverable empty/error state.
+        if (conn) try { await conn.end(); } catch (e) {}
+        return res.status(404).json({ success: false, error: 'Investment record not found.' });
       }
 
       const st = (found.status || 'active').toLowerCase();
