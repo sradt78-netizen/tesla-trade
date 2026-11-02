@@ -240,8 +240,8 @@
       '</div>';
 
     try {
-      localStorage.removeItem('ttinc_deposit_status');
-      localStorage.removeItem('ttinc_payment_status');
+      localStorage.setItem('ttinc_deposit_status', 'active');
+      localStorage.setItem('ttinc_payment_status', 'active');
       var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
       meta.status = 'active';
       if (data && data.total) meta.total = Number(data.total);
@@ -335,8 +335,8 @@
 
         if (hasActive) {
           try {
-            localStorage.removeItem('ttinc_deposit_status');
-            localStorage.removeItem('ttinc_payment_status');
+            localStorage.setItem('ttinc_deposit_status', 'active');
+            localStorage.setItem('ttinc_payment_status', 'active');
             var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
             meta.status = 'active';
             if (data.total) meta.total = Number(data.total);

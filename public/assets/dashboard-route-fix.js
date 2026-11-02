@@ -131,17 +131,12 @@
 
   function holdDashboardRedirect() {
     if (location.pathname !== '/dashboard') return;
-    var previousId = localStorage.getItem('ttinc_investment_id') || '';
     heldDashboard = true;
     releaseTimer = setTimeout(releaseHeldDashboard, 1500);
     findInvestment().then(function (row) {
-      if (row && setInvestment(row)) {
-        var reloadKey = 'ttinc_dashboard_synced_' + row.id;
-        if (previousId && previousId !== row.id && !sessionStorage.getItem(reloadKey)) {
-          sessionStorage.setItem(reloadKey, '1');
-          window.location.reload();
-          return;
-        }
+      if (row) {
+        setInvestment(row);
+        window.dispatchEvent(new Event('storage'));
       }
       releaseHeldDashboard();
     });
@@ -167,16 +162,10 @@
 
   function sync() {
     if (location.pathname !== '/dashboard' && location.pathname !== '/overview') return;
-    var previousId = localStorage.getItem('ttinc_investment_id') || '';
     findInvestment().then(function (row) {
-      if (!row || !setInvestment(row)) return;
-      if (location.pathname === '/overview' && previousId && previousId !== row.id) {
-        var reloadKey = 'ttinc_overview_synced_' + row.id;
-        if (!sessionStorage.getItem(reloadKey)) {
-          sessionStorage.setItem(reloadKey, '1');
-          window.location.reload();
-          return;
-        }
+      if (row) {
+        setInvestment(row);
+        window.dispatchEvent(new Event('storage'));
       }
       if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
       var ldr = document.getElementById('ttinc-initial-loader');

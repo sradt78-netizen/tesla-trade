@@ -1,5 +1,13 @@
 [
   {
+    "id": "u_mvzhnqrp",
+    "name": "Alex Morgan",
+    "email": "sim_test_1793637839781@tesla.test",
+    "phone": "—",
+    "onboarding_status": "active",
+    "registered_at": "2026-11-02T16:43:59.941Z"
+  },
+  {
     "id": "u_mvyy4kg8",
     "name": "Investor",
     "email": "newinvestor@gmail.com",

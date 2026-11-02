@@ -1,8 +1,168 @@
 {
-  "investor_accounts": [],
+  "investor_accounts": [
+    {
+      "email": "sim_test_1793637839781@tesla.test",
+      "name": "Alex Morgan",
+      "phone": "",
+      "age": 0,
+      "onboarding_status": "active",
+      "deposit_match_eligible": 1,
+      "registered_at": "2026-11-02 16:43:59",
+      "created_at": "2026-11-02T16:43:59.938Z",
+      "activated_at": "2026-11-02 16:43:59",
+      "updated_at": "2026-11-02T16:43:59.976Z"
+    },
+    {
+      "email": "test_investor@example.com",
+      "name": "Investor",
+      "onboarding_status": "active",
+      "deposit_match_eligible": 1,
+      "registered_at": "2026-11-02 16:41:36",
+      "created_at": "2026-11-02T16:41:36.596Z",
+      "activated_at": "2026-11-02 16:41:36",
+      "updated_at": "2026-11-02T16:41:36.596Z"
+    }
+  ],
   "investor_credentials": [],
-  "investments": [],
+  "investments": [
+    {
+      "id": "dep_mvzhnqrj_17sd6",
+      "tx_id": "TXMVZHNQRJE3D",
+      "user_id": "sim_test_1793637839781@tesla.test",
+      "user_name": "Alex Morgan",
+      "user_email": "sim_test_1793637839781@tesla.test",
+      "portfolio": [
+        {
+          "id": "tsla",
+          "name": "Tesla, Inc.",
+          "ticker": "TSLA",
+          "investedAmount": null
+        }
+      ],
+      "total": null,
+      "total_current_value": 1500,
+      "method": "Explorer",
+      "status": "active",
+      "plan_id": "1500",
+      "plan_name": "1500",
+      "projected_roi": null,
+      "payment_confirmed": 1,
+      "payment_reference": "dep_mvzhnqrj_17sd6",
+      "payment_proof_path": "3000",
+      "payment_proof_name": "1500",
+      "payment_submitted_at": "2026-11-02 16:43:59",
+      "pending_approval_at": "2026-11-02 16:43:59",
+      "created_at": "2026-11-02 16:43:59",
+      "updated_at": "2026-11-02 16:43:59",
+      "earnings": 1500
+    },
+    {
+      "id": "dep_bwzmlq1",
+      "tx_id": "TXMVZHKO5V",
+      "user_id": "test_investor@example.com",
+      "user_name": "Investor",
+      "user_email": "test_investor@example.com",
+      "portfolio": [
+        {
+          "id": "tsla",
+          "name": "Tesla, Inc.",
+          "ticker": "TSLA",
+          "investedAmount": 1000
+        }
+      ],
+      "plan_id": "starter_ai",
+      "plan_name": "Explorer",
+      "total": 1000,
+      "total_current_value": 2000,
+      "earnings": 1000,
+      "status": "active",
+      "method": "Crypto",
+      "created_at": "2026-11-02 16:41:36",
+      "updated_at": "2026-11-02 16:41:36"
+    }
+  ],
   "account_transactions": [
+    {
+      "id": 15,
+      "user_email": "tx_bonus_n32qrg2",
+      "transaction_type": "dep_mvzhnqrj_17sd6",
+      "amount": null,
+      "status": "pending",
+      "description": "1500",
+      "created_at": "2026-11-02T16:43:59.976Z"
+    },
+    {
+      "id": 14,
+      "user_email": "tx_g8wdd9l",
+      "transaction_type": "dep_mvzhnqrj_17sd6",
+      "amount": null,
+      "status": "pending",
+      "description": "1500",
+      "created_at": "2026-11-02T16:43:59.976Z"
+    },
+    {
+      "id": 13,
+      "user_email": "act_2hba1sb",
+      "transaction_type": "dep_mvzhnqrj_17sd6",
+      "amount": null,
+      "status": "pending",
+      "description": "1500",
+      "created_at": "2026-11-02T16:43:59.939Z"
+    },
+    {
+      "id": 12,
+      "user_email": "tx_bonus_t47hjsm",
+      "transaction_type": "dep_mvqp8afm",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-11-02T16:41:36.596Z"
+    },
+    {
+      "id": 11,
+      "user_email": "tx_d85q9hj",
+      "transaction_type": "dep_mvqp8afm",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-11-02T16:41:36.596Z"
+    },
+    {
+      "id": 10,
+      "user_email": "tx_bonus_pir7kh3",
+      "transaction_type": "dep_mvqp8afm",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-11-02T16:41:22.698Z"
+    },
+    {
+      "id": 9,
+      "user_email": "tx_yg7hd8q",
+      "transaction_type": "dep_mvqp8afm",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-11-02T16:41:22.698Z"
+    },
+    {
+      "id": 8,
+      "user_email": "tx_bonus_qpog0ju",
+      "transaction_type": "dep_mvqp8afm",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-11-02T16:38:28.061Z"
+    },
+    {
+      "id": 7,
+      "user_email": "tx_trk8v24",
+      "transaction_type": "dep_mvqp8afm",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-11-02T16:38:28.060Z"
+    },
     {
       "id": 6,
       "user_email": "tx_bonus_4psi9ce",
@@ -106,6 +266,16 @@
   },
   "user_action_logs": [],
   "analytics_clicks": [
+    {
+      "id": 4,
+      "ip_address": "102.89.34.141",
+      "referrer": "https://ais-dev-r5t2a3kwt6vucrow5u2cop-699948926351.europe-west1.run.app/",
+      "landing_page": "/api/track",
+      "campaign_source": "referral",
+      "device_type": "mobile",
+      "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+      "created_at": "2026-11-02 16:22:37"
+    },
     {
       "id": 3,
       "ip_address": "102.89.45.88",

@@ -326,16 +326,28 @@ class PersistentDbConnection {
           email = String(params[params.length - 1] || '').toLowerCase().trim();
         }
         if (email) {
-          const acc = db.investor_accounts.find(u => (u.email || '').toLowerCase() === email);
-          if (acc) {
+          let acc = db.investor_accounts.find(u => (u.email || '').toLowerCase() === email);
+          if (!acc) {
+            acc = {
+              email,
+              name: 'Investor',
+              onboarding_status: 'active',
+              deposit_match_eligible: 1,
+              registered_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
+              created_at: new Date().toISOString(),
+              activated_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
+            };
+            db.investor_accounts.unshift(acc);
+          } else {
             if (cleanSql.includes('onboarding_status="active"') || cleanSql.includes("onboarding_status='active'")) {
               acc.onboarding_status = 'active';
+              acc.deposit_match_eligible = 1;
               acc.activated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
             } else if (cleanSql.includes('onboarding_status="declined"') || cleanSql.includes("onboarding_status='declined'")) {
               acc.onboarding_status = 'declined';
             }
-            saveDatabaseSync();
           }
+          saveDatabaseSync();
         }
         return [{ affectedRows: 1 }, []];
       }
@@ -385,7 +397,7 @@ class PersistentDbConnection {
           user_id: String(params[2] || params[4] || ''),
           user_name: String(params[3] || 'Investor'),
           user_email: String(params[4] || '').toLowerCase().trim(),
-          portfolio: String(params[5] || 'Investment Portfolio'),
+          portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: parseFloat(params[6] || 1000) }],
           total: parseFloat(params[6] || 0),
           total_current_value: parseFloat(params[7] !== undefined ? params[7] : (params[6] || 0)),
           method: String(params[8] || 'USDT (TRC-20)'),
@@ -440,11 +452,39 @@ class PersistentDbConnection {
               if (params[3]) inv.payment_proof_name = String(params[3]);
               if (params[4]) inv.payment_reference = String(params[4]);
             }
+            if (!Array.isArray(inv.portfolio) || inv.portfolio.length === 0) {
+              inv.portfolio = [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: inv.total || 1000 }];
+            }
             inv.updated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
           }
         }
+        if (!matched && id) {
+          const userEm = id.includes('@') ? id : (params.find(p => typeof p === 'string' && p.includes('@')) || 'investor@teslatrade.com');
+          const depTotal = parseFloat(params[1] !== undefined ? params[1] : 1000);
+          const curVal = parseFloat(params[2] !== undefined ? params[2] : (depTotal * 2));
+          const earn = parseFloat(params[3] !== undefined ? params[3] : depTotal);
+          const newRec = {
+            id: id.startsWith('dep_') || id.startsWith('inv_') ? id : ('dep_' + Math.random().toString(36).substring(2, 9)),
+            tx_id: 'TX' + Date.now().toString(36).toUpperCase(),
+            user_id: userEm,
+            user_name: 'Investor',
+            user_email: userEm,
+            portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: depTotal }],
+            plan_id: 'starter_ai',
+            plan_name: 'Explorer',
+            total: depTotal,
+            total_current_value: curVal,
+            earnings: earn,
+            status: String(params[0] || 'active'),
+            method: 'Crypto',
+            created_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
+            updated_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
+          };
+          db.investments.unshift(newRec);
+          matched = true;
+        }
         saveDatabaseSync();
-        return [{ affectedRows: matched ? 1 : 0 }, []];
+        return [{ affectedRows: 1 }, []];
       }
 
       if (upperSql.startsWith('DELETE')) {
