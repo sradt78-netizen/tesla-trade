@@ -347,8 +347,8 @@ const MARKETING_TEMPLATES = {
 };
 
 async function sendAccountStatusEmail(toEmail, toName, status) {
-  const apiKey = cleanString(process.env.RESEND_API_KEY || process.env.TT_RESEND_API_KEY);
-  const fromEmail = cleanString(process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM || 'onboarding@resend.dev');
+  const apiKey = cleanString(process.env.RESEND_API_KEY || process.env.TT_RESEND_API_KEY || mockStore.settings.resend_api_key);
+  const fromEmail = cleanString(process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM || mockStore.settings.resend_from_email || 'onboarding@resend.dev');
   if (!apiKey || !toEmail) return { sent: false, reason: 'Resend is not configured or recipient is missing.' };
   const approved = status === 'active';
   const subject = approved ? 'Your Tesla Trade deposit status has been updated' : 'Update about your Tesla Trade deposit';
