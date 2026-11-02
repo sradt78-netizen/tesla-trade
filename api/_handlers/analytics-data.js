@@ -1,4 +1,5 @@
 import { getDbConnection } from './dbcheck.js';
+import { isAuthorizedAdmin } from './admin.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -8,11 +9,9 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const adminPass = process.env.ADMIN_PASSWORD || process.env.TT_ADMIN_PASSWORD || 'Heartofwisdom101@$';
-
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const pass = url.searchParams.get('password') || req.headers['x-admin-password'] || '';
-  const isAuthed = pass === adminPass;
+  const isAuthed = isAuthorizedAdmin(req, {}, url);
+  if (!isAuthed) return res.status(401).json({ authenticated: false, error: 'Admin authentication required.' });
 
   try {
     const conn = await getDbConnection();
@@ -29,18 +28,9 @@ export default async function handler(req, res) {
 
     const [sources] = await conn.query('SELECT campaign_source, COUNT(*) as count FROM analytics_clicks GROUP BY campaign_source ORDER BY count DESC LIMIT 10');
     const [devices] = await conn.query('SELECT device_type, COUNT(*) as count FROM analytics_clicks GROUP BY device_type ORDER BY count DESC');
-    const [recent_clicks] = await conn.query('SELECT id, ip_address, referrer, landing_page, campaign_source, device_type, created_at FROM analytics_clicks ORDER BY id DESC LIMIT 50');
+    const [recent_clicks] = await conn.query('SELECT id, landing_page, campaign_source, device_type, created_at FROM analytics_clicks ORDER BY id DESC LIMIT 50');
 
-    let [recent_signups] = await conn.query('SELECT email, name, phone, onboarding_status, registered_at FROM investor_accounts ORDER BY registered_at DESC LIMIT 20');
-    if (!isAuthed) {
-      recent_signups = recent_signups.map(r => {
-        const parts = (r.email || '').split('@');
-        return {
-          ...r,
-          email: parts[0] ? parts[0].substring(0, 3) + '***@' + (parts[1] || '') : '—'
-        };
-      });
-    }
+    const [recent_signups] = await conn.query('SELECT email, name, phone, onboarding_status, registered_at FROM investor_accounts ORDER BY registered_at DESC LIMIT 20');
 
     await conn.end();
 

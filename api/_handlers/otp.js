@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { getDbConnection, resolveDatabaseConfig } from './dbcheck.js';
 
 function cleanString(val) {
@@ -41,7 +42,7 @@ async function sendViaResend(apiKey, fromEmail, toEmail, toName, code) {
         </div>
       </div>
       <p style="font-size: 12px; color: #6b7280; line-height: 1.6; margin-bottom: 8px;">
-        This code will expire in 24 hours. For security, never share this code with anyone.
+        This code will expire in 10 minutes. For security, never share this code with anyone.
       </p>
       <p style="font-size: 12px; color: #6b7280; line-height: 1.6;">
         If you did not request this verification code, please ignore this email.
@@ -143,7 +144,11 @@ export default async function handler(req, res) {
       });
     }
 
-    const verificationToken = 'tok_' + Math.random().toString(36).substring(2, 12) + Date.now().toString(36);
+    const secret = process.env.OTP_TOKEN_SECRET || process.env.TT_OTP_TOKEN_SECRET;
+    if (!secret) return res.status(503).json({ success: false, error: 'Email verification is not configured.' });
+    const payloadPart = Buffer.from(JSON.stringify({ email, exp: Date.now() + 10 * 60 * 1000 })).toString('base64url');
+    const signature = crypto.createHmac('sha256', secret).update(payloadPart).digest('hex');
+    const verificationToken = `${payloadPart}.${signature}`;
     return res.status(200).json({
       success: true,
       verificationToken,
@@ -155,7 +160,7 @@ export default async function handler(req, res) {
   // ── 2. SEND OTP (VIA RESEND) ───────────────────────────────────
   if (isSend) {
     const name = cleanString(body.name || 'Investor');
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = crypto.randomInt(100000, 1000000).toString();
 
     // Read Resend configuration from environment variables or database app_settings
     let resendApiKey = cleanString(
@@ -197,9 +202,9 @@ export default async function handler(req, res) {
       // Invalidate old unused OTPs
       await conn.query('UPDATE otps SET used=1 WHERE LOWER(email)=? AND used=0', [email]);
 
-      // Insert new OTP with 24hr expiration
+      // Insert new OTP with 10-minute expiration
       await conn.query(
-        'INSERT INTO otps (email, code, expires_at, name, created_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR), ?, NOW())',
+        'INSERT INTO otps (email, code, expires_at, name, created_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE), ?, NOW())',
         [email, code, name]
       );
 
@@ -212,7 +217,7 @@ export default async function handler(req, res) {
     inMemoryOtps.set(email, {
       code,
       name,
-      expiresAt: Date.now() + 24 * 60 * 60 * 1000
+      expiresAt: Date.now() + 10 * 60 * 1000
     });
 
     // Send email via Resend if API key is present
@@ -226,11 +231,10 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      code: code, // Enables instant dev/testing preview in UI banner
-      message: resendResult.ok ? 'Verification code sent to your email.' : 'Verification code generated.',
+      message: resendResult.ok ? 'Verification code sent to your email.' : 'Verification code could not be delivered.',
       email_delivered: resendResult.ok,
       resend_status: resendResult.ok ? 'sent' : resendResult.error,
-      expires_in: '24 hours'
+      expires_in: '10 minutes'
     });
   }
 

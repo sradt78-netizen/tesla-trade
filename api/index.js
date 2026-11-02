@@ -1,5 +1,5 @@
 import adminHandler from './_handlers/admin.js';
-import dbcheckHandler from './_handlers/dbcheck.js';
+import dbcheckHandler, { getDbConnection } from './_handlers/dbcheck.js';
 import paymentSettingsHandler from './_handlers/payment-settings.js';
 import paymentSubmitHandler from './_handlers/payment-submit.js';
 import trackHandler from './_handlers/track.js';
@@ -115,9 +115,20 @@ export default async function handler(req, res) {
     return await stocksHandler(req, res);
   }
 
-  // 11. Invitation verification fallback
+  // 11. Invitation verification: accept only an active code stored by an administrator.
   if (normalizedPath === '/invitation/verify') {
-    return res.status(200).json({ valid: true });
+    const code = String(url.searchParams.get('code') || '').trim().toUpperCase();
+    if (!code || code.length > 64) return res.status(400).json({ valid: false, error: 'A valid invitation code is required.' });
+    let conn;
+    try {
+      conn = await getDbConnection();
+      const [rows] = await conn.query('SELECT code FROM invitation_codes WHERE UPPER(code)=? AND status="active" LIMIT 1', [code]);
+      await conn.end();
+      return res.status(200).json({ valid: rows.length > 0 });
+    } catch (error) {
+      if (conn) try { await conn.end(); } catch (e) {}
+      return res.status(503).json({ valid: false, error: 'Invitation validation is temporarily unavailable.' });
+    }
   }
 
   // 12. Trading Settings

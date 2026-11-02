@@ -1,4 +1,5 @@
 import bcryptjs from 'bcryptjs';
+import crypto from 'crypto';
 import { getDbConnection } from './dbcheck.js';
 import { resolveSupabaseCredentials } from './supabase-config.js';
 
@@ -84,7 +85,6 @@ export default async function handler(req, res) {
           const { mockStore } = await import('./admin.js');
           const mockUser = mockStore.investors.find(u => u.email.toLowerCase() === email);
           if (mockUser) {
-            credential = { email, password_hash: password }; // accept password for seeded mock investor
             investorName = mockUser.name;
           }
         } catch (errM) {}
@@ -100,8 +100,7 @@ export default async function handler(req, res) {
       try {
         passwordValid = bcryptjs.compareSync(password, credential.password_hash);
       } catch (err) {
-        // Fallback for plain text or legacy hashes
-        passwordValid = password === credential.password_hash;
+        passwordValid = false;
       }
     }
 
@@ -120,6 +119,7 @@ export default async function handler(req, res) {
   if (pathname === '/auth/set-password' || pathname === '/auth/set-password.php') {
     const email = cleanString(body.email).toLowerCase();
     const password = body.password || '';
+    const verificationToken = cleanString(body.verificationToken || body.token);
 
     if (!email || !email.includes('@')) {
       return res.status(400).json({ success: false, message: 'Enter a valid email address.' });
@@ -127,6 +127,16 @@ export default async function handler(req, res) {
     if (!password || password.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
     }
+
+    const secret = process.env.OTP_TOKEN_SECRET || process.env.TT_OTP_TOKEN_SECRET;
+    if (!secret || !verificationToken) return res.status(401).json({ success: false, message: 'Verify your email before setting a password.' });
+    try {
+      const [payloadPart, signature] = verificationToken.split('.');
+      const expected = crypto.createHmac('sha256', secret).update(payloadPart || '').digest();
+      const supplied = Buffer.from(signature || '', 'hex');
+      const payload = JSON.parse(Buffer.from(payloadPart || '', 'base64url').toString('utf8'));
+      if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected) || payload.email !== email || !Number.isFinite(payload.exp) || payload.exp < Date.now()) throw new Error('invalid token');
+    } catch (e) { return res.status(401).json({ success: false, message: 'Verification token invalid or expired.' }); }
 
     const hash = bcryptjs.hashSync(password, 10);
     inMemoryCredentials.set(email, { email, password_hash: hash });
@@ -153,7 +163,7 @@ export default async function handler(req, res) {
 
       // Upsert account
       await conn.query(
-        'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, "Investor", "active", NOW()) ON DUPLICATE KEY UPDATE onboarding_status="active"',
+        'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, "Investor", "pending_approval", NOW()) ON DUPLICATE KEY UPDATE email=VALUES(email)',
         [email]
       );
 
@@ -212,7 +222,7 @@ export default async function handler(req, res) {
     try {
       const conn = await getDbConnection();
       await conn.query(
-        'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "active", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name)), onboarding_status="active"',
+        'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_approval", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name))',
         [email, name]
       );
       await conn.end();
@@ -222,14 +232,14 @@ export default async function handler(req, res) {
         const found = mockStore.investors.find(u => u.email.toLowerCase() === email);
         if (found) {
           found.name = name;
-          found.onboarding_status = 'active';
+          found.onboarding_status = found.onboarding_status || 'pending_approval';
         } else {
           mockStore.investors.unshift({
             id: Date.now(),
             name,
             email,
             phone: '—',
-            onboarding_status: 'active',
+            onboarding_status: 'pending_approval',
             registered_at: new Date().toISOString()
           });
         }
