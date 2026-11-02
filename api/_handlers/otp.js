@@ -160,7 +160,7 @@ export default async function handler(req, res) {
   // ── 2. SEND OTP (VIA RESEND) ───────────────────────────────────
   if (isSend) {
     const name = cleanString(body.name || 'Investor');
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = crypto.randomInt(100000, 1000000).toString();
 
     // Read Resend configuration from environment variables or database app_settings
     let resendApiKey = cleanString(
