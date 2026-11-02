@@ -202,7 +202,7 @@ export default async function handler(req, res) {
       // Invalidate old unused OTPs
       await conn.query('UPDATE otps SET used=1 WHERE LOWER(email)=? AND used=0', [email]);
 
-      // Insert new OTP with 24hr expiration
+      // Insert new OTP with 10-minute expiration
       await conn.query(
         'INSERT INTO otps (email, code, expires_at, name, created_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE), ?, NOW())',
         [email, code, name]
@@ -234,7 +234,7 @@ export default async function handler(req, res) {
       message: resendResult.ok ? 'Verification code sent to your email.' : 'Verification code could not be delivered.',
       email_delivered: resendResult.ok,
       resend_status: resendResult.ok ? 'sent' : resendResult.error,
-      expires_in: '24 hours'
+      expires_in: '10 minutes'
     });
   }
 
