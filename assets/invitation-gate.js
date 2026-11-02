@@ -3,9 +3,6 @@
 
   var currentPath = (window.location.pathname || '').toLowerCase();
   var isPublicPage = (
-    currentPath === '/' ||
-    currentPath === '' ||
-    currentPath === '/index.html' ||
     currentPath.indexOf('/about') !== -1 ||
     currentPath.indexOf('/contact') !== -1 ||
     currentPath.indexOf('/faq') !== -1 ||
@@ -141,10 +138,6 @@
   function verifyCode(code) {
     if (!nativeFetch) return Promise.reject(new Error('Invitation verification is unavailable.'));
     var normCode = normalize(code);
-    var isKnownVip = normCode === 'TT-2026-VIP' || normCode === 'INVITATIONCODE' || normCode === 'TESLA-TRADE-2026';
-    if (isKnownVip) {
-      return Promise.resolve({ valid: true });
-    }
     var controller = window.AbortController ? new AbortController() : null;
     var timeoutId = setTimeout(function () {
       if (controller) controller.abort();
@@ -246,12 +239,6 @@
         return;
       }
 
-      var isVip = code === 'TT-2026-VIP' || code === 'INVITATIONCODE' || code === 'TESLA-TRADE-2026';
-      if (isVip) {
-        set(code);
-        unlockPage();
-        return;
-      }
 
       var button = form.querySelector('button');
       button.disabled = true;
@@ -281,11 +268,6 @@
     }
 
     var normCode = normalize(code);
-    var isKnownVip = normCode === 'TT-2026-VIP' || normCode === 'INVITATIONCODE' || normCode === 'TESLA-TRADE-2026';
-    if (isKnownVip) {
-      unlockPage();
-      return;
-    }
 
     verifyCode(code).then(function () {
       unlockPage();
