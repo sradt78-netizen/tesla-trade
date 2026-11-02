@@ -4,6 +4,42 @@
   "investments": [],
   "account_transactions": [
     {
+      "id": 6,
+      "user_email": "tx_bonus_4psi9ce",
+      "transaction_type": "dep_nonexistent_123",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-11-02T07:37:12.586Z"
+    },
+    {
+      "id": 5,
+      "user_email": "tx_kcuj3og",
+      "transaction_type": "dep_nonexistent_123",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-11-02T07:37:12.586Z"
+    },
+    {
+      "id": 4,
+      "user_email": "tx_bonus_wqtx3iz",
+      "transaction_type": "dep_dansaki_1",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-11-02T07:21:56.674Z"
+    },
+    {
+      "id": 3,
+      "user_email": "tx_3tadoqm",
+      "transaction_type": "dep_dansaki_1",
+      "amount": null,
+      "status": "pending",
+      "description": "1000",
+      "created_at": "2026-11-02T07:21:56.674Z"
+    },
+    {
       "id": 2,
       "user_email": "tx_bonus_5atzdfl",
       "transaction_type": "dep_mvqymovo",
@@ -69,7 +105,38 @@
     "marketing_last_run": ""
   },
   "user_action_logs": [],
-  "analytics_clicks": [],
+  "analytics_clicks": [
+    {
+      "id": 3,
+      "ip_address": "102.89.45.88",
+      "referrer": "https://ais-dev-rcz6tqycwq6fdngi7es3qu-132905307464.europe-west2.run.app/",
+      "landing_page": "/api/track",
+      "campaign_source": "referral",
+      "device_type": "mobile",
+      "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+      "created_at": "2026-11-02 07:16:10"
+    },
+    {
+      "id": 2,
+      "ip_address": "102.89.45.88",
+      "referrer": "https://ais-dev-rcz6tqycwq6fdngi7es3qu-132905307464.europe-west2.run.app/",
+      "landing_page": "/api/track",
+      "campaign_source": "referral",
+      "device_type": "mobile",
+      "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+      "created_at": "2026-11-02 07:13:12"
+    },
+    {
+      "id": 1,
+      "ip_address": "38.248.89.51",
+      "referrer": "https://ais-dev-rcz6tqycwq6fdngi7es3qu-132905307464.europe-west2.run.app/",
+      "landing_page": "/api/track",
+      "campaign_source": "referral",
+      "device_type": "mobile",
+      "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+      "created_at": "2026-11-02 07:11:36"
+    }
+  ],
   "marketing_emails_log": [],
   "financing": []
 }
