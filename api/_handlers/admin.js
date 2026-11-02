@@ -51,7 +51,7 @@ export function getAdminExpectedPassword() {
   return cleanString(
     process.env.ADMIN_PASSWORD ||
     process.env.TT_ADMIN_PASSWORD ||
-    'Heartofwisdom101@$'
+    ''
   );
 }
 
