@@ -9,6 +9,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
+  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const isAuthed = isAuthorizedAdmin(req, {}, url);
   if (!isAuthed) return res.status(401).json({ authenticated: false, error: 'Admin authentication required.' });
 
