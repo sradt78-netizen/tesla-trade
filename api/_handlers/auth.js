@@ -85,7 +85,6 @@ export default async function handler(req, res) {
           const { mockStore } = await import('./admin.js');
           const mockUser = mockStore.investors.find(u => u.email.toLowerCase() === email);
           if (mockUser) {
-            credential = { email, password_hash: password }; // accept password for seeded mock investor
             investorName = mockUser.name;
           }
         } catch (errM) {}
@@ -101,8 +100,7 @@ export default async function handler(req, res) {
       try {
         passwordValid = bcryptjs.compareSync(password, credential.password_hash);
       } catch (err) {
-        // Fallback for plain text or legacy hashes
-        passwordValid = password === credential.password_hash;
+        passwordValid = false;
       }
     }
 
