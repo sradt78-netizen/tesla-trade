@@ -1,8 +1,74 @@
 {
-  "investor_accounts": [],
+  "investor_accounts": [
+    {
+      "email": "investor@tesla.com",
+      "name": "Tesla Investor",
+      "phone": "",
+      "age": 0,
+      "onboarding_status": "active",
+      "deposit_match_eligible": 1,
+      "registered_at": "2026-11-03 09:38:51",
+      "created_at": "2026-11-03T09:38:51.792Z",
+      "activated_at": "2026-11-03 09:38:58"
+    }
+  ],
   "investor_credentials": [],
-  "investments": [],
-  "account_transactions": [],
+  "investments": [
+    {
+      "id": "dep_mw0hwv80_h8bct",
+      "tx_id": "TXMW0HWV80LAC",
+      "user_id": "investor@tesla.com",
+      "user_name": "Tesla Investor",
+      "user_email": "investor@tesla.com",
+      "portfolio": "Tesla Investor · Tesla · Model 3 Arbitrage",
+      "total": 500,
+      "total_current_value": 1000,
+      "method": "USDT (TRC-20)",
+      "status": "active",
+      "plan_id": "standard",
+      "plan_label": "Tesla · Model 3 Arbitrage",
+      "plan_name": "Tesla · Model 3 Arbitrage",
+      "projected_roi": 70,
+      "payment_confirmed": 1,
+      "payment_reference": "TXTEST123",
+      "payment_proof_path": "",
+      "payment_proof_name": "receipt.jpg",
+      "payment_submitted_at": "2026-11-03 09:38:51",
+      "created_at": "2026-11-03 09:38:51",
+      "updated_at": "2026-11-03 09:38:58",
+      "earnings": 500,
+      "activated_at": "2026-11-03 09:38:58"
+    }
+  ],
+  "account_transactions": [
+    {
+      "id": 3,
+      "user_email": "tx_bonus_b45n4zs",
+      "transaction_type": "dep_mw0hwv80_h8bct",
+      "amount": null,
+      "status": "pending",
+      "description": "500",
+      "created_at": "2026-11-03T09:38:58.438Z"
+    },
+    {
+      "id": 2,
+      "user_email": "tx_nx1ude0",
+      "transaction_type": "dep_mw0hwv80_h8bct",
+      "amount": null,
+      "status": "pending",
+      "description": "500",
+      "created_at": "2026-11-03T09:38:58.437Z"
+    },
+    {
+      "id": 1,
+      "user_email": "act_y2fos30",
+      "transaction_type": "dep_mw0hwv80_h8bct",
+      "amount": null,
+      "status": "pending",
+      "description": "500",
+      "created_at": "2026-11-03T09:38:51.793Z"
+    }
+  ],
   "kyc_submissions": [],
   "ev_orders": [],
   "withdrawals": [],
@@ -40,7 +106,28 @@
     "marketing_last_run": ""
   },
   "user_action_logs": [],
-  "analytics_clicks": [],
+  "analytics_clicks": [
+    {
+      "id": 2,
+      "ip_address": "105.113.107.114",
+      "referrer": "https://ais-dev-jqovz4owua7mkkjz6q6q5f-453580786471.europe-west3.run.app/",
+      "landing_page": "/api/track",
+      "campaign_source": "referral",
+      "device_type": "mobile",
+      "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36",
+      "created_at": "2026-11-03 09:25:51"
+    },
+    {
+      "id": 1,
+      "ip_address": "105.113.107.114",
+      "referrer": "https://ais-dev-jqovz4owua7mkkjz6q6q5f-453580786471.europe-west3.run.app/",
+      "landing_page": "/api/track",
+      "campaign_source": "referral",
+      "device_type": "mobile",
+      "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36",
+      "created_at": "2026-11-03 09:21:05"
+    }
+  ],
   "marketing_emails_log": [],
   "financing": []
 }

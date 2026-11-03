@@ -41,15 +41,29 @@
           return res.clone().json().then(function (data) {
             if (data && typeof data === 'object') {
               var modified = false;
-              if (data.status === 'approved' || data.status === 'verified' || localStorage.getItem('ttinc_account_approved') === 'true') {
+              var isUserApproved = (data.status === 'approved' || data.status === 'verified' || data.status === 'active' || localStorage.getItem('ttinc_account_approved') === 'true');
+              if (isUserApproved) {
                 data.status = 'active';
+                data.canWithdraw = true;
                 modified = true;
               }
               var p = Number(data.total != null ? data.total : (data.amount != null ? data.amount : 0));
+              if (p <= 0 && isUserApproved) {
+                var localMeta = {};
+                try { localMeta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
+                var localTotal = Number(localMeta.total != null ? localMeta.total : (localMeta.amount != null ? localMeta.amount : (localStorage.getItem('ttinc_deposit_amount') || 0)));
+                if (localTotal > 0) {
+                  p = localTotal;
+                  data.total = p;
+                  modified = true;
+                }
+              }
               var c = Number(data.totalCurrentValue || data.total_current_value || (p > 0 ? p * 2 : 0));
               if (c <= p && p > 0) {
-                data.totalCurrentValue = p * 2;
-                data.total_current_value = p * 2;
+                c = p * 2;
+                data.totalCurrentValue = c;
+                data.total_current_value = c;
+                data.bonus = p;
                 modified = true;
               }
               if (!Array.isArray(data.portfolio) || data.portfolio.length === 0) {
@@ -65,6 +79,10 @@
                 modified = true;
               }
               if (modified) {
+                try {
+                  localStorage.setItem('ttinc_inv_meta', JSON.stringify(data));
+                  if (data.status === 'active') localStorage.setItem('ttinc_account_approved', 'true');
+                } catch (e) {}
                 return new Response(JSON.stringify(data), {
                   status: 200,
                   headers: { 'Content-Type': 'application/json' }
@@ -283,6 +301,11 @@
         );
         if (Number.isFinite(storedPrincipal)) oldPrincipal = storedPrincipal;
         if (Number.isFinite(storedCurrent)) oldCurrent = storedCurrent;
+        if (principal <= 0 && storedPrincipal > 0) {
+          principal = storedPrincipal;
+          current = storedCurrent || (principal * 2);
+          bonus = principal;
+        }
         oldMeta.id = investmentId || oldMeta.id || 'sim_inv_1';
         oldMeta.total = principal;
         oldMeta.totalCurrentValue = current;

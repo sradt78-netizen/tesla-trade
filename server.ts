@@ -209,11 +209,7 @@ app.all(
 app.all(['/api/stocks', '/api/stocks.php'], (req, res) => stocksHandler(req, res));
 app.all(['/api/payment-settings', '/api/payment-settings.php'], (req, res) => paymentSettingsHandler(req, res));
 // ── In-Memory Trading Store & Handlers for Mock / Live Support ──
-const mockTradingInvestments: Record<string, any> = {
-  'mock-funded': { id: 'mock-funded', status: 'active', total: 1000, totalCurrentValue: 2000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null },
-  'mock-empty': { id: 'mock-empty', status: 'active', total: 0, totalCurrentValue: 0, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null },
-  'sim_inv_1': { id: 'sim_inv_1', status: 'active', total: 1000, totalCurrentValue: 2000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null }
-};
+const mockTradingInvestments: Record<string, any> = {};
 
 let serverTradingSettings = {
   profitIntervalSeconds: 3,
@@ -222,13 +218,51 @@ let serverTradingSettings = {
   lossRatePercent: 1
 };
 
+function resolveTradingInvestment(id: string, email?: string) {
+  let inv = mockTradingInvestments[id];
+  if (inv && inv.total > 0) return inv;
+
+  try {
+    const diskDeposits = loadPersistentDeposits();
+    const found = diskDeposits.find((d: any) =>
+      String(d.id) === String(id) ||
+      (email && (d.user_email || d.email || '').toLowerCase() === email.toLowerCase()) ||
+      ((d.user_email || d.email) && String(d.user_email || d.email).toLowerCase() === String(id).toLowerCase())
+    ) || diskDeposits.find((d: any) => d.status === 'active' || d.status === 'approved') || (diskDeposits.length > 0 ? diskDeposits[0] : null);
+
+    if (found) {
+      const tot = Number(found.total != null ? found.total : (found.amount != null ? found.amount : 0));
+      let curVal = Number(found.totalCurrentValue || found.total_current_value || (tot > 0 ? tot * 2 : 0));
+      if (curVal <= tot && tot > 0) curVal = tot * 2;
+      inv = {
+        id: found.id || id,
+        status: found.status || 'active',
+        total: tot,
+        totalCurrentValue: curVal,
+        tradingStatus: inv?.tradingStatus || 'idle',
+        tradingAmount: inv?.tradingAmount || 0,
+        tradingStartedAt: inv?.tradingStartedAt || null
+      };
+      mockTradingInvestments[id] = inv;
+      if (found.id) mockTradingInvestments[found.id] = inv;
+      return inv;
+    }
+  } catch (e) {}
+
+  if (!inv) {
+    inv = { id, status: 'active', total: 0, totalCurrentValue: 0, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
+    mockTradingInvestments[id] = inv;
+  }
+  return inv;
+}
+
 function computeTradeValue(inv: any, now: number) {
   const tot = Number(inv.total || 0);
   let curVal = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : 0));
   if ((inv.status === 'active' || inv.status === 'approved') && (curVal <= tot || curVal === 0) && tot > 0) {
     curVal = tot * 2;
   }
-  const balance = curVal || (tot > 0 ? tot * 2 : 2000);
+  const balance = curVal || (tot > 0 ? tot * 2 : 0);
   if (inv.tradingStatus !== 'active' || !inv.tradingStartedAt) {
     return {
       status: 'idle',
@@ -305,24 +339,7 @@ app.post('/api/admin/trading-settings', (req, res) => {
 app.get('/api/investments/:id/trading-state', (req, res) => {
   const id = req.params.id;
   const now = Number(req.query.now || Math.floor(Date.now() / 1000));
-  let inv = mockTradingInvestments[id];
-  if (!inv) {
-    try {
-      const diskDeposits = loadPersistentDeposits();
-      const found = diskDeposits.find((d: any) => String(d.id) === String(id) || ((d.user_email || d.email) && String(d.user_email || d.email).toLowerCase() === String(id).toLowerCase()));
-      if (found) {
-        const tot = Number(found.total || 1000);
-        let curVal = Number(found.totalCurrentValue || found.total_current_value || (tot * 2));
-        if (curVal <= tot && tot > 0) curVal = tot * 2;
-        inv = { id, status: found.status || 'active', total: tot, totalCurrentValue: curVal, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
-        mockTradingInvestments[id] = inv;
-      }
-    } catch (e) {}
-  }
-  if (!inv) {
-    inv = { id, status: 'active', total: 1000, totalCurrentValue: 2000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
-    mockTradingInvestments[id] = inv;
-  }
+  const inv = resolveTradingInvestment(id, req.query.email as string);
   return res.json({
     investmentId: id,
     trade: computeTradeValue(inv, now)
@@ -332,24 +349,7 @@ app.get('/api/investments/:id/trading-state', (req, res) => {
 app.post('/api/investments/:id/trading/start', (req, res) => {
   const id = req.params.id;
   const now = Number(req.query.now || Math.floor(Date.now() / 1000));
-  let inv = mockTradingInvestments[id];
-  if (!inv) {
-    try {
-      const diskDeposits = loadPersistentDeposits();
-      const found = diskDeposits.find((d: any) => String(d.id) === String(id) || ((d.user_email || d.email) && String(d.user_email || d.email).toLowerCase() === String(id).toLowerCase()));
-      if (found) {
-        const tot = Number(found.total || 1000);
-        let curVal = Number(found.totalCurrentValue || found.total_current_value || (tot * 2));
-        if (curVal <= tot && tot > 0) curVal = tot * 2;
-        inv = { id, status: found.status || 'active', total: tot, totalCurrentValue: curVal, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
-        mockTradingInvestments[id] = inv;
-      }
-    } catch (e) {}
-  }
-  if (!inv) {
-    inv = { id, status: 'active', total: 1000, totalCurrentValue: 2000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
-    mockTradingInvestments[id] = inv;
-  }
+  const inv = resolveTradingInvestment(id, req.query.email as string);
   const amount = Number(req.body.amount || 0);
   const tot = Number(inv.total || 0);
   let available = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : tot * 2));
@@ -392,9 +392,13 @@ app.post('/api/investments/:id/trading/stop', (req, res) => {
 app.get('/api/wallet', (req, res) => {
   const email = String(req.query.email || '').toLowerCase().trim();
   const diskDeposits = loadPersistentDeposits();
-  const found = diskDeposits.find((d: any) => (d.user_email || d.email || '').toLowerCase() === email);
-  const total = Number(found?.total || 1000);
-  const totalCurrentValue = Number(found?.totalCurrentValue || found?.total_current_value || (total * 2));
+  const found = diskDeposits.find((d: any) =>
+    (email && (d.user_email || d.email || '').toLowerCase() === email) ||
+    d.status === 'active' || d.status === 'approved'
+  ) || (diskDeposits.length > 0 ? diskDeposits[0] : null);
+  const total = Number(found?.total != null ? found.total : (found?.amount || 0));
+  let totalCurrentValue = Number(found?.totalCurrentValue || found?.total_current_value || (total > 0 ? total * 2 : 0));
+  if (totalCurrentValue <= total && total > 0) totalCurrentValue = total * 2;
   return res.json({
     email,
     connected: true,
@@ -410,42 +414,20 @@ app.get(['/api/investments/:id/chart-data', '/api/investments/chart-data', '/api
   const email = String(req.query.email || '').toLowerCase().trim();
   const timeframe = String(req.query.timeframe || '30d').toLowerCase();
 
-  let inv = mockTradingInvestments[id];
-  if (!inv) {
-    try {
-      const diskDeposits = loadPersistentDeposits();
-      const found = diskDeposits.find((d: any) =>
-        (id && String(d.id) === String(id)) ||
-        (email && (d.user_email || d.email || '').toLowerCase() === email)
-      );
-      if (found) {
-        const tot = Number(found.total || 1000);
-        let curVal = Number(found.totalCurrentValue || found.total_current_value || (tot * 2));
-        if (curVal <= tot && tot > 0) curVal = tot * 2;
-        inv = {
-          id: found.id || id,
-          status: found.status || 'active',
-          total: tot,
-          totalCurrentValue: curVal,
-          bonus: tot,
-          roi_percent: found.roi_percent || found.roiPercent || 70,
-          plan_name: found.plan_name || found.planName || found.portfolio || 'Tesla · Explorer',
-          created_at: found.created_at || found.createdAt
-        };
-      }
-    } catch (e) {}
-  }
-  if (!inv) {
-    inv = {
-      id: id || 'sim_inv_1',
-      status: 'active',
-      total: 1000,
-      totalCurrentValue: 2000,
-      bonus: 1000,
-      roi_percent: 70,
-      plan_name: 'Tesla · Explorer'
-    };
-  }
+  const found = resolveTradingInvestment(id, email);
+  const tot = Number(found.total || 0);
+  let curVal = Number(found.totalCurrentValue || (tot > 0 ? tot * 2 : 0));
+  if (curVal <= tot && tot > 0) curVal = tot * 2;
+  const inv = {
+    id: found.id || id || 'sim_inv_1',
+    status: found.status || 'active',
+    total: tot,
+    totalCurrentValue: curVal,
+    bonus: tot,
+    roi_percent: found.roi_percent || found.roiPercent || 70,
+    plan_name: found.plan_name || found.planName || found.portfolio || 'Tesla · Explorer',
+    created_at: found.created_at || found.createdAt
+  };
   return res.json(generateChartData(inv, timeframe));
 });
 

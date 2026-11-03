@@ -165,6 +165,15 @@
       '<div class="ttinc-modal-card" role="dialog" aria-modal="true" aria-labelledby="ttinc-modal-title">' +
         '<h3 id="ttinc-modal-title">Trade Now — Capital Allocation</h3>' +
         '<p>Select your allocation to start the algorithmic trading engine. Your live graph tracks high-frequency arbitrage yield in real-time.</p>' +
+        '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:14px 16px;margin:0 0 16px;display:flex;align-items:center;justify-content:space-between;">' +
+          '<div>' +
+            '<span style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;font-weight:700;">Available Wallet Balance</span>' +
+            '<strong id="ttinc-modal-wallet-balance" style="font-family:\'SF Mono\',Monaco,Consolas,monospace;font-size:20px;color:#fff;">$0.00</strong>' +
+          '</div>' +
+          '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:999px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);color:#4ade80;font-size:11px;font-weight:700;">' +
+            '✦ 100% Match Applied' +
+          '</span>' +
+        '</div>' +
         '<div class="ttinc-alloc-grid">' +
           '<button class="ttinc-alloc" data-pct="10">10%</button>' +
           '<button class="ttinc-alloc" data-pct="50">50%</button>' +
@@ -176,16 +185,59 @@
         '<div class="ttinc-modal-actions"><button class="ttinc-cancel" type="button">Cancel</button><button class="ttinc-confirm" type="button">Trade Now ✦</button></div>' +
       '</div>';
     document.body.appendChild(modal);
+
+    var customInput = modal.querySelector('#ttinc-custom-amount');
+    var confirmBtn = modal.querySelector('.ttinc-confirm');
+    var errorBox = modal.querySelector('#ttinc-modal-error');
+
+    function syncButtonLabel() {
+      var available = Number(modal.dataset.available || 0);
+      var val = Number(customInput.value || 0);
+      if (val > available && available > 0) {
+        errorBox.textContent = 'Enter an amount within your available balance of ' + money(available);
+        errorBox.style.display = 'block';
+        confirmBtn.textContent = 'Trade Now ✦';
+      } else if (val > 0) {
+        errorBox.style.display = 'none';
+        confirmBtn.textContent = 'Trade ' + money(val) + ' Now ✦';
+      } else {
+        errorBox.style.display = 'none';
+        confirmBtn.textContent = 'Trade Now ✦';
+      }
+    }
+
+    customInput.addEventListener('input', function () {
+      var available = Number(modal.dataset.available || 0);
+      var val = Number(customInput.value || 0);
+      modal.querySelectorAll('.ttinc-alloc').forEach(function (button) {
+        var pct = Number(button.dataset.pct || 0);
+        var expected = Number((available * pct / 100).toFixed(2));
+        if (Math.abs(val - expected) < 0.01 && val > 0) {
+          button.classList.add('selected');
+        } else {
+          button.classList.remove('selected');
+        }
+      });
+      syncButtonLabel();
+    });
+
     modal.addEventListener('click', function (event) {
       if (event.target === modal || event.target.closest('.ttinc-cancel')) {
         modal.style.display = 'none';
       }
       var allocation = event.target.closest('.ttinc-alloc');
       if (allocation) {
+        var available = Number(modal.dataset.available || 0);
+        var pct = Number(allocation.dataset.pct || 0);
+        var calculatedAmt = Number((available * pct / 100).toFixed(2));
         modal.querySelectorAll('.ttinc-alloc').forEach(function (button) { button.classList.remove('selected'); });
         allocation.classList.add('selected');
-        modal.querySelector('#ttinc-custom-amount').value = '';
-        modal.querySelector('#ttinc-modal-error').style.display = 'none';
+        customInput.value = calculatedAmt.toFixed(2);
+        errorBox.style.display = 'none';
+        syncButtonLabel();
+      }
+      if (event.target.closest('.ttinc-confirm')) {
+        confirmStart();
       }
     });
   }
@@ -193,10 +245,25 @@
   function openModal(available) {
     ensureModal();
     var modal = document.getElementById(modalId);
+    if (!available || available <= 0) {
+      try {
+        var metaObj = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+        if (metaObj.totalCurrentValue) available = Number(metaObj.totalCurrentValue);
+        else if (metaObj.total) available = Number(metaObj.total) * 2;
+        else if (localStorage.getItem('ttinc_deposit_amount')) available = Number(localStorage.getItem('ttinc_deposit_amount')) * 2;
+      } catch (e) {}
+    }
+    available = Math.max(0, Number(available || 0));
     modal.dataset.available = String(available);
+    var balNode = modal.querySelector('#ttinc-modal-wallet-balance');
+    if (balNode) balNode.textContent = money(available);
     modal.querySelectorAll('.ttinc-alloc').forEach(function (button) { button.classList.remove('selected'); });
-    modal.querySelector('#ttinc-custom-amount').value = '';
-    modal.querySelector('#ttinc-modal-error').style.display = 'none';
+    var customInput = modal.querySelector('#ttinc-custom-amount');
+    if (customInput) customInput.value = '';
+    var errorBox = modal.querySelector('#ttinc-modal-error');
+    if (errorBox) errorBox.style.display = 'none';
+    var confirmBtn = modal.querySelector('.ttinc-confirm');
+    if (confirmBtn) confirmBtn.textContent = 'Trade Now ✦';
     modal.style.display = 'flex';
     var firstAlloc = modal.querySelector('.ttinc-alloc');
     if (firstAlloc) firstAlloc.focus();
@@ -366,14 +433,15 @@
       }
     }
 
-    var metaVal = 2000;
+    var metaVal = 0;
     try {
       var metaObj = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
       if (metaObj.totalCurrentValue) metaVal = Number(metaObj.totalCurrentValue);
       else if (metaObj.total) metaVal = Number(metaObj.total) * 2;
+      else if (localStorage.getItem('ttinc_deposit_amount')) metaVal = Number(localStorage.getItem('ttinc_deposit_amount')) * 2;
     } catch (e) {}
-    var available = Number(trade.availableBalance != null ? trade.availableBalance : metaVal);
-    if (!trade.status && available < metaVal && metaVal > 0) {
+    var available = Number(trade.availableBalance != null && trade.availableBalance > 0 ? trade.availableBalance : metaVal);
+    if (!trade.status && metaVal > 0 && available < metaVal) {
       available = metaVal;
     }
     var active = trade.status === 'active';
@@ -526,10 +594,12 @@
     var available = Number(modal.dataset.available || 0);
     var selected = modal.querySelector('.ttinc-alloc.selected');
     var custom = Number(modal.querySelector('#ttinc-custom-amount').value || 0);
-    var amount = selected ? available * Number(selected.dataset.pct) / 100 : custom;
+    var amount = custom > 0 ? custom : (selected ? Number((available * Number(selected.dataset.pct) / 100).toFixed(2)) : 0);
     var error = modal.querySelector('#ttinc-modal-error');
     if (!amount || amount <= 0 || amount > available) {
-      error.textContent = 'Enter an amount between $0.01 and your available balance.';
+      error.textContent = available > 0
+        ? 'Enter an amount between $0.01 and your available balance of ' + money(available) + '.'
+        : 'You have no available funds. Top up your account before starting a trade.';
       error.style.display = 'block';
       return;
     }

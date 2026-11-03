@@ -83,7 +83,7 @@
       if (isApproved) {
         if (str.indexOf('/invest') !== -1 || str.indexOf('/waiting') !== -1 || str.indexOf('/payment') !== -1) {
           if (window.location.pathname !== '/overview' && window.location.pathname !== '/dashboard') {
-            window.location.replace('/overview');
+            window.location.replace('/dashboard');
           }
           return true;
         }
@@ -430,10 +430,10 @@
           window.dispatchEvent(new Event('storage'));
           window.dispatchEvent(new Event('ttinc_balance_sync'));
 
-          // If current route is /waiting or /invest, route straight to /overview
+          // If current route is /waiting or /invest, route straight to /dashboard
           var currentPath = (window.location.pathname || '').toLowerCase();
           if (currentPath === '/waiting' || currentPath === '/invest' || currentPath === '/payment') {
-            window.location.replace('/overview');
+            window.location.replace('/dashboard');
             return;
           }
 

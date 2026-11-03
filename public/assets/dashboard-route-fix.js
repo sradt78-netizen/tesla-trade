@@ -86,10 +86,13 @@
         cache: 'no-store'
       }).then(function (r) { return r.ok ? r.json() : null; }).then(function (acc) {
         if (acc && (acc.hasActiveInvestment || acc.status === 'active') && acc.activeInvestmentId) {
+          var actTot = Number(acc.total != null ? acc.total : 0);
+          var actCur = Number(acc.totalCurrentValue || (actTot > 0 ? actTot * 2 : 0));
+          if (actCur <= actTot && actTot > 0) actCur = actTot * 2;
           return {
             id: acc.activeInvestmentId,
-            total: acc.total || 1000,
-            totalCurrentValue: acc.totalCurrentValue || 2000,
+            total: actTot,
+            totalCurrentValue: actCur,
             status: 'active',
             planName: acc.planName || 'Explorer'
           };

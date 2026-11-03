@@ -286,20 +286,21 @@ export default async function handler(req, res) {
       } catch (eP) {}
 
       if (!found) {
-        // If an investor was approved, find their active deposit or return active state
+        // If an investor was approved or seeking active deposit, match by email, active status, or latest deposit
+        const emailMatch = qEmail ? all.find(x => (x.user_email || x.email || '').toLowerCase().trim() === qEmail) : null;
         const activeFallback = all.find(x => x.status === 'active' || x.status === 'approved');
-        if (activeFallback) {
-          found = activeFallback;
-        } else {
-          return res.status(200).json({
-            id: String(qId || 'dep_active'),
-            status: userAdminApproved ? 'active' : 'none',
-            total: 0,
-            totalCurrentValue: 0,
-            bonus: 0,
-            planName: 'Explorer'
-          });
-        }
+        found = emailMatch || activeFallback || (all.length > 0 ? all[0] : null);
+      }
+
+      if (!found) {
+        return res.status(200).json({
+          id: String(qId || 'dep_active'),
+          status: userAdminApproved ? 'active' : 'none',
+          total: 0,
+          totalCurrentValue: 0,
+          bonus: 0,
+          planName: 'Explorer'
+        });
       }
 
       const isApproved = userAdminApproved || found.status === 'active' || found.status === 'approved' || found.status === 'completed';

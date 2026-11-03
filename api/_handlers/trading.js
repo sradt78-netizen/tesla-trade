@@ -1,11 +1,7 @@
 // Trading API Handler for Live Algorithmic Trading & Performance Graph
 import { loadPersistentDeposits } from './payment-submit.js';
 
-export const tradingInvestments = {
-  'mock-funded': { id: 'mock-funded', status: 'active', total: 1000, totalCurrentValue: 2000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null },
-  'mock-empty': { id: 'mock-empty', status: 'active', total: 0, totalCurrentValue: 0, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null },
-  'sim_inv_1': { id: 'sim_inv_1', status: 'active', total: 1000, totalCurrentValue: 2000, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null }
-};
+export const tradingInvestments = {};
 
 export let tradingSettings = {
   profitIntervalSeconds: 3,
@@ -20,7 +16,7 @@ export function computeTradeValue(inv, now) {
   if ((inv.status === 'active' || inv.status === 'approved') && (curVal <= tot || curVal === 0) && tot > 0) {
     curVal = tot * 2;
   }
-  const balance = curVal || (tot > 0 ? tot * 2 : 2000);
+  const balance = curVal || (tot > 0 ? tot * 2 : 0);
   if (inv.tradingStatus !== 'active' || !inv.tradingStartedAt) {
     return {
       status: 'idle',
@@ -82,21 +78,26 @@ export function computeTradeValue(inv, now) {
 export function getOrCreateInvestment(id) {
   let inv = tradingInvestments[id];
   if (!inv) {
-    let depositTotal = 1000;
-    let curVal = 2000;
+    let depositTotal = 0;
+    let curVal = 0;
+    let invStatus = 'active';
     try {
       const diskDeposits = loadPersistentDeposits();
-      const match = diskDeposits.find(d => String(d.id) === String(id) || ((d.user_email || d.email) && String(d.user_email || d.email).toLowerCase() === String(id).toLowerCase()));
+      const match = diskDeposits.find(d =>
+        String(d.id) === String(id) ||
+        ((d.user_email || d.email) && String(d.user_email || d.email).toLowerCase() === String(id).toLowerCase())
+      ) || diskDeposits.find(d => d.status === 'active' || d.status === 'approved') || (diskDeposits.length > 0 ? diskDeposits[0] : null);
       if (match) {
-        depositTotal = parseFloat(match.total || '1000');
-        curVal = parseFloat(match.totalCurrentValue || match.total_current_value || (depositTotal * 2));
+        depositTotal = parseFloat(match.total != null ? match.total : (match.amount || '0'));
+        curVal = parseFloat(match.totalCurrentValue || match.total_current_value || (depositTotal > 0 ? depositTotal * 2 : '0'));
         if (curVal <= depositTotal && depositTotal > 0) curVal = depositTotal * 2;
+        invStatus = match.status || 'active';
       }
     } catch (e) {}
 
     inv = {
       id,
-      status: 'active',
+      status: invStatus,
       total: depositTotal,
       totalCurrentValue: curVal,
       tradingStatus: 'idle',
