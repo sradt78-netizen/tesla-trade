@@ -581,7 +581,8 @@
             <option value="active">Active Only</option>
           </select>
         </div>
-        <div style="display:flex;gap:8px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" onclick="purgeMockData()" style="font-size:12px;padding:8px 12px;background:#371b1e;border:1px solid #7f1d1d;color:#fca5a5;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">🧹 Purge All Mock Data</button>
           <button type="button" onclick="exportInvestorsCSV()" style="font-size:12px;padding:8px 12px;background:#181b22;border:1px solid #2a313d;color:#cbd5e1;border-radius:8px;">📥 Export Investors (CSV)</button>
         </div>
       </div>
@@ -1444,8 +1445,13 @@
     function renderDashboard(data) {
       // 1. Investors & Investments
       var invBody = document.getElementById('investorsTableBody');
-      var investors = data.investors || [];
-      var investments = data.investments || [];
+      var isMockEntry = function(emailStr) {
+        if (!emailStr) return false;
+        var s = String(emailStr).toLowerCase();
+        return s.indexOf('example.com') !== -1 || s.indexOf('test_') !== -1 || s.indexOf('investor_test') !== -1 || s.indexOf('flow_test') !== -1 || s.indexOf('dansaki') !== -1;
+      };
+      var investors = (data.investors || []).filter(function(u) { return !isMockEntry(u.email); });
+      var investments = (data.investments || []).filter(function(i) { return !isMockEntry(i.user_email || i.email || i.user_id); });
       document.getElementById('stat-investors').textContent = investors.length;
       document.getElementById('b-investors').textContent = investors.length;
 
@@ -2064,6 +2070,24 @@
       });
     }
 
+    function purgeMockData() {
+      if (!confirm('Permanently remove all mock, test, and placeholder accounts & deposits?\n\nThis will keep your dashboard completely clean with only real investors.')) return;
+      showToast('Purging all mock and test data…');
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'purge_mock_data' })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast(d.message || 'All mock data removed.');
+        loadDashboardData();
+      })
+      .catch(function(err) {
+        alert('Error purging mock data: ' + (err.message || 'Try again'));
+      });
+    }
+
     function approveInvestorPayment(email, id) {
       if (!confirm('Approve payment for ' + (email || 'this investor') + '?\n\nThis will immediately unlock their investor dashboard and apply the 100% deposit match bonus.')) return;
       showToast('Approving payment & unlocking dashboard…');
@@ -2255,9 +2279,21 @@
         document.getElementById('depModalRef').textContent = ref;
 
         var isApproved = (status === 'active' || status === 'approved' || status === 'completed');
+        var targetEm = email.toLowerCase().trim();
         if (!isApproved && globalData && globalData.investors) {
-          var matchedUser = globalData.investors.find(function(u) { return (u.email || '').toLowerCase() === email.toLowerCase(); });
-          if (matchedUser && (matchedUser.onboarding_status === 'active' || matchedUser.onboarding_status === 'verified')) {
+          var matchedUser = globalData.investors.find(function(u) { return (u.email || '').toLowerCase().trim() === targetEm; });
+          if (matchedUser && (matchedUser.onboarding_status === 'active' || matchedUser.onboarding_status === 'verified' || matchedUser.onboarding_status === 'approved')) {
+            isApproved = true;
+          }
+        }
+        if (!isApproved && globalData && globalData.investments) {
+          var matchedInv = globalData.investments.find(function(i) {
+            var iId = String(i.id || '');
+            var iClean = iId.replace(/^dep_/, '');
+            var iEmail = (i.user_email || i.email || i.user_id || '').toLowerCase().trim();
+            return (cleanId && (iId === cleanId || iClean === cleanId)) || (targetEm && iEmail === targetEm);
+          });
+          if (matchedInv && (matchedInv.status === 'active' || matchedInv.status === 'approved' || matchedInv.status === 'completed')) {
             isApproved = true;
           }
         }

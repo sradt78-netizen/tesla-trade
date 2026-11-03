@@ -93,13 +93,13 @@ export function loadDatabase() {
         loaded[key] = JSON.parse(JSON.stringify(INITIAL_DB[key]));
       }
     }
-    // Normalize any legacy or corrupted investment rows
+    // Normalize investment rows preserving actual values
     if (Array.isArray(loaded.investments)) {
       loaded.investments.forEach(inv => {
         const t = parseFloat(inv.total);
-        inv.total = !isNaN(t) && t > 0 ? t : 1000;
+        inv.total = !isNaN(t) && t > 0 ? t : 0;
         const cv = parseFloat(inv.total_current_value);
-        inv.total_current_value = !isNaN(cv) && cv > inv.total ? cv : inv.total * 2;
+        inv.total_current_value = !isNaN(cv) && cv > 0 ? cv : (inv.total > 0 ? inv.total * 2 : 0);
       });
     }
   }
@@ -381,8 +381,13 @@ class PersistentDbConnection {
           rows = rows.filter(r => (r.user_email || '').toLowerCase() === email);
         }
         if (cleanSql.includes('id=?') || cleanSql.includes('id = ?')) {
-          const id = String(params[0] || '').trim();
-          rows = rows.filter(r => String(r.id) === id);
+          const matchIds = params.map(p => String(p || '').trim().toLowerCase()).filter(Boolean);
+          rows = rows.filter(r => {
+            const rId = String(r.id || '').trim().toLowerCase();
+            const rClean = rId.replace(/^dep_/, '');
+            const rDep = 'dep_' + rClean;
+            return matchIds.some(m => m === rId || m === rClean || m === rDep);
+          });
         }
         if (cleanSql.includes('status="pending_approval"') || cleanSql.includes("status='pending_approval'")) {
           rows = rows.filter(r => r.status === 'pending_approval');
@@ -405,8 +410,8 @@ class PersistentDbConnection {
           user_name: 'Investor',
           user_email: '',
           portfolio: 'Investment Portfolio',
-          total: 1000,
-          total_current_value: 2000,
+          total: 0,
+          total_current_value: 0,
           method: 'USDT (TRC-20)',
           status: 'pending_approval',
           plan_id: 'starter_ai',
@@ -438,10 +443,10 @@ class PersistentDbConnection {
         }
 
         // Numeric normalization
-        const parsedTotal = parseFloat(newInv.total != null ? newInv.total : 1000);
-        newInv.total = !isNaN(parsedTotal) && parsedTotal > 0 ? parsedTotal : 1000;
+        const parsedTotal = parseFloat(newInv.total != null ? newInv.total : 0);
+        newInv.total = !isNaN(parsedTotal) && parsedTotal >= 0 ? parsedTotal : 0;
         const parsedVal = parseFloat(newInv.total_current_value != null ? newInv.total_current_value : (newInv.total * 2));
-        newInv.total_current_value = !isNaN(parsedVal) && parsedVal > 0 ? parsedVal : (newInv.total * 2);
+        newInv.total_current_value = !isNaN(parsedVal) && parsedVal >= 0 ? parsedVal : (newInv.total * 2);
         newInv.user_email = String(newInv.user_email || '').toLowerCase().trim();
         if (cleanSql.includes('"active"') || cleanSql.includes("'active'")) {
           newInv.status = 'active';
@@ -476,9 +481,20 @@ class PersistentDbConnection {
             if (cleanSql.includes('status=?') || cleanSql.includes('status = ?')) {
               // params: [status, total, total_current_value, earnings, ...]
               inv.status = String(params[0] || 'active');
-              if (params[1] !== undefined) inv.total = parseFloat(params[1]) || 1000;
-              if (params[2] !== undefined) inv.total_current_value = parseFloat(params[2]) || (inv.total * 2);
-              if (params[3] !== undefined) inv.earnings = parseFloat(params[3]) || inv.total;
+              if (params[1] !== undefined) {
+                const amt = parseFloat(params[1]);
+                if (!isNaN(amt) && amt > 0) inv.total = amt;
+              }
+              if (params[2] !== undefined) {
+                const cv = parseFloat(params[2]);
+                if (!isNaN(cv) && cv > 0) inv.total_current_value = cv;
+                else if (inv.total > 0) inv.total_current_value = inv.total * 2;
+              }
+              if (params[3] !== undefined) {
+                const earn = parseFloat(params[3]);
+                if (!isNaN(earn) && earn >= 0) inv.earnings = earn;
+                else inv.earnings = inv.total;
+              }
               if (inv.status === 'active') {
                 inv.activated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
               }

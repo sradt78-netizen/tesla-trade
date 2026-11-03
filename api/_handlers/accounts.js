@@ -71,7 +71,7 @@ export default async function handler(req, res) {
       }
 
       const [invRows] = await conn.query(
-        'SELECT id, status, user_name, plan_id, plan_name, total, payment_submitted_at, payment_proof_path, payment_reference FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC',
+        'SELECT id, status, user_name, plan_id, plan_name, total, total_current_value, earnings, payment_submitted_at, payment_proof_path, payment_reference FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC',
         [email]
       );
       if (invRows.length > 0) {
@@ -90,12 +90,12 @@ export default async function handler(req, res) {
       const { inMemoryDeposits, loadPersistentDeposits } = await import('./payment-submit.js');
       if (typeof loadPersistentDeposits === 'function') {
         const diskDeposits = loadPersistentDeposits();
-        const userDisk = diskDeposits.filter(d => d.user_email && d.user_email.toLowerCase() === email);
+        const userDisk = diskDeposits.filter(d => (d.user_email || d.email || d.user_id || '').toLowerCase().trim() === email);
         for (const dd of userDisk) {
           hasAccount = true;
           const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(dd.id));
           if (exIdx >= 0) {
-            const isApproved = dd.status === 'active' || dd.status === 'approved' || userInvestments[exIdx].status === 'active' || userInvestments[exIdx].status === 'approved';
+            const isApproved = dd.status === 'active' || dd.status === 'approved' || userInvestments[exIdx].status === 'active' || userInvestments[exIdx].status === 'approved' || userAdminApproved;
             userInvestments[exIdx] = {
               ...userInvestments[exIdx],
               ...dd,
@@ -108,12 +108,12 @@ export default async function handler(req, res) {
       }
 
       if (Array.isArray(inMemoryDeposits)) {
-        const memDeposits = inMemoryDeposits.filter(d => d.user_email && d.user_email.toLowerCase() === email);
+        const memDeposits = inMemoryDeposits.filter(d => (d.user_email || d.email || d.user_id || '').toLowerCase().trim() === email);
         for (const md of memDeposits) {
           hasAccount = true;
           const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(md.id));
           if (exIdx >= 0) {
-            const isApproved = md.status === 'active' || md.status === 'approved' || userInvestments[exIdx].status === 'active' || userInvestments[exIdx].status === 'approved';
+            const isApproved = md.status === 'active' || md.status === 'approved' || userInvestments[exIdx].status === 'active' || userInvestments[exIdx].status === 'approved' || userAdminApproved;
             userInvestments[exIdx] = {
               ...userInvestments[exIdx],
               ...md,
@@ -128,24 +128,24 @@ export default async function handler(req, res) {
       const { mockStore, loadPersistentInvestors } = await import('./admin.js');
       if (typeof loadPersistentInvestors === 'function') {
         const savedInvs = loadPersistentInvestors();
-        const savedU = savedInvs.find(u => (u.email || '').toLowerCase() === email);
+        const savedU = savedInvs.find(u => (u.email || '').toLowerCase().trim() === email);
         if (savedU) {
           hasAccount = true;
           if (savedU.name) investorName = savedU.name;
-          if (savedU.onboarding_status === 'active' || savedU.onboarding_status === 'approved') {
+          if (savedU.onboarding_status === 'active' || savedU.onboarding_status === 'approved' || savedU.onboarding_status === 'verified') {
             userAdminApproved = true;
           }
         }
       }
-      const mockUser = mockStore.investors.find(u => u.email.toLowerCase() === email);
+      const mockUser = mockStore.investors.find(u => (u.email || '').toLowerCase().trim() === email);
       if (mockUser) {
         hasAccount = true;
         if (mockUser.name) investorName = mockUser.name;
-        if (mockUser.onboarding_status === 'active' || mockUser.onboarding_status === 'approved') {
+        if (mockUser.onboarding_status === 'active' || mockUser.onboarding_status === 'approved' || mockUser.onboarding_status === 'verified') {
           userAdminApproved = true;
         }
       }
-      const mockInvs = mockStore.investments.filter(i => i.user_email && i.user_email.toLowerCase() === email);
+      const mockInvs = mockStore.investments.filter(i => (i.user_email || i.email || i.user_id || '').toLowerCase().trim() === email);
       for (const mi of mockInvs) {
         hasAccount = true;
         const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(mi.id));
@@ -165,22 +165,30 @@ export default async function handler(req, res) {
         if (userInvestments.length > 0) {
           userInvestments = userInvestments.map(inv => ({ ...inv, status: 'active' }));
         } else {
+          let foundAmount = 0;
+          try {
+            const { loadPersistentDeposits } = await import('./payment-submit.js');
+            const allD = loadPersistentDeposits();
+            const anyMatch = allD.find(d => (d.user_email || d.email || d.user_id || '').toLowerCase().trim() === email);
+            if (anyMatch && anyMatch.total) foundAmount = parseFloat(anyMatch.total);
+          } catch(e) {}
+          if (!foundAmount) foundAmount = 200;
           const defaultInv = {
             id: 'dep_' + email.replace(/[^a-z0-9]/g, '_'),
             tx_id: 'TX' + Date.now().toString(36).toUpperCase(),
             user_id: email,
             user_email: email,
             user_name: investorName || 'Investor',
-            portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: 1000 }],
+            portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: foundAmount }],
             plan_id: 'starter_ai',
             plan_label: 'Explorer',
             plan_name: 'Explorer',
-            total: 1000,
-            total_current_value: 2000,
-            totalCurrentValue: 2000,
-            bonus: 1000,
-            availableBalance: 2000,
-            walletBalance: 2000,
+            total: foundAmount,
+            total_current_value: foundAmount * 2,
+            totalCurrentValue: foundAmount * 2,
+            bonus: foundAmount,
+            availableBalance: foundAmount * 2,
+            walletBalance: foundAmount * 2,
             canWithdraw: true,
             status: 'active',
             method: 'Crypto',
@@ -203,7 +211,7 @@ export default async function handler(req, res) {
 
     // Format all investments with proper values
     const formattedInvestments = userInvestments.map(inv => {
-      const depAmt = parseFloat(inv.total || '1000');
+      const depAmt = parseFloat(inv.total != null ? inv.total : (inv.amount != null ? inv.amount : 0));
       let val = parseFloat(inv.total_current_value != null ? inv.total_current_value : (inv.totalCurrentValue != null ? inv.totalCurrentValue : (depAmt * 2)));
       if (val <= depAmt && depAmt > 0) val = depAmt * 2;
       return {
@@ -216,7 +224,7 @@ export default async function handler(req, res) {
     });
 
     // Check for active or approved investment first
-    const activeInv = formattedInvestments.find(inv => inv.status === 'active' || inv.status === 'approved');
+    const activeInv = formattedInvestments.find(inv => inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed');
     if (activeInv || userAdminApproved) {
       status = 'active';
       activeInvestmentId = activeInv ? activeInv.id : (formattedInvestments[0] ? formattedInvestments[0].id : ('dep_' + email.replace(/[^a-z0-9]/g, '_')));
@@ -225,14 +233,14 @@ export default async function handler(req, res) {
     // Check for pending or declined investments
     for (const inv of formattedInvestments) {
       if (inv.status === 'pending_approval' || inv.status === 'pending') {
-        const amt = parseFloat(inv.total || '0');
+        const amt = parseFloat(inv.total != null ? inv.total : (inv.amount || 0));
         if (status !== 'active') {
           pendingDepositTotal += amt;
           pendingPayments.push({
             id: inv.id,
             status: inv.status,
             planId: inv.plan_id || 'starter_ai',
-            planName: inv.plan_name || inv.plan_label || 'Investment Plan',
+            planName: inv.plan_name || inv.plan_label || 'Explorer',
             amount: amt,
             submittedAt: inv.payment_submitted_at || inv.created_at || new Date().toISOString()
           });
@@ -248,11 +256,16 @@ export default async function handler(req, res) {
       pendingDepositTotal = 0;
     }
 
-    const activeTotal = activeInv ? parseFloat(activeInv.total || '1000') : (formattedInvestments[0] ? parseFloat(formattedInvestments[0].total || '1000') : 1000);
-    let activeVal = activeInv ? parseFloat(activeInv.totalCurrentValue || activeInv.total_current_value || (activeTotal * 2)) : (activeTotal * 2);
+    const firstValidInv = formattedInvestments.find(i => parseFloat(i.total || '0') > 0) || formattedInvestments[0];
+    const activeTotal = activeInv
+      ? parseFloat(activeInv.total != null ? activeInv.total : 0)
+      : (firstValidInv ? parseFloat(firstValidInv.total != null ? firstValidInv.total : 0) : 0);
+    let activeVal = activeInv
+      ? parseFloat(activeInv.totalCurrentValue || activeInv.total_current_value || (activeTotal > 0 ? activeTotal * 2 : 0))
+      : (activeTotal > 0 ? activeTotal * 2 : 0);
     if (activeVal <= activeTotal && activeTotal > 0) activeVal = activeTotal * 2;
 
-    const resolvedActiveId = activeInvestmentId || (status === 'active' ? (formattedInvestments[0] ? formattedInvestments[0].id : 'dep_active') : null);
+    const resolvedActiveId = activeInvestmentId || (status === 'active' ? (firstValidInv ? firstValidInv.id : 'dep_active') : null);
 
     return res.status(200).json({
       success: true,

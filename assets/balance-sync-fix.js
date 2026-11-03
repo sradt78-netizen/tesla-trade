@@ -15,17 +15,17 @@
           if (!res.ok) {
             var meta = {};
             try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
-            var p = Number(meta.total || 1000);
-            var c = Number(meta.totalCurrentValue || (p * 2));
+            var p = Number(meta.total != null ? meta.total : (meta.amount != null ? meta.amount : 0));
+            var c = Number(meta.totalCurrentValue || (p > 0 ? p * 2 : 0));
             if (c <= p && p > 0) c = p * 2;
             var synthData = {
               id: localStorage.getItem('ttinc_investment_id') || 'inv_active_1',
-              status: 'active',
+              status: (localStorage.getItem('ttinc_account_approved') === 'true' || meta.status === 'active' || meta.status === 'approved') ? 'active' : (meta.status || 'pending_approval'),
               total: p,
               totalCurrentValue: c,
               total_current_value: c,
               bonus: p,
-              planName: meta.planName || 'Pioneer',
+              planName: meta.planName || 'Explorer',
               portfolio: [
                 { id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: Math.round(p * 0.5) },
                 { id: 'nvda', name: 'NVIDIA Corp.', ticker: 'NVDA', investedAmount: Math.round(p * 0.3) },
@@ -41,12 +41,12 @@
           return res.clone().json().then(function (data) {
             if (data && typeof data === 'object') {
               var modified = false;
-              if (data.status === 'approved' || data.status === 'verified') {
+              if (data.status === 'approved' || data.status === 'verified' || localStorage.getItem('ttinc_account_approved') === 'true') {
                 data.status = 'active';
                 modified = true;
               }
-              var p = Number(data.total || 1000);
-              var c = Number(data.totalCurrentValue || data.total_current_value || 0);
+              var p = Number(data.total != null ? data.total : (data.amount != null ? data.amount : 0));
+              var c = Number(data.totalCurrentValue || data.total_current_value || (p > 0 ? p * 2 : 0));
               if (c <= p && p > 0) {
                 data.totalCurrentValue = p * 2;
                 data.total_current_value = p * 2;
@@ -258,16 +258,16 @@
         investmentId = String(invId);
       }
 
-      var principal = Number(investment.total || 1000);
+      var principal = Number(investment.total != null ? investment.total : (investment.amount != null ? investment.amount : 0));
       var current = Number(
         investment.totalCurrentValue != null
           ? investment.totalCurrentValue
-          : (investment.total_current_value != null ? investment.total_current_value : (principal > 0 ? principal * 2 : 2000))
+          : (investment.total_current_value != null ? investment.total_current_value : (principal > 0 ? principal * 2 : 0))
       );
       if (current <= principal && principal > 0) {
         current = principal * 2;
       }
-      var bonus = Number(investment.bonus || principal);
+      var bonus = Number(investment.bonus != null ? investment.bonus : principal);
 
       if (!Number.isFinite(principal) || !Number.isFinite(current)) return;
 
@@ -287,7 +287,9 @@
         oldMeta.total = principal;
         oldMeta.totalCurrentValue = current;
         oldMeta.bonus = bonus;
-        oldMeta.status = 'active';
+        if (investment.status === 'active' || investment.status === 'approved' || localStorage.getItem('ttinc_account_approved') === 'true') {
+          oldMeta.status = 'active';
+        }
         localStorage.setItem('ttinc_inv_meta', JSON.stringify(oldMeta));
       } catch (error) {}
 

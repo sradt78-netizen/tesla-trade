@@ -180,12 +180,15 @@ export default async function handler(req, res) {
     const qEmail = cleanString(req.query?.email || parsedUrl.searchParams.get('email')).toLowerCase();
     const idMatch = parsedUrl.pathname.match(/\/api\/investments\/([^/?]+)/);
     const qId = idMatch ? idMatch[1] : (req.params?.id || parsedUrl.searchParams.get('id'));
+    const cleanQId = qId ? String(qId).replace(/^dep_/, '').trim() : '';
+    const depQId = cleanQId ? ('dep_' + cleanQId) : '';
 
     let dbRows = [];
+    let userAdminApproved = false;
     try {
       const conn = await getDbConnection();
       if (qId) {
-        const [rows] = await conn.query('SELECT * FROM investments WHERE id=? LIMIT 1', [qId]);
+        const [rows] = await conn.query('SELECT * FROM investments WHERE id=? OR id=? OR id=? LIMIT 1', [qId, cleanQId, depQId]);
         dbRows = rows;
       } else if (qEmail) {
         const [rows] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC', [qEmail]);
@@ -193,6 +196,13 @@ export default async function handler(req, res) {
       } else {
         const [rows] = await conn.query('SELECT * FROM investments ORDER BY id DESC');
         dbRows = rows;
+      }
+      const checkEmail = qEmail || (dbRows[0] && (dbRows[0].user_email || dbRows[0].email));
+      if (checkEmail) {
+        const [acc] = await conn.query('SELECT onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [checkEmail.toLowerCase()]);
+        if (acc.length > 0 && (acc[0].onboarding_status === 'active' || acc[0].onboarding_status === 'approved' || acc[0].onboarding_status === 'verified')) {
+          userAdminApproved = true;
+        }
       }
       await conn.end();
     } catch (e) {}
@@ -238,34 +248,64 @@ export default async function handler(req, res) {
     } catch (e) {}
 
     if (qId) {
-      let found = all.find(x => String(x.id) === String(qId));
-      if (!found && qEmail) {
-        found = all.find(x => (x.user_email || x.email || '').toLowerCase() === qEmail && (x.status === 'active' || x.status === 'approved'))
-             || all.find(x => (x.user_email || x.email || '').toLowerCase() === qEmail);
+      let found = all.find(x => {
+        const xId = String(x.id || '').trim();
+        const xClean = xId.replace(/^dep_/, '');
+        return xId === String(qId) || xId === cleanQId || xId === depQId || xClean === cleanQId;
+      });
+      if (!found && (qEmail || String(qId).includes('@'))) {
+        const targetEm = (qEmail || String(qId).replace(/^dep_/, '')).toLowerCase().trim();
+        found = all.find(x => (x.user_email || x.email || x.user_id || '').toLowerCase().trim() === targetEm && (x.status === 'active' || x.status === 'approved'))
+             || all.find(x => (x.user_email || x.email || x.user_id || '').toLowerCase().trim() === targetEm);
       }
-      if (!found && all.length > 0) {
-        // Fallback to active investment or latest investment
-        found = all.find(x => x.status === 'active' || x.status === 'approved') || all[0];
+      if (!found && cleanQId) {
+        found = all.find(x => (x.tx_id && String(x.tx_id).toLowerCase() === cleanQId.toLowerCase()) || (x.payment_reference && String(x.payment_reference).toLowerCase() === cleanQId.toLowerCase()));
       }
-      if (!found) {
-        // Fallback default active investment for smooth client hydration
-        found = {
-          id: String(qId || 'dep_active'),
-          tx_id: 'TX' + Date.now().toString(36).toUpperCase(),
-          user_id: qEmail || 'investor@teslatrade.com',
-          user_name: 'Investor',
-          user_email: qEmail || 'investor@teslatrade.com',
-          total: 1000,
-          total_current_value: 2000,
-          status: 'active',
-          plan_name: 'Pioneer'
-        };
+      if (!found && cleanQId) {
+        found = all.find(x => {
+          const xId = String(x.id || '').toLowerCase();
+          return (xId.length > 4 && cleanQId.includes(xId)) || (cleanQId.length > 4 && xId.includes(cleanQId));
+        });
+      }
+      // If single deposit exists, link it
+      if (!found && all.length === 1) {
+        found = all[0];
       }
 
-      const st = (found.status || 'active').toLowerCase();
-      const tot = Number(found.total || found.amount || 1000) || 1000;
-      let curVal = Number(found.totalCurrentValue || found.total_current_value || 0);
-      if ((st === 'active' || st === 'approved' || st === 'completed' || !st) && (curVal <= tot || curVal === 0) && tot > 0) {
+      // Check if user is active in persistent investors
+      try {
+        const { loadPersistentInvestors } = await import('./admin.js');
+        const pInvs = loadPersistentInvestors();
+        const pEmail = (found && (found.user_email || found.email || found.user_id)) || qEmail || (String(qId).includes('@') ? String(qId).replace(/^dep_/, '') : '');
+        if (pEmail) {
+          const matchP = pInvs.find(u => (u.email || '').toLowerCase().trim() === pEmail.toLowerCase().trim());
+          if (matchP && (matchP.onboarding_status === 'active' || matchP.onboarding_status === 'approved' || matchP.onboarding_status === 'verified')) {
+            userAdminApproved = true;
+          }
+        }
+      } catch (eP) {}
+
+      if (!found) {
+        // If an investor was approved, find their active deposit or return active state
+        const activeFallback = all.find(x => x.status === 'active' || x.status === 'approved');
+        if (activeFallback) {
+          found = activeFallback;
+        } else {
+          return res.status(200).json({
+            id: String(qId || 'dep_active'),
+            status: userAdminApproved ? 'active' : 'none',
+            total: 0,
+            totalCurrentValue: 0,
+            bonus: 0,
+            planName: 'Explorer'
+          });
+        }
+      }
+
+      const isApproved = userAdminApproved || found.status === 'active' || found.status === 'approved' || found.status === 'completed';
+      const tot = Number(found.total != null ? found.total : (found.amount != null ? found.amount : 0));
+      let curVal = Number(found.totalCurrentValue || found.total_current_value || (tot > 0 ? tot * 2 : 0));
+      if (isApproved && (curVal <= tot || curVal === 0) && tot > 0) {
         curVal = tot * 2;
       }
       if (!curVal || isNaN(curVal)) curVal = tot * 2;
@@ -273,13 +313,13 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         ...found,
-        status: (st === 'approved' || st === 'completed' || !st) ? 'active' : st,
+        status: isApproved ? 'active' : (found.status || 'pending_approval'),
         portfolio: Array.isArray(found.portfolio) && found.portfolio.length > 0
           ? found.portfolio
           : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot }],
-        planName: found.planName || found.plan_name || found.plan_label || 'Pioneer',
+        planName: found.planName || found.plan_name || found.plan_label || 'Explorer',
         txId: found.txId || found.tx_id || ('TX' + Date.now().toString(36).toUpperCase()),
-        canWithdraw: true,
+        canWithdraw: isApproved,
         total: tot,
         totalCurrentValue: curVal,
         total_current_value: curVal,
@@ -297,7 +337,7 @@ export default async function handler(req, res) {
 
     all = all.map(item => {
       const st = (item.status || 'active').toLowerCase();
-      const tot = Number(item.total || item.amount || 1000);
+      const tot = Number(item.total != null ? item.total : (item.amount != null ? item.amount : 0));
       let curVal = Number(item.totalCurrentValue || item.total_current_value || 0);
       if ((st === 'active' || st === 'approved' || st === 'completed' || !st) && (curVal <= tot || curVal === 0) && tot > 0) {
         curVal = tot * 2;

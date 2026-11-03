@@ -467,22 +467,37 @@ export default async function handler(req, res) {
   try {
     // ── 0b. GET DEPOSIT RECEIPT DETAILS & FULL IMAGE ───────────────
     if (action === 'get_receipt' || action === 'view_receipt') {
-      const id = body.id || url.searchParams.get('id');
-      const email = cleanString(body.email || url.searchParams.get('email')).toLowerCase();
+      const rawId = body.id || url.searchParams.get('id') || '';
+      const cleanId = String(rawId).replace(/^dep_/, '').replace(/^user_/, '').trim();
+      const depId = cleanId ? ('dep_' + cleanId) : '';
+      const email = cleanString(body.email || url.searchParams.get('email') || (String(rawId).includes('@') ? rawId : '')).toLowerCase().trim();
 
       let found = null;
+      const matches = (d) => {
+        if (!d) return false;
+        const dId = String(d.id || '').trim();
+        const dClean = dId.replace(/^dep_/, '').trim();
+        const dEmail = String(d.user_email || d.email || d.user_id || d.userId || '').toLowerCase().trim();
+        if (rawId && (dId === String(rawId) || dId === cleanId || dId === depId || dClean === cleanId)) return true;
+        if (email && dEmail === email) return true;
+        return false;
+      };
+
       try {
         const disk = loadPersistentDeposits();
-        found = disk.find(d => String(d.id) === String(id) || (email && (d.user_email || '').toLowerCase() === email));
+        found = disk.find(matches);
       } catch (e) {}
 
       if (!found && Array.isArray(inMemoryDeposits)) {
-        found = inMemoryDeposits.find(d => String(d.id) === String(id) || (email && (d.user_email || '').toLowerCase() === email));
+        found = inMemoryDeposits.find(matches);
       }
 
       if (!found && isDbConnected && conn) {
         try {
-          const [rows] = await conn.query('SELECT * FROM investments WHERE id=? OR LOWER(user_email)=? LIMIT 1', [id, email]);
+          const [rows] = await conn.query(
+            'SELECT * FROM investments WHERE id=? OR id=? OR id=? OR LOWER(user_email)=? LIMIT 1',
+            [rawId, cleanId, depId, email]
+          );
           if (rows.length > 0) found = rows[0];
         } catch (e) {}
       }
@@ -498,8 +513,8 @@ export default async function handler(req, res) {
           method: found.method,
           reference: found.payment_reference,
           status: found.status,
-          userEmail: found.user_email,
-          userName: found.user_name
+          userEmail: found.user_email || found.email,
+          userName: found.user_name || 'Investor'
         });
       }
 
@@ -600,9 +615,9 @@ export default async function handler(req, res) {
 
       // Ensure investors list includes any depositor and reflects their active/pending status accurately
       for (const inv of investments) {
-        const em = (inv.user_email || '').toLowerCase();
-        if (!em) continue;
-        const existingIdx = investors.findIndex(u => (u.email || '').toLowerCase() === em);
+        const em = String(inv.user_email || inv.email || inv.user_id || inv.userId || '').toLowerCase().trim();
+        if (!em || !em.includes('@')) continue;
+        const existingIdx = investors.findIndex(u => (u.email || '').toLowerCase().trim() === em);
         const isActive = inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed';
         if (existingIdx >= 0) {
           if (isActive) investors[existingIdx].onboarding_status = 'active';
@@ -619,19 +634,35 @@ export default async function handler(req, res) {
       }
 
       investors.forEach(u => {
-        const em = (u.email || '').toLowerCase();
-        const userInvs = investments.filter(i => (i.user_email || '').toLowerCase() === em);
-        const activeInvs = userInvs.filter(i => i.status === 'active' || i.status === 'approved');
+        const em = String(u.email || '').toLowerCase().trim();
+        const userInvs = investments.filter(i => {
+          const iEmail = String(i.user_email || i.email || i.user_id || i.userId || '').toLowerCase().trim();
+          return iEmail === em;
+        });
+        const activeInvs = userInvs.filter(i => i.status === 'active' || i.status === 'approved' || i.status === 'completed');
         const targetInvs = activeInvs.length ? activeInvs : userInvs;
-        const totalDep = targetInvs.reduce((sum, i) => sum + parseFloat(i.total || '0'), 0);
-        const totalVal = targetInvs.reduce((sum, i) => sum + parseFloat(i.total_current_value != null ? i.total_current_value : (parseFloat(i.total || 0) * 2)), 0);
+        const totalDep = targetInvs.reduce((sum, i) => sum + parseFloat(i.total != null ? i.total : (i.amount || 0)), 0);
+        const totalVal = targetInvs.reduce((sum, i) => {
+          const dep = parseFloat(i.total != null ? i.total : (i.amount || 0));
+          const cur = parseFloat(i.total_current_value != null ? i.total_current_value : (i.totalCurrentValue != null ? i.totalCurrentValue : (dep * 2)));
+          return sum + (cur > 0 ? cur : (dep > 0 ? dep * 2 : 0));
+        }, 0);
         u.total_deposited = totalDep;
-        u.total_current_value = totalVal;
-        u.available_balance = totalVal;
+        u.total_current_value = totalVal > 0 ? totalVal : (totalDep * 2);
+        u.available_balance = u.total_current_value;
         if (activeInvs.length > 0) {
           u.onboarding_status = 'active';
         }
       });
+
+      // Filter out mock or test data so admin dashboard strictly shows real investors
+      const isMockEmail = (em) => {
+        if (!em) return false;
+        const s = String(em).toLowerCase().trim();
+        return s.includes('example.com') || s.includes('test_user') || s.includes('investor_test') || s.includes('flow_test') || s.includes('dansaki');
+      };
+      investors = investors.filter(u => !isMockEmail(u.email));
+      investments = investments.filter(i => !isMockEmail(i.user_email || i.email || i.user_id));
 
       const unfundedCount = investors.filter(inv => {
         const matching = investments.filter(i => (i.user_email || '').toLowerCase() === (inv.email || '').toLowerCase());
@@ -1012,8 +1043,9 @@ export default async function handler(req, res) {
       const matchesDeposit = (d) => {
         if (!d) return false;
         const dId = String(d.id || '').trim();
-        const dEmail = (d.user_email || d.email || '').toLowerCase();
-        if (rawId && (dId === String(rawId) || dId === cleanId || dId === depId)) return true;
+        const dCleanId = dId.replace(/^dep_/, '').trim();
+        const dEmail = String(d.user_email || d.email || d.user_id || d.userId || '').toLowerCase().trim();
+        if (rawId && (dId === String(rawId) || dId === cleanId || dId === depId || dCleanId === cleanId)) return true;
         if (targetEmail && dEmail === targetEmail) return true;
         return false;
       };
@@ -1024,12 +1056,14 @@ export default async function handler(req, res) {
         for (const found of diskDeposits) {
           if (matchesDeposit(found)) {
             if (!foundDeposit) foundDeposit = found;
-            if (!approvedDepositAmount) approvedDepositAmount = parseFloat(found.total || '1000');
+            const amt = parseFloat(found.total != null ? found.total : (found.amount != null ? found.amount : 0));
+            if (!approvedDepositAmount && !isNaN(amt) && amt > 0) approvedDepositAmount = amt;
             found.status = status;
             if (status === 'active') {
-              const bonusMatch = approvedDepositAmount;
-              const doubleVal = approvedDepositAmount * 2;
-              found.total = approvedDepositAmount;
+              const curTotal = approvedDepositAmount || amt || 200;
+              const bonusMatch = curTotal;
+              const doubleVal = curTotal * 2;
+              found.total = curTotal;
               found.total_current_value = doubleVal;
               found.totalCurrentValue = doubleVal;
               found.earnings = bonusMatch;
@@ -1042,14 +1076,16 @@ export default async function handler(req, res) {
       // 2. Check memory deposits
       for (const mem of inMemoryDeposits) {
         if (matchesDeposit(mem)) {
-          if (!approvedDepositAmount) approvedDepositAmount = parseFloat(mem.total || '1000');
+          const amt = parseFloat(mem.total != null ? mem.total : (mem.amount != null ? mem.amount : 0));
+          if (!approvedDepositAmount && !isNaN(amt) && amt > 0) approvedDepositAmount = amt;
           mem.status = status;
           if (status === 'active') {
-            const doubleVal = approvedDepositAmount * 2;
-            mem.total = approvedDepositAmount;
+            const curTotal = approvedDepositAmount || amt || 200;
+            const doubleVal = curTotal * 2;
+            mem.total = curTotal;
             mem.total_current_value = doubleVal;
             mem.totalCurrentValue = doubleVal;
-            mem.earnings = approvedDepositAmount;
+            mem.earnings = curTotal;
           }
           if (!foundDeposit) foundDeposit = mem;
         }
@@ -1058,20 +1094,23 @@ export default async function handler(req, res) {
       // 3. Check mockStore
       for (const inv of mockStore.investments) {
         if (matchesDeposit(inv)) {
-          if (!approvedDepositAmount) approvedDepositAmount = parseFloat(inv.total || '1000');
+          const amt = parseFloat(inv.total != null ? inv.total : (inv.amount != null ? inv.amount : 0));
+          if (!approvedDepositAmount && !isNaN(amt) && amt > 0) approvedDepositAmount = amt;
           inv.status = status;
           if (status === 'active') {
-            const doubleVal = approvedDepositAmount * 2;
-            inv.total = approvedDepositAmount;
+            const curTotal = approvedDepositAmount || amt || 200;
+            const doubleVal = curTotal * 2;
+            inv.total = curTotal;
             inv.total_current_value = doubleVal;
             inv.totalCurrentValue = doubleVal;
-            inv.earnings = approvedDepositAmount;
+            inv.earnings = curTotal;
           }
           if (!foundDeposit) foundDeposit = inv;
         }
       }
 
-      if (!approvedDepositAmount) approvedDepositAmount = 1000;
+      if (!approvedDepositAmount && body.amount) approvedDepositAmount = parseFloat(body.amount);
+      if (!approvedDepositAmount) approvedDepositAmount = (foundDeposit && parseFloat(foundDeposit.total)) || 200;
       const bonusMatch = approvedDepositAmount;
       const totalBalanceWithBonus = approvedDepositAmount * 2;
 
@@ -1325,19 +1364,53 @@ export default async function handler(req, res) {
       // Delete from persistent disk deposits
       try {
         const disk = loadPersistentDeposits();
-        const filtered = disk.filter(d => (d.user_email || '').toLowerCase() !== email);
-        if (filtered.length !== disk.length) {
-          try {
-            const fs = await import('fs');
-            const path = await import('path');
-            const p = path.resolve(process.cwd(), 'data', 'saved_deposits.json');
-            fs.writeFileSync(p, JSON.stringify(filtered, null, 2), 'utf8');
-            fs.writeFileSync('/tmp/tesla_saved_deposits.json', JSON.stringify(filtered, null, 2), 'utf8');
-          } catch (e) {}
-        }
+        const filtered = disk.filter(d => (d.user_email || d.email || '').toLowerCase() !== email);
+        const fs = await import('fs');
+        const path = await import('path');
+        const p = path.resolve(process.cwd(), 'data', 'saved_deposits.json');
+        fs.writeFileSync(p, JSON.stringify(filtered, null, 2), 'utf8');
+        try { fs.writeFileSync('/tmp/tesla_saved_deposits.json', JSON.stringify(filtered, null, 2), 'utf8'); } catch (e) {}
+      } catch (e) {}
+
+      // Delete from persistent disk investors
+      try {
+        const diskInv = loadPersistentInvestors();
+        const filteredInv = diskInv.filter(u => (u.email || '').toLowerCase() !== email);
+        const fs = await import('fs');
+        const path = await import('path');
+        const pInv = path.resolve(process.cwd(), 'data', 'saved_investors.json');
+        fs.writeFileSync(pInv, JSON.stringify(filteredInv, null, 2), 'utf8');
       } catch (e) {}
 
       return res.status(200).json({ success: true, message: `Investor ${email} deleted successfully.` });
+    }
+
+    // ── 11b. PURGE ALL MOCK & TEST DATA ──────────────────────────────
+    if (action === 'purge_mock_data' || action === 'clear_all_test_data') {
+      if (isDbConnected && conn) {
+        try {
+          await conn.query('DELETE FROM investments WHERE user_email LIKE "%example.com" OR user_email LIKE "%test%" OR user_email LIKE "%dansaki%" OR user_email LIKE "%flow_test%"');
+          await conn.query('DELETE FROM investor_accounts WHERE email LIKE "%example.com" OR email LIKE "%test%" OR email LIKE "%dansaki%" OR email LIKE "%flow_test%"');
+          await conn.end();
+        } catch (e) {}
+      }
+      mockStore.investors = [];
+      mockStore.investments = [];
+      mockStore.kyc = [];
+      mockStore.orders = [];
+      mockStore.withdrawals = [];
+      mockStore.financing = [];
+      mockStore.marketingLogs = [];
+      mockStore.clicks = [];
+      if (Array.isArray(inMemoryDeposits)) inMemoryDeposits.length = 0;
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        fs.writeFileSync(path.resolve(process.cwd(), 'data', 'saved_deposits.json'), '[]\n', 'utf8');
+        fs.writeFileSync(path.resolve(process.cwd(), 'data', 'saved_investors.json'), '[]\n', 'utf8');
+        try { fs.unlinkSync('/tmp/tesla_saved_deposits.json'); } catch (e) {}
+      } catch (e) {}
+      return res.status(200).json({ success: true, message: 'All mock and test data removed successfully.' });
     }
 
     // ── 12. GET / UPDATE TRADING GRAPH SETTINGS ─────────────────────

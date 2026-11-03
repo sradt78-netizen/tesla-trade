@@ -42,9 +42,6 @@
         meta.status === 'pending_approval' || meta.status === 'pending') {
         return true;
       }
-      if (location.search && location.search.indexOf('payment=pending') !== -1) {
-        return true;
-      }
       return false;
     } catch (e) {
       return false;
@@ -62,30 +59,29 @@
       if (!method && meta.method) method = meta.method;
     } catch (e) {}
     return {
-      amount: amt ? money(amt) : '$1,000.00',
-      plan: plan || 'Pioneer (100% Projected ROI)',
+      amount: amt ? money(amt) : '$200.00',
+      plan: plan || 'Explorer',
       method: method || 'USDT (TRC-20)'
     };
   }
 
-  // Intercept any attempts to redirect back to /invest when a deposit is active or pending
+  // Intercept any attempts to redirect back to /invest or /waiting
   function guardNavigation() {
     var origPush = window.history.pushState;
     var origReplace = window.history.replaceState;
     function shouldBlock(targetUrl) {
+      var str = String(targetUrl || '').toLowerCase();
+      var isApproved = (localStorage.getItem('ttinc_account_approved') === 'true');
       var meta = {};
       try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
       var curAuth = auth() || {};
-      var isAuthActive = (curAuth.onboardingState === 'completed' || curAuth.onboarding_status === 'verified' || curAuth.onboarding_status === 'active');
-      var dep = localStorage.getItem('ttinc_deposit_status');
-      var pay = localStorage.getItem('ttinc_payment_status');
-      var isActive = (isAuthActive || meta.status === 'active' || meta.status === 'approved' || dep === 'active' || pay === 'active');
-      var isPending = !isActive && (dep === 'pending_approval' || pay === 'pending_approval' || meta.status === 'pending_approval' || meta.status === 'pending');
-      var str = String(targetUrl || '').toLowerCase();
+      if (curAuth.onboardingState === 'completed' || curAuth.onboarding_status === 'verified' || curAuth.onboarding_status === 'active' || meta.status === 'active' || meta.status === 'approved') {
+        isApproved = true;
+      }
 
-      // If active, prevent kicking back to /invest or /waiting
-      if (isActive) {
-        if (str.indexOf('/invest') !== -1 || str.indexOf('/waiting') !== -1) {
+      // If active, prevent kicking back to /invest, /waiting, or /payment
+      if (isApproved) {
+        if (str.indexOf('/invest') !== -1 || str.indexOf('/waiting') !== -1 || str.indexOf('/payment') !== -1) {
           if (window.location.pathname !== '/overview' && window.location.pathname !== '/dashboard') {
             window.location.replace('/overview');
           }
@@ -94,9 +90,14 @@
         return false;
       }
 
-      if (isPending || isDepositPendingLocal()) {
-        return (str.indexOf('/invest') !== -1 || str.indexOf('/payment') !== -1) &&
-          str.indexOf('approved') === -1;
+      // If pending, strictly stay on /overview and block flashing to /invest or /waiting
+      if (isDepositPendingLocal()) {
+        if (str.indexOf('/invest') !== -1 || str.indexOf('/waiting') !== -1 || str.indexOf('/payment') !== -1) {
+          if (window.location.pathname !== '/overview') {
+            window.location.replace('/overview');
+          }
+          return true;
+        }
       }
       return false;
     }
@@ -243,6 +244,10 @@
   };
 
   function celebrateAndUnlock(data) {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
     var overlay = document.getElementById(LOCK_OVERLAY_ID);
     if (!overlay) return;
 
@@ -333,6 +338,17 @@
       return;
     }
 
+    if (localStorage.getItem('ttinc_account_approved') === 'true') {
+      removeLock();
+      removeBanner();
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+      if (typeof callback === 'function') callback(true);
+      return;
+    }
+
     var current = auth();
     if (!current || !current.email) {
       removeLock();
@@ -361,10 +377,15 @@
           (!hasActive && Array.isArray(data.pendingPayments) && data.pendingPayments.length > 0);
 
         if (hasActive) {
+          if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+          }
           if (typeof callback === 'function') callback(true);
           try {
             localStorage.removeItem('ttinc_deposit_status');
             localStorage.removeItem('ttinc_payment_status');
+            localStorage.setItem('ttinc_account_approved', 'true');
             var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
             meta.status = 'active';
             if (data.total) meta.total = Number(data.total);
@@ -407,6 +428,7 @@
 
           window.dispatchEvent(new CustomEvent('ttinc_account_activated', { detail: data }));
           window.dispatchEvent(new Event('storage'));
+          window.dispatchEvent(new Event('ttinc_balance_sync'));
 
           // If current route is /waiting or /invest, route straight to /overview
           var currentPath = (window.location.pathname || '').toLowerCase();
@@ -415,12 +437,7 @@
             return;
           }
 
-          // If there is an additional follow-up deposit pending review for an already active investor:
-          if (Array.isArray(data.pendingPayments) && data.pendingPayments.length) {
-            renderFollowUpBanner(data);
-          } else {
-            removeBanner();
-          }
+          removeBanner();
           return;
         }
 
