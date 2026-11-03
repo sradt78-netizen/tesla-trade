@@ -1506,8 +1506,9 @@
         investors.forEach(function(u) {
           var em = (u.email || '').toLowerCase();
           var inv = invMap[em] || {};
-          var bal = parseFloat(inv.total || '0');
-          var cur = parseFloat(inv.total_current_value || inv.totalCurrentValue || (bal > 0 ? bal * 2 : 0));
+          var bal = parseFloat(u.total_deposited != null ? u.total_deposited : (inv.total || '0'));
+          var cur = parseFloat(u.total_current_value != null ? u.total_current_value : (inv.total_current_value || inv.totalCurrentValue || (bal > 0 ? bal * 2 : 0)));
+          if (bal > 0 && cur <= bal) cur = bal * 2;
           var isApproved = (inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed' || u.onboarding_status === 'verified' || u.onboarding_status === 'active');
           var isPending = !isApproved && (inv.status === 'pending_approval' || u.onboarding_status === 'pending_deposit' || inv.payment_proof_path || inv.payment_reference || bal > 0);
 

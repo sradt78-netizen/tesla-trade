@@ -315,23 +315,46 @@
   readBalance();
   timer = window.setInterval(readBalance, 2500);
 
-  // Also observe DOM changes to keep elements patched smoothly
+  var isPatching = false;
+  function safeTriggerPatch() {
+    if (isPatching || !isBalancePage()) return;
+    try {
+      var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+      if (meta && meta.total) {
+        var p = Number(meta.total || 1000);
+        var c = Number(meta.totalCurrentValue || (p * 2));
+        var b = Number(meta.bonus || p);
+        isPatching = true;
+        patchVisibleWalletDom(p, c, b);
+      }
+    } catch (e) {} finally {
+      isPatching = false;
+    }
+  }
+
+  window.addEventListener('ttinc_account_activated', safeTriggerPatch);
+  window.addEventListener('popstate', safeTriggerPatch);
+  window.addEventListener('storage', safeTriggerPatch);
+
+  var domObserver = null;
   if (typeof MutationObserver !== 'undefined') {
-    var domObserver = new MutationObserver(function () {
-      try {
-        var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-        if (meta && meta.total) {
-          var p = Number(meta.total || 1000);
-          var c = Number(meta.totalCurrentValue || (p * 2));
-          var b = Number(meta.bonus || p);
-          patchVisibleWalletDom(p, c, b);
-        }
-      } catch (e) {}
+    var debounceTimer = null;
+    domObserver = new MutationObserver(function () {
+      if (document.getElementById('ttinc-investor-wallet-card')) return;
+      if (debounceTimer) return;
+      debounceTimer = setTimeout(function () {
+        debounceTimer = null;
+        safeTriggerPatch();
+      }, 200);
     });
-    domObserver.observe(document.documentElement, { childList: true, subtree: true });
+    var rootElem = document.getElementById('root') || document.body;
+    if (rootElem) {
+      domObserver.observe(rootElem, { childList: true });
+    }
   }
 
   window.addEventListener('beforeunload', function () {
     if (timer) window.clearInterval(timer);
+    if (domObserver) domObserver.disconnect();
   });
 })();

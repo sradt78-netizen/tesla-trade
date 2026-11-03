@@ -93,6 +93,15 @@ export function loadDatabase() {
         loaded[key] = JSON.parse(JSON.stringify(INITIAL_DB[key]));
       }
     }
+    // Normalize any legacy or corrupted investment rows
+    if (Array.isArray(loaded.investments)) {
+      loaded.investments.forEach(inv => {
+        const t = parseFloat(inv.total);
+        inv.total = !isNaN(t) && t > 0 ? t : 1000;
+        const cv = parseFloat(inv.total_current_value);
+        inv.total_current_value = !isNaN(cv) && cv > inv.total ? cv : inv.total * 2;
+      });
+    }
   }
 
   memoryDb = loaded;
@@ -326,19 +335,8 @@ class PersistentDbConnection {
           email = String(params[params.length - 1] || '').toLowerCase().trim();
         }
         if (email) {
-          let acc = db.investor_accounts.find(u => (u.email || '').toLowerCase() === email);
-          if (!acc) {
-            acc = {
-              email,
-              name: 'Investor',
-              onboarding_status: 'active',
-              deposit_match_eligible: 1,
-              registered_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-              created_at: new Date().toISOString(),
-              activated_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
-            };
-            db.investor_accounts.unshift(acc);
-          } else {
+          const acc = db.investor_accounts.find(u => (u.email || '').toLowerCase() === email);
+          if (acc) {
             if (cleanSql.includes('onboarding_status="active"') || cleanSql.includes("onboarding_status='active'")) {
               acc.onboarding_status = 'active';
               acc.deposit_match_eligible = 1;
@@ -346,6 +344,15 @@ class PersistentDbConnection {
             } else if (cleanSql.includes('onboarding_status="declined"') || cleanSql.includes("onboarding_status='declined'")) {
               acc.onboarding_status = 'declined';
             }
+          } else {
+            db.investor_accounts.unshift({
+              email: email,
+              name: 'Investor',
+              onboarding_status: 'active',
+              deposit_match_eligible: 1,
+              registered_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
+              created_at: new Date().toISOString()
+            });
           }
           saveDatabaseSync();
         }
@@ -390,74 +397,56 @@ class PersistentDbConnection {
       }
 
       if (upperSql.startsWith('INSERT INTO')) {
-        // Robust parameter extraction supporting both payment-submit and admin insert formats
-        const invId = String(params[0] || 'inv_' + Math.random().toString(36).substring(2, 10));
-        const txId = String(params[1] || 'tx_' + Math.random().toString(36).substring(2, 10));
-        const userId = String(params[2] || params[4] || '');
-        const userName = String(params[3] || 'Investor');
-        const userEmail = String(params[4] || '').toLowerCase().trim();
-
-        // Detect total amount from params (index 9 in payment-submit, or index 5/6 in fallback inserts)
-        let totalAmt = 1000;
-        if (params[9] !== undefined && !isNaN(parseFloat(params[9]))) {
-          totalAmt = parseFloat(params[9]);
-        } else if (params[5] !== undefined && !isNaN(parseFloat(params[5]))) {
-          totalAmt = parseFloat(params[5]);
-        } else if (params[6] !== undefined && !isNaN(parseFloat(params[6]))) {
-          totalAmt = parseFloat(params[6]);
-        }
-        if (isNaN(totalAmt) || totalAmt <= 0) totalAmt = 1000;
-
-        let curVal = totalAmt;
-        if (params[10] !== undefined && !isNaN(parseFloat(params[10]))) {
-          curVal = parseFloat(params[10]);
-        } else if (params[6] !== undefined && !isNaN(parseFloat(params[6]))) {
-          curVal = parseFloat(params[6]);
-        } else if (params[7] !== undefined && !isNaN(parseFloat(params[7]))) {
-          curVal = parseFloat(params[7]);
-        }
-        if (isNaN(curVal) || curVal <= 0) curVal = totalAmt;
-
-        const planName = String(
-          (params[8] && isNaN(Number(params[8]))) ? params[8] :
-          ((params[7] && isNaN(Number(params[7]))) ? params[7] :
-          ((params[5] && isNaN(Number(params[5]))) ? params[5] : 'Explorer'))
-        );
-        const planId = String(
-          (params[6] && isNaN(Number(params[6]))) ? params[6] :
-          (planName.toLowerCase().includes('pioneer') ? 'growth_ai' : 'starter_ai')
-        );
-        const method = String(
-          (params[11] && isNaN(Number(params[11]))) ? params[11] :
-          ((params[8] && isNaN(Number(params[8]))) ? params[8] : 'USDT (TRC-20)')
-        );
-
+        const colMatch = cleanSql.match(/insert\s+into\s+investments\s*\(([^)]+)\)/i);
         const newInv = {
-          id: invId,
-          tx_id: txId,
-          user_id: userId,
-          user_name: userName,
-          user_email: userEmail,
-          portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: totalAmt }],
-          total: totalAmt,
-          total_current_value: curVal,
-          totalCurrentValue: curVal,
-          method: method,
-          status: cleanSql.includes('status="active"') || cleanSql.includes("status='active'") ? 'active' : 'pending_approval',
-          plan_id: planId,
-          plan_name: planName,
+          id: 'inv_' + Math.random().toString(36).substring(2, 10),
+          tx_id: 'tx_' + Math.random().toString(36).substring(2, 10),
+          user_id: '',
+          user_name: 'Investor',
+          user_email: '',
+          portfolio: 'Investment Portfolio',
+          total: 1000,
+          total_current_value: 2000,
+          method: 'USDT (TRC-20)',
+          status: 'pending_approval',
+          plan_id: 'starter_ai',
+          plan_label: 'Explorer',
+          plan_name: 'Explorer',
           projected_roi: 70,
           payment_confirmed: 1,
-          payment_reference: params[12] ? String(params[12]) : '',
-          payment_proof_path: params[13] ? String(params[13]) : '',
-          payment_proof_name: params[14] ? String(params[14]) : 'receipt.jpg',
+          payment_reference: '',
+          payment_proof_path: '',
+          payment_proof_name: 'receipt.jpg',
           payment_submitted_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-          pending_approval_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
           created_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
           updated_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
         };
 
-        // If an investment with this ID exists, update it; otherwise unshift
+        if (colMatch && colMatch[1]) {
+          const cols = colMatch[1].split(',').map(c => c.trim().toLowerCase().replace(/[`"']/g, ''));
+          cols.forEach((col, idx) => {
+            if (params[idx] !== undefined && params[idx] !== null) {
+              newInv[col] = params[idx];
+            }
+          });
+        } else {
+          if (params[0]) newInv.id = String(params[0]);
+          if (params[1]) newInv.tx_id = String(params[1]);
+          if (params[2]) newInv.user_id = String(params[2]);
+          if (params[3]) newInv.user_name = String(params[3]);
+          if (params[4]) newInv.user_email = String(params[4]).toLowerCase().trim();
+        }
+
+        // Numeric normalization
+        const parsedTotal = parseFloat(newInv.total != null ? newInv.total : 1000);
+        newInv.total = !isNaN(parsedTotal) && parsedTotal > 0 ? parsedTotal : 1000;
+        const parsedVal = parseFloat(newInv.total_current_value != null ? newInv.total_current_value : (newInv.total * 2));
+        newInv.total_current_value = !isNaN(parsedVal) && parsedVal > 0 ? parsedVal : (newInv.total * 2);
+        newInv.user_email = String(newInv.user_email || '').toLowerCase().trim();
+        if (cleanSql.includes('"active"') || cleanSql.includes("'active'")) {
+          newInv.status = 'active';
+        }
+
         const idx = db.investments.findIndex(i => String(i.id) === String(newInv.id));
         if (idx >= 0) {
           db.investments[idx] = { ...db.investments[idx], ...newInv };
@@ -472,61 +461,44 @@ class PersistentDbConnection {
         const id = String(params[params.length - 1] || '').trim().toLowerCase();
         let matched = false;
         for (const inv of db.investments) {
-          if (String(inv.id).toLowerCase() === id || (inv.user_email && inv.user_email.toLowerCase() === id)) {
+          const invId = String(inv.id || '').toLowerCase();
+          const invEmail = (inv.user_email || '').toLowerCase();
+          if (invId === id || invEmail === id || id === '' || (id.includes('@') && invEmail === id)) {
             matched = true;
             if (cleanSql.includes('status=?') || cleanSql.includes('status = ?')) {
+              // params: [status, total, total_current_value, earnings, id/email]
               inv.status = String(params[0] || 'active');
-              if (params[1] !== undefined) inv.total = parseFloat(params[1]);
-              if (params[2] !== undefined) inv.total_current_value = parseFloat(params[2]);
-              if (params[3] !== undefined) inv.earnings = parseFloat(params[3]);
+              if (params[1] !== undefined) inv.total = parseFloat(params[1]) || 1000;
+              if (params[2] !== undefined) inv.total_current_value = parseFloat(params[2]) || (inv.total * 2);
+              if (params[3] !== undefined) inv.earnings = parseFloat(params[3]) || inv.total;
+              if (inv.status === 'active') {
+                inv.activated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
+              }
+            } else if (cleanSql.includes('total=?, total_current_value=?')) {
+              // params from payment submit: [total, total_current_value, proofPath, proofName, reference, id]
+              inv.total = parseFloat(params[0] || inv.total || 1000);
+              inv.total_current_value = parseFloat(params[1] || (inv.total * 2));
+              if (params[2] !== undefined && params[2] !== null) inv.payment_proof_path = String(params[2]);
+              if (params[3] !== undefined && params[3] !== null) inv.payment_proof_name = String(params[3]);
+              if (params[4] !== undefined && params[4] !== null) inv.payment_reference = String(params[4]);
+              if (cleanSql.includes('status="pending_approval"') || cleanSql.includes("status='pending_approval'")) {
+                inv.status = 'pending_approval';
+              }
             } else if (cleanSql.includes('status="active"') || cleanSql.includes("status='active'")) {
               inv.status = 'active';
-              inv.total_current_value = (inv.total || 1000) * 2;
-              inv.earnings = inv.total || 1000;
+              inv.total = parseFloat(inv.total || 1000);
+              inv.total_current_value = inv.total * 2;
+              inv.earnings = inv.total;
               inv.activated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
             } else if (cleanSql.includes('status="declined"') || cleanSql.includes("status='declined'")) {
               inv.status = 'declined';
             }
-            if (cleanSql.includes('total=?, total_current_value=?')) {
-              inv.total = parseFloat(params[0] || inv.total);
-              inv.total_current_value = parseFloat(params[1] || inv.total_current_value);
-              if (params[2]) inv.payment_proof_path = String(params[2]);
-              if (params[3]) inv.payment_proof_name = String(params[3]);
-              if (params[4]) inv.payment_reference = String(params[4]);
-            }
-            if (!Array.isArray(inv.portfolio) || inv.portfolio.length === 0) {
-              inv.portfolio = [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: inv.total || 1000 }];
-            }
             inv.updated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
+            break;
           }
         }
-        if (!matched && id) {
-          const userEm = id.includes('@') ? id : (params.find(p => typeof p === 'string' && p.includes('@')) || 'investor@teslatrade.com');
-          const depTotal = parseFloat(params[1] !== undefined ? params[1] : 1000);
-          const curVal = parseFloat(params[2] !== undefined ? params[2] : (depTotal * 2));
-          const earn = parseFloat(params[3] !== undefined ? params[3] : depTotal);
-          const newRec = {
-            id: id.startsWith('dep_') || id.startsWith('inv_') ? id : ('dep_' + Math.random().toString(36).substring(2, 9)),
-            tx_id: 'TX' + Date.now().toString(36).toUpperCase(),
-            user_id: userEm,
-            user_name: 'Investor',
-            user_email: userEm,
-            portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: depTotal }],
-            plan_id: 'starter_ai',
-            plan_name: 'Explorer',
-            total: depTotal,
-            total_current_value: curVal,
-            earnings: earn,
-            status: String(params[0] || 'active'),
-            method: 'Crypto',
-            created_at: new Date().toISOString().replace('T', ' ').substring(0, 19),
-            updated_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
-          };
-          db.investments.unshift(newRec);
-          matched = true;
-        }
         saveDatabaseSync();
-        return [{ affectedRows: 1 }, []];
+        return [{ affectedRows: matched ? 1 : 0 }, []];
       }
 
       if (upperSql.startsWith('DELETE')) {

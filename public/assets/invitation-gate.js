@@ -200,6 +200,9 @@
     for (var i = 0; i < gates.length; i++) {
       gates[i].remove();
     }
+    if (document.body) document.body.style.display = '';
+    var root = document.getElementById('root');
+    if (root) root.style.display = '';
   }
 
   function setGateMessage(message, isError) {

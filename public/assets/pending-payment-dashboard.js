@@ -274,6 +274,7 @@
       }
     } catch (e) {}
 
+    document.documentElement.classList.remove('ttinc-invitation-locked');
     removeLock();
     removeBanner();
     var ov1 = document.getElementById('ttinc-account-status-overlay');
@@ -285,6 +286,7 @@
     if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
 
     setTimeout(function () {
+      document.documentElement.classList.remove('ttinc-invitation-locked');
       removeLock();
       removeBanner();
       if (ov1) ov1.remove();
@@ -297,8 +299,17 @@
       window.dispatchEvent(new Event('storage'));
 
       var p = (window.location.pathname || '').toLowerCase();
+      if (window.location.search && window.location.search.indexOf('payment=pending') !== -1) {
+        window.location.href = '/overview';
+        return;
+      }
       if (p !== '/overview' && p !== '/dashboard') {
         window.location.replace('/overview');
+        return;
+      }
+      var root = document.getElementById('root');
+      if (!root || !root.textContent.trim()) {
+        window.location.reload();
       }
     }, 400);
   }

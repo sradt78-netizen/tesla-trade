@@ -1,37 +1,51 @@
 [
   {
-    "id": "dep_mvzhnqrj_17sd6",
-    "tx_id": "TXMVZHNQRJE3D",
-    "user_id": "sim_test_1793637839781@tesla.test",
-    "user_email": "sim_test_1793637839781@tesla.test",
-    "user_name": "Alex Morgan",
-    "portfolio": [
-      {
-        "id": "tsla",
-        "name": "Tesla, Inc.",
-        "ticker": "TSLA",
-        "investedAmount": 1500
-      }
-    ],
-    "plan_id": "standard",
+    "id": "dep_mw0czzzb_4iyis",
+    "tx_id": "TXMW0CZZZBS3D",
+    "user_id": "test_user_2026@gmail.com",
+    "user_email": "test_user_2026@gmail.com",
+    "user_name": "Test Investor",
+    "portfolio": "Test Investor · Explorer",
+    "plan_id": "starter_ai",
     "plan_label": "Explorer",
     "plan_name": "Explorer",
-    "total": 1500,
-    "total_current_value": 3000,
+    "total": 1000,
+    "total_current_value": 2000,
     "method": "USDT (TRC-20)",
-    "payment_reference": "",
+    "payment_reference": "TRX987654321",
     "payment_proof_path": "",
     "payment_proof_name": "",
     "status": "active",
-    "created_at": "2026-11-02T16:43:59.939Z",
-    "totalCurrentValue": 3000,
-    "earnings": 1500
+    "created_at": "2026-11-03T07:21:19.849Z",
+    "totalCurrentValue": 2000,
+    "earnings": 1000
   },
   {
-    "id": "dep_nonexistent_123",
-    "tx_id": "TXMVYY4KG8",
-    "user_id": "newinvestor@gmail.com",
-    "user_email": "newinvestor@gmail.com",
+    "id": "dep_mvysqt2r_r9bv5",
+    "tx_id": "TXMVYSQT2RCOT",
+    "user_id": "investor_test@gmail.com",
+    "user_email": "investor_test@gmail.com",
+    "user_name": "Test Investor",
+    "portfolio": "Test Investor · Explorer",
+    "plan_id": "starter_ai",
+    "plan_label": "Explorer",
+    "plan_name": "Explorer",
+    "total": 1000,
+    "total_current_value": 2000,
+    "method": "USDT (TRC-20)",
+    "payment_reference": "TX998877",
+    "payment_proof_path": "",
+    "payment_proof_name": "",
+    "status": "active",
+    "created_at": "2026-11-02T05:06:32.500Z",
+    "totalCurrentValue": 2000,
+    "earnings": 1000
+  },
+  {
+    "id": "test_nonexistent_id",
+    "tx_id": "TXMVYSQNFN",
+    "user_id": "nonexistent_user@example.com",
+    "user_email": "nonexistent_user@example.com",
     "user_name": "Investor",
     "portfolio": "Tesla · Explorer",
     "plan_id": "starter_ai",
@@ -43,7 +57,7 @@
     "earnings": 1000,
     "status": "active",
     "method": "Crypto",
-    "created_at": "2026-11-02T07:37:12.584Z"
+    "created_at": "2026-11-02T05:06:25.187Z"
   },
   {
     "id": "dep_dansaki_1",
@@ -72,7 +86,10 @@
     "status": "active",
     "method": "Crypto",
     "created_at": "2026-10-29T09:40:00.932Z",
-    "earnings": 1000
+    "earnings": {
+      "tsla": 2000,
+      "total": 1000
+    }
   },
   {
     "id": "dep_mvqymovo",
@@ -224,6 +241,9 @@
     "status": "active",
     "method": "Admin Credit",
     "created_at": "2026-10-27T13:06:00.275Z",
-    "earnings": 1000
+    "earnings": {
+      "tsla": 2000,
+      "total": 1000
+    }
   }
 ]

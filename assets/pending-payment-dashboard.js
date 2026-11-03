@@ -223,9 +223,25 @@
   }
 
   function celebrateAndUnlock(data) {
+    var overlay = document.getElementById(LOCK_OVERLAY_ID);
+    if (!overlay) return;
+
+    overlay.innerHTML =
+      '<div style="max-width:480px;width:100%;background:#0e1611;border:1px solid #166534;border-radius:24px;padding:40px 30px;box-shadow:0 30px 80px rgba(0,0,0,0.85);text-align:center;">' +
+        '<div style="width:72px;height:72px;margin:0 auto 20px;border-radius:50%;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);display:flex;align-items:center;justify-content:center;">' +
+          '<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+            '<polyline points="20 6 9 17 4 12"></polyline>' +
+          '</svg>' +
+        '</div>' +
+        '<h2 style="font-size:24px;font-weight:900;color:#ffffff;margin:0 0 10px;">Deposit Approved!</h2>' +
+        '<p style="font-size:14px;color:#86efac;margin:0 0 20px;line-height:1.5;">' +
+          'Your deposit has been verified by the administrator. 100% Match Bonus applied. Unlocking your dashboard…' +
+        '</p>' +
+      '</div>';
+
     try {
-      localStorage.setItem('ttinc_deposit_status', 'active');
-      localStorage.setItem('ttinc_payment_status', 'active');
+      localStorage.removeItem('ttinc_deposit_status');
+      localStorage.removeItem('ttinc_payment_status');
       var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
       meta.status = 'active';
       if (data && data.total) meta.total = Number(data.total);
@@ -239,11 +255,14 @@
       if (data && data.planName) meta.planName = data.planName;
       localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
 
-      var invId = (data && (data.activeInvestmentId || data.id)) ||
-        (data && data.investments && data.investments[0] && data.investments[0].id) ||
-        localStorage.getItem('ttinc_investment_id') ||
-        ('dep_' + Date.now().toString(36));
-      localStorage.setItem('ttinc_investment_id', String(invId));
+      if (data && data.activeInvestmentId) {
+        localStorage.setItem('ttinc_investment_id', String(data.activeInvestmentId));
+      } else {
+        var existingInvId = localStorage.getItem('ttinc_investment_id');
+        if (!existingInvId) {
+          localStorage.setItem('ttinc_investment_id', (data && data.investments && data.investments[0] && data.investments[0].id) || ('dep_' + Date.now().toString(36)));
+        }
+      }
 
       var curAuth = auth() || {};
       curAuth.onboardingState = 'completed';
@@ -255,7 +274,9 @@
       }
     } catch (e) {}
 
-    // Clean up any background initial loader and auxiliary overlays immediately
+    document.documentElement.classList.remove('ttinc-invitation-locked');
+    removeLock();
+    removeBanner();
     var ov1 = document.getElementById('ttinc-account-status-overlay');
     if (ov1) ov1.remove();
     var ov2 = document.getElementById('ttinc-pending-overlay');
@@ -264,52 +285,33 @@
     if (ldr) ldr.remove();
     if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
 
-    var overlay = document.getElementById(LOCK_OVERLAY_ID);
-    if (overlay) {
-      overlay.innerHTML =
-        '<div style="max-width:480px;width:100%;background:#0e1611;border:1px solid #166534;border-radius:24px;padding:40px 30px;box-shadow:0 30px 80px rgba(0,0,0,0.85);text-align:center;">' +
-          '<div style="width:72px;height:72px;margin:0 auto 20px;border-radius:50%;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);display:flex;align-items:center;justify-content:center;">' +
-            '<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
-              '<polyline points="20 6 9 17 4 12"></polyline>' +
-            '</svg>' +
-          '</div>' +
-          '<h2 style="font-size:24px;font-weight:900;color:#ffffff;margin:0 0 10px;">Deposit Approved!</h2>' +
-          '<p style="font-size:14px;color:#86efac;margin:0 0 20px;line-height:1.5;">' +
-            'Your deposit has been verified by the administrator. 100% Match Bonus applied. Unlocking your dashboard…' +
-          '</p>' +
-          '<div style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#4ade80;">' +
-            '<span style="width:8px;height:8px;border-radius:50%;background:#22c55e;animation:ttinc-lock-pulse 1s infinite;"></span>' +
-            'Opening investor dashboard…' +
-          '</div>' +
-        '</div>';
-    }
-
     setTimeout(function () {
+      document.documentElement.classList.remove('ttinc-invitation-locked');
       removeLock();
       removeBanner();
-      var o1 = document.getElementById('ttinc-account-status-overlay');
-      if (o1) o1.remove();
-      var o2 = document.getElementById('ttinc-pending-overlay');
-      if (o2) o2.remove();
-      var l2 = document.getElementById('ttinc-initial-loader');
-      if (l2) l2.remove();
+      if (ov1) ov1.remove();
+      if (ov2) ov2.remove();
+      var ldr2 = document.getElementById('ttinc-initial-loader');
+      if (ldr2) ldr2.remove();
       if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
 
       window.dispatchEvent(new CustomEvent('ttinc_account_activated', { detail: data }));
       window.dispatchEvent(new Event('storage'));
 
       var p = (window.location.pathname || '').toLowerCase();
-      if (p === '/waiting' || p === '/invest' || p === '/payment') {
-        window.location.replace('/overview');
-      } else if (p === '/overview' || p === '/dashboard') {
-        // If already on dashboard or overview, trigger balance refresh without reload
-        if (typeof window.dispatchEvent === 'function') {
-          window.dispatchEvent(new Event('storage'));
-        }
-      } else {
-        window.location.replace('/overview');
+      if (window.location.search && window.location.search.indexOf('payment=pending') !== -1) {
+        window.location.href = '/overview';
+        return;
       }
-    }, 1200);
+      if (p !== '/overview' && p !== '/dashboard') {
+        window.location.replace('/overview');
+        return;
+      }
+      var root = document.getElementById('root');
+      if (!root || !root.textContent.trim()) {
+        window.location.reload();
+      }
+    }, 400);
   }
 
   function checkAccountStatus() {
@@ -344,8 +346,8 @@
 
         if (hasActive) {
           try {
-            localStorage.setItem('ttinc_deposit_status', 'active');
-            localStorage.setItem('ttinc_payment_status', 'active');
+            localStorage.removeItem('ttinc_deposit_status');
+            localStorage.removeItem('ttinc_payment_status');
             var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
             meta.status = 'active';
             if (data.total) meta.total = Number(data.total);
