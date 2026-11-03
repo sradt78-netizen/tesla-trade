@@ -56,13 +56,18 @@ export default async function handler(req, res) {
     let userInvestments = [];
     let dbRead = false; // true once the database answered; its rows are authoritative
 
+    let userAdminApproved = false;
+
     // 1. Try MySQL Database
     try {
       const conn = await getDbConnection();
-      const [accRows] = await conn.query('SELECT name, email FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
+      const [accRows] = await conn.query('SELECT name, email, onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
       if (accRows.length > 0) {
         hasAccount = true;
         investorName = accRows[0].name || investorName;
+        if (accRows[0].onboarding_status === 'active' || accRows[0].onboarding_status === 'verified' || accRows[0].onboarding_status === 'approved') {
+          userAdminApproved = true;
+        }
       }
 
       const [invRows] = await conn.query(
@@ -121,7 +126,6 @@ export default async function handler(req, res) {
       }
 
       const { mockStore, loadPersistentInvestors } = await import('./admin.js');
-      let userAdminApproved = false;
       if (typeof loadPersistentInvestors === 'function') {
         const savedInvs = loadPersistentInvestors();
         const savedU = savedInvs.find(u => (u.email || '').toLowerCase() === email);
@@ -213,9 +217,9 @@ export default async function handler(req, res) {
 
     // Check for active or approved investment first
     const activeInv = formattedInvestments.find(inv => inv.status === 'active' || inv.status === 'approved');
-    if (activeInv) {
+    if (activeInv || userAdminApproved) {
       status = 'active';
-      activeInvestmentId = activeInv.id;
+      activeInvestmentId = activeInv ? activeInv.id : (formattedInvestments[0] ? formattedInvestments[0].id : ('dep_' + email.replace(/[^a-z0-9]/g, '_')));
     }
 
     // Check for pending or declined investments
@@ -224,21 +228,24 @@ export default async function handler(req, res) {
         const amt = parseFloat(inv.total || '0');
         if (status !== 'active') {
           pendingDepositTotal += amt;
-        }
-        pendingPayments.push({
-          id: inv.id,
-          status: inv.status,
-          planId: inv.plan_id || 'starter_ai',
-          planName: inv.plan_name || inv.plan_label || 'Investment Plan',
-          amount: amt,
-          submittedAt: inv.payment_submitted_at || inv.created_at || new Date().toISOString()
-        });
-        if (status !== 'active') {
+          pendingPayments.push({
+            id: inv.id,
+            status: inv.status,
+            planId: inv.plan_id || 'starter_ai',
+            planName: inv.plan_name || inv.plan_label || 'Investment Plan',
+            amount: amt,
+            submittedAt: inv.payment_submitted_at || inv.created_at || new Date().toISOString()
+          });
           status = 'pending_approval';
         }
       } else if (['declined', 'rejected', 'cancelled'].includes(inv.status) && status === 'none') {
         status = inv.status;
       }
+    }
+
+    if (status === 'active') {
+      pendingPayments.length = 0;
+      pendingDepositTotal = 0;
     }
 
     const activeTotal = activeInv ? parseFloat(activeInv.total || '1000') : (formattedInvestments[0] ? parseFloat(formattedInvestments[0].total || '1000') : 1000);

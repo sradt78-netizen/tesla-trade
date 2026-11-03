@@ -1,6 +1,17 @@
 {
   "investor_accounts": [
     {
+      "email": "flow_test_1793691949667@teslawealths.org",
+      "name": "Verification Tester",
+      "phone": "",
+      "age": 0,
+      "onboarding_status": "active",
+      "deposit_match_eligible": 1,
+      "registered_at": "2026-11-03 07:45:49",
+      "created_at": "2026-11-03T07:45:49.808Z",
+      "activated_at": "2026-11-03 07:45:49"
+    },
+    {
       "email": "test_user_2026@gmail.com",
       "name": "Test Investor",
       "phone": "",
@@ -25,6 +36,31 @@
   ],
   "investor_credentials": [],
   "investments": [
+    {
+      "id": "dep_mw0dvi7g_qr7py",
+      "tx_id": "TXMW0DVI7HB79",
+      "user_id": "flow_test_1793691949667@teslawealths.org",
+      "user_name": "Verification Tester",
+      "user_email": "flow_test_1793691949667@teslawealths.org",
+      "portfolio": "Verification Tester · Explorer",
+      "total": 200,
+      "total_current_value": 400,
+      "method": "USDT (TRC-20)",
+      "status": "active",
+      "plan_id": "starter_ai",
+      "plan_label": "Explorer",
+      "plan_name": "Explorer",
+      "projected_roi": 70,
+      "payment_confirmed": 1,
+      "payment_reference": "TRX_TEST_200",
+      "payment_proof_path": "",
+      "payment_proof_name": "receipt.jpg",
+      "payment_submitted_at": "2026-11-03 07:45:49",
+      "created_at": "2026-11-03 07:45:49",
+      "updated_at": "2026-11-03 07:45:49",
+      "earnings": 200,
+      "activated_at": "2026-11-03 07:45:49"
+    },
     {
       "id": "dep_mw0czzzb_4iyis",
       "tx_id": "TXMW0CZZZBS3D",
@@ -77,6 +113,33 @@
     }
   ],
   "account_transactions": [
+    {
+      "id": 15,
+      "user_email": "tx_bonus_9lt7br5",
+      "transaction_type": "dep_mw0dvi7g_qr7py",
+      "amount": null,
+      "status": "pending",
+      "description": "200",
+      "created_at": "2026-11-03T07:45:49.824Z"
+    },
+    {
+      "id": 14,
+      "user_email": "tx_rv9fcys",
+      "transaction_type": "dep_mw0dvi7g_qr7py",
+      "amount": null,
+      "status": "pending",
+      "description": "200",
+      "created_at": "2026-11-03T07:45:49.824Z"
+    },
+    {
+      "id": 13,
+      "user_email": "act_q874bn4",
+      "transaction_type": "dep_mw0dvi7g_qr7py",
+      "amount": null,
+      "status": "pending",
+      "description": "200",
+      "created_at": "2026-11-03T07:45:49.808Z"
+    },
     {
       "id": 12,
       "user_email": "tx_bonus_7pxw5y5",
@@ -233,7 +296,18 @@
     "marketing_last_run": ""
   },
   "user_action_logs": [],
-  "analytics_clicks": [],
+  "analytics_clicks": [
+    {
+      "id": 1,
+      "ip_address": "102.89.23.84",
+      "referrer": "https://ais-dev-fsd7slkmk6mtpl6sxalyyr-616002737462.europe-west2.run.app/?__aistudio_auth_token=cwYH8vaf5nCjAqwvkaKKBBoFmX-WrwxXF70kGFCyKbw%3D",
+      "landing_page": "/api/track",
+      "campaign_source": "referral",
+      "device_type": "mobile",
+      "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36",
+      "created_at": "2026-11-03 07:44:18"
+    }
+  ],
   "marketing_emails_log": [],
   "financing": []
 }

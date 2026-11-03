@@ -2254,13 +2254,55 @@
         document.getElementById('depModalMethod').textContent = method;
         document.getElementById('depModalRef').textContent = ref;
 
+        var isApproved = (status === 'active' || status === 'approved' || status === 'completed');
+        if (!isApproved && globalData && globalData.investors) {
+          var matchedUser = globalData.investors.find(function(u) { return (u.email || '').toLowerCase() === email.toLowerCase(); });
+          if (matchedUser && (matchedUser.onboarding_status === 'active' || matchedUser.onboarding_status === 'verified')) {
+            isApproved = true;
+          }
+        }
+
         var statusEl = document.getElementById('depModalStatusBadge');
-        if (status === 'active') {
-          statusEl.innerHTML = '<span class="badge green">Active / Approved</span>';
+        var approveBtn = document.getElementById('depModalApproveBtn');
+
+        if (isApproved) {
+          statusEl.innerHTML = '<span class="badge green">✓ Active &amp; Approved (100% Match Active)</span>';
+          if (approveBtn) {
+            approveBtn.innerHTML = '✓ Already Approved';
+            approveBtn.style.background = 'rgba(34, 197, 94, 0.2)';
+            approveBtn.style.color = '#86efac';
+            approveBtn.style.border = '1px solid rgba(34, 197, 94, 0.4)';
+            approveBtn.style.cursor = 'default';
+            approveBtn.onclick = function() {
+              showToast('This deposit is already approved and 100% bonus is active.');
+            };
+          }
         } else if (status === 'declined') {
           statusEl.innerHTML = '<span class="badge red">Declined</span>';
+          if (approveBtn) {
+            approveBtn.innerHTML = '✅ Approve Deposit';
+            approveBtn.style.background = '#16a34a';
+            approveBtn.style.color = '#ffffff';
+            approveBtn.style.border = '1px solid #22c55e';
+            approveBtn.style.cursor = 'pointer';
+            approveBtn.onclick = function() {
+              depositAction(record.id || cleanId || invId, 'approve_deposit', record.user_email || record.email || record.user_id || email || '');
+              closeDepositReceiptModal();
+            };
+          }
         } else {
           statusEl.innerHTML = '<span class="badge amber">⏳ Pending Approval</span>';
+          if (approveBtn) {
+            approveBtn.innerHTML = '✅ Approve Deposit';
+            approveBtn.style.background = '#16a34a';
+            approveBtn.style.color = '#ffffff';
+            approveBtn.style.border = '1px solid #22c55e';
+            approveBtn.style.cursor = 'pointer';
+            approveBtn.onclick = function() {
+              depositAction(record.id || cleanId || invId, 'approve_deposit', record.user_email || record.email || record.user_id || email || '');
+              closeDepositReceiptModal();
+            };
+          }
         }
 
         var proof = record.payment_proof_path || (window.__proofCache && (window.__proofCache['dep_' + record.id] || window.__proofCache[String(record.id)] || window.__proofCache['user_' + (record.user_email||'').toLowerCase()]));
@@ -2299,13 +2341,8 @@
           openBtn.style.display = 'none';
         }
 
-        // Connect action buttons
-        document.getElementById('depModalApproveBtn').onclick = function() {
-          depositAction(record.id, 'approve_deposit', record.user_email || record.email || record.user_id || '');
-          closeDepositReceiptModal();
-        };
         document.getElementById('depModalDeclineBtn').onclick = function() {
-          depositAction(record.id, 'reject_deposit', record.user_email || record.email || record.user_id || '');
+          depositAction(record.id || cleanId || invId, 'reject_deposit', record.user_email || record.email || record.user_id || email || '');
           closeDepositReceiptModal();
         };
 

@@ -553,12 +553,13 @@ export default async function handler(req, res) {
         if (Array.isArray(diskDeposits) && diskDeposits.length > 0) {
           const mergedInvs = [...investments];
           for (const dep of diskDeposits) {
-            // Match by deposit id only. Matching by email merged different
-            // deposits of the same investor into one row.
-            const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id));
+            const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (dep.user_email && (x.user_email || '').toLowerCase() === dep.user_email.toLowerCase() && (dep.status === 'active' || dep.status === 'approved')));
             if (idx >= 0) {
-              // Cached copies are stale; never override what MySQL holds.
-              if (!dbInvestmentsAuthoritative) mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
+              if (dep.status === 'active' || dep.status === 'approved') {
+                mergedInvs[idx] = { ...mergedInvs[idx], ...dep, status: 'active' };
+              } else if (!dbInvestmentsAuthoritative) {
+                mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
+              }
             } else {
               mergedInvs.unshift(dep);
             }
@@ -999,61 +1000,75 @@ export default async function handler(req, res) {
 
     // ── 6. APPROVE / REJECT INVESTMENT DEPOSIT RECEIPT ──────────────
     if (action === 'approve_deposit' || action === 'reject_deposit' || action === 'approve_investor') {
-      const id = body.id;
+      const rawId = body.id || '';
+      const cleanId = String(rawId).replace(/^dep_/, '').trim();
+      const depId = cleanId ? ('dep_' + cleanId) : '';
       const targetEmail = cleanString(body.email || url.searchParams.get('email')).toLowerCase();
       const status = action === 'reject_deposit' ? 'declined' : 'active';
 
       let approvedDepositAmount = parseFloat(body.amount || '0');
       let foundDeposit = null;
 
+      const matchesDeposit = (d) => {
+        if (!d) return false;
+        const dId = String(d.id || '').trim();
+        const dEmail = (d.user_email || d.email || '').toLowerCase();
+        if (rawId && (dId === String(rawId) || dId === cleanId || dId === depId)) return true;
+        if (targetEmail && dEmail === targetEmail) return true;
+        return false;
+      };
+
       // 1. Check disk persistent deposits
       try {
         const diskDeposits = loadPersistentDeposits();
-        const found = diskDeposits.find(d => (id && String(d.id) === String(id)) || (targetEmail && (d.user_email || '').toLowerCase() === targetEmail));
-        if (found) {
-          foundDeposit = found;
-          if (!approvedDepositAmount) approvedDepositAmount = parseFloat(found.total || '1000');
-          found.status = status;
-          if (status === 'active') {
-            const bonusMatch = approvedDepositAmount;
-            const doubleVal = approvedDepositAmount * 2;
-            found.total = approvedDepositAmount;
-            found.total_current_value = doubleVal;
-            found.totalCurrentValue = doubleVal;
-            found.earnings = bonusMatch;
+        for (const found of diskDeposits) {
+          if (matchesDeposit(found)) {
+            if (!foundDeposit) foundDeposit = found;
+            if (!approvedDepositAmount) approvedDepositAmount = parseFloat(found.total || '1000');
+            found.status = status;
+            if (status === 'active') {
+              const bonusMatch = approvedDepositAmount;
+              const doubleVal = approvedDepositAmount * 2;
+              found.total = approvedDepositAmount;
+              found.total_current_value = doubleVal;
+              found.totalCurrentValue = doubleVal;
+              found.earnings = bonusMatch;
+            }
+            savePersistentDeposit(found);
           }
-          savePersistentDeposit(found);
         }
       } catch (e) {}
 
       // 2. Check memory deposits
-      const mem = inMemoryDeposits.find(i => (id && String(i.id) === String(id)) || (targetEmail && (i.user_email || '').toLowerCase() === targetEmail));
-      if (mem) {
-        if (!approvedDepositAmount) approvedDepositAmount = parseFloat(mem.total || '1000');
-        mem.status = status;
-        if (status === 'active') {
-          const doubleVal = approvedDepositAmount * 2;
-          mem.total = approvedDepositAmount;
-          mem.total_current_value = doubleVal;
-          mem.totalCurrentValue = doubleVal;
-          mem.earnings = approvedDepositAmount;
+      for (const mem of inMemoryDeposits) {
+        if (matchesDeposit(mem)) {
+          if (!approvedDepositAmount) approvedDepositAmount = parseFloat(mem.total || '1000');
+          mem.status = status;
+          if (status === 'active') {
+            const doubleVal = approvedDepositAmount * 2;
+            mem.total = approvedDepositAmount;
+            mem.total_current_value = doubleVal;
+            mem.totalCurrentValue = doubleVal;
+            mem.earnings = approvedDepositAmount;
+          }
+          if (!foundDeposit) foundDeposit = mem;
         }
-        if (!foundDeposit) foundDeposit = mem;
       }
 
       // 3. Check mockStore
-      const inv = mockStore.investments.find(i => (id && String(i.id) === String(id)) || (targetEmail && (i.user_email || '').toLowerCase() === targetEmail));
-      if (inv) {
-        if (!approvedDepositAmount) approvedDepositAmount = parseFloat(inv.total || '1000');
-        inv.status = status;
-        if (status === 'active') {
-          const doubleVal = approvedDepositAmount * 2;
-          inv.total = approvedDepositAmount;
-          inv.total_current_value = doubleVal;
-          inv.totalCurrentValue = doubleVal;
-          inv.earnings = approvedDepositAmount;
+      for (const inv of mockStore.investments) {
+        if (matchesDeposit(inv)) {
+          if (!approvedDepositAmount) approvedDepositAmount = parseFloat(inv.total || '1000');
+          inv.status = status;
+          if (status === 'active') {
+            const doubleVal = approvedDepositAmount * 2;
+            inv.total = approvedDepositAmount;
+            inv.total_current_value = doubleVal;
+            inv.totalCurrentValue = doubleVal;
+            inv.earnings = approvedDepositAmount;
+          }
+          if (!foundDeposit) foundDeposit = inv;
         }
-        if (!foundDeposit) foundDeposit = inv;
       }
 
       if (!approvedDepositAmount) approvedDepositAmount = 1000;
@@ -1061,8 +1076,8 @@ export default async function handler(req, res) {
       const totalBalanceWithBonus = approvedDepositAmount * 2;
 
       // If no deposit was found on disk or memory yet, create an approved record now
-      const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || (inv && inv.user_email) || (mem && mem.user_email);
-      const effectiveId = id || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
+      const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || 'investor@teslawealths.org';
+      const effectiveId = rawId || depId || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
 
       if (!foundDeposit && effectiveEmail && status === 'active') {
         const freshDep = {
@@ -1130,22 +1145,26 @@ export default async function handler(req, res) {
       if (isDbConnected && conn) {
         try {
           let result = null;
-          if (id) {
-            [result] = await conn.query(
-              'UPDATE investments SET status=?, total=?, total_current_value=?, earnings=? WHERE id=?',
-              [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, status === 'active' ? bonusMatch : 0, id]
-            );
-          }
+          // Comprehensive update: match by any variant of id or user_email
+          [result] = await conn.query(
+            `UPDATE investments 
+             SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
+             WHERE id=? OR id=? OR id=? OR (LOWER(user_email)=? AND (status="pending_approval" OR status="pending"))`,
+            [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, status === 'active' ? bonusMatch : 0, rawId, cleanId, depId, effectiveEmail]
+          );
+
           if ((!result || !result.affectedRows) && effectiveEmail) {
             [result] = await conn.query(
-              'UPDATE investments SET status=?, total=?, total_current_value=?, earnings=? WHERE LOWER(user_email)=? ORDER BY created_at DESC LIMIT 1',
+              `UPDATE investments 
+               SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
+               WHERE LOWER(user_email)=?`,
               [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, status === 'active' ? bonusMatch : 0, effectiveEmail]
             );
           }
 
           // If still no row affected in DB, INSERT a new active investment row!
           if ((!result || !result.affectedRows) && effectiveEmail && status === 'active') {
-            const insId = id || effectiveId || ('inv_' + Math.random().toString(36).substring(2, 9));
+            const insId = rawId || depId || effectiveId || ('inv_' + Math.random().toString(36).substring(2, 9));
             const txId = 'tx_' + Math.random().toString(36).substring(2, 9);
             try {
               await conn.query(
@@ -1170,7 +1189,7 @@ export default async function handler(req, res) {
           dbSaved = !!(result && result.affectedRows);
 
           if (effectiveEmail && status === 'active') {
-            await conn.query('UPDATE investor_accounts SET onboarding_status="active", deposit_match_eligible=1 WHERE LOWER(email)=?', [effectiveEmail]);
+            await conn.query('UPDATE investor_accounts SET onboarding_status="active", deposit_match_eligible=1, activated_at=NOW() WHERE LOWER(email)=?', [effectiveEmail]);
             const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
             const txBonId = 'tx_bonus_' + Math.random().toString(36).substring(2, 9);
             try {

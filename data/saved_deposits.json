@@ -1,5 +1,26 @@
 [
   {
+    "id": "dep_mw0dvi7g_qr7py",
+    "tx_id": "TXMW0DVI7HB79",
+    "user_id": "flow_test_1793691949667@teslawealths.org",
+    "user_email": "flow_test_1793691949667@teslawealths.org",
+    "user_name": "Verification Tester",
+    "portfolio": "Verification Tester · Explorer",
+    "plan_id": "starter_ai",
+    "plan_label": "Explorer",
+    "plan_name": "Explorer",
+    "total": 200,
+    "total_current_value": 400,
+    "method": "USDT (TRC-20)",
+    "payment_reference": "TRX_TEST_200",
+    "payment_proof_path": "",
+    "payment_proof_name": "",
+    "status": "active",
+    "created_at": "2026-11-03T07:45:49.809Z",
+    "totalCurrentValue": 400,
+    "earnings": 200
+  },
+  {
     "id": "dep_mw0czzzb_4iyis",
     "tx_id": "TXMW0CZZZBS3D",
     "user_id": "test_user_2026@gmail.com",

@@ -30,6 +30,7 @@
 
   function isDepositPendingLocal() {
     try {
+      if (localStorage.getItem('ttinc_account_approved') === 'true') return false;
       var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
       if (meta.status === 'active' || meta.status === 'approved') return false;
       var curAuth = auth() || {};
@@ -204,10 +205,15 @@
           'Our compliance administrators are currently verifying your payment receipt. This screen automatically detects approval and unlocks your full dashboard with zero manual refresh required.' +
         '</div>' +
 
-        // Animated Polling Pill
-        '<div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;color:#64748b;letter-spacing:0.5px;">' +
-          '<span style="width:6px;height:6px;border-radius:50%;background:#e31937;animation:ttinc-lock-pulse 1.2s infinite;"></span>' +
-          '<span id="ttinc-lock-poll-status">Checking for administrator approval every 4 seconds…</span>' +
+        // Animated Polling Pill & Immediate Manual Verification Trigger
+        '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;">' +
+          '<div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;color:#64748b;letter-spacing:0.5px;">' +
+            '<span style="width:6px;height:6px;border-radius:50%;background:#e31937;animation:ttinc-lock-pulse 1.2s infinite;"></span>' +
+            '<span id="ttinc-lock-poll-status">Checking for administrator approval every 4 seconds…</span>' +
+          '</div>' +
+          '<button type="button" id="ttinc-manual-poll-btn" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:11px;font-weight:700;padding:7px 16px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .2s ease;" onclick="window.__ttincForceCheckStatus && window.__ttincForceCheckStatus()">' +
+            '<span>↻</span> Check Verification Status Now' +
+          '</button>' +
         '</div>' +
       '</div>';
 
@@ -221,6 +227,20 @@
       document.head.appendChild(st);
     }
   }
+
+  window.__ttincForceCheckStatus = function () {
+    var btn = document.getElementById('ttinc-manual-poll-btn');
+    if (btn) {
+      btn.innerHTML = '<span>↻</span> Verifying with server…';
+      btn.style.opacity = '0.7';
+    }
+    checkAccountStatus(function (approved) {
+      if (btn) {
+        btn.innerHTML = approved ? '✓ Approved! Unlocking…' : '<span>↻</span> Check Verification Status Now';
+        btn.style.opacity = '1';
+      }
+    });
+  };
 
   function celebrateAndUnlock(data) {
     var overlay = document.getElementById(LOCK_OVERLAY_ID);
@@ -242,6 +262,10 @@
     try {
       localStorage.removeItem('ttinc_deposit_status');
       localStorage.removeItem('ttinc_payment_status');
+      localStorage.removeItem('ttinc_deposit_amount');
+      localStorage.removeItem('ttinc_deposit_plan');
+      localStorage.removeItem('ttinc_deposit_method');
+      localStorage.setItem('ttinc_account_approved', 'true');
       var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
       meta.status = 'active';
       if (data && data.total) meta.total = Number(data.total);
@@ -274,22 +298,14 @@
       }
     } catch (e) {}
 
-    document.documentElement.classList.remove('ttinc-invitation-locked');
-    removeLock();
-    removeBanner();
-    var ov1 = document.getElementById('ttinc-account-status-overlay');
-    if (ov1) ov1.remove();
-    var ov2 = document.getElementById('ttinc-pending-overlay');
-    if (ov2) ov2.remove();
-    var ldr = document.getElementById('ttinc-initial-loader');
-    if (ldr) ldr.remove();
-    if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
-
+    // Display the approval celebration clearly for 1.2s before unlocking
     setTimeout(function () {
       document.documentElement.classList.remove('ttinc-invitation-locked');
       removeLock();
       removeBanner();
+      var ov1 = document.getElementById('ttinc-account-status-overlay');
       if (ov1) ov1.remove();
+      var ov2 = document.getElementById('ttinc-pending-overlay');
       if (ov2) ov2.remove();
       var ldr2 = document.getElementById('ttinc-initial-loader');
       if (ldr2) ldr2.remove();
@@ -297,33 +313,30 @@
 
       window.dispatchEvent(new CustomEvent('ttinc_account_activated', { detail: data }));
       window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('ttinc_balance_sync'));
 
       var p = (window.location.pathname || '').toLowerCase();
       if (window.location.search && window.location.search.indexOf('payment=pending') !== -1) {
-        window.location.href = '/overview';
-        return;
+        window.history.replaceState(null, '', window.location.pathname);
       }
       if (p !== '/overview' && p !== '/dashboard') {
         window.location.replace('/overview');
-        return;
       }
-      var root = document.getElementById('root');
-      if (!root || !root.textContent.trim()) {
-        window.location.reload();
-      }
-    }, 400);
+    }, 1200);
   }
 
-  function checkAccountStatus() {
+  function checkAccountStatus(callback) {
     if (!onInvestorRoute()) {
       removeLock();
       removeBanner();
+      if (typeof callback === 'function') callback(false);
       return;
     }
 
     var current = auth();
     if (!current || !current.email) {
       removeLock();
+      if (typeof callback === 'function') callback(false);
       return;
     }
 
@@ -338,13 +351,17 @@
     })
       .then(function (res) { return res.ok ? res.json() : null; })
       .then(function (data) {
-        if (!data) return;
+        if (!data) {
+          if (typeof callback === 'function') callback(false);
+          return;
+        }
 
         var hasActive = data.hasActiveInvestment || data.status === 'active' || data.investmentStatus === 'active' || data.status === 'approved' || data.investmentStatus === 'approved';
         var isPending = data.status === 'pending_approval' || data.investmentStatus === 'pending_approval' ||
           (!hasActive && Array.isArray(data.pendingPayments) && data.pendingPayments.length > 0);
 
         if (hasActive) {
+          if (typeof callback === 'function') callback(true);
           try {
             localStorage.removeItem('ttinc_deposit_status');
             localStorage.removeItem('ttinc_payment_status');

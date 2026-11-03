@@ -33,12 +33,18 @@
         row.totalCurrentValue != null ? row.totalCurrentValue : (row.total_current_value != null ? row.total_current_value : (tot > 0 ? tot * 2 : 0))
       );
       if (curVal <= tot && tot > 0) curVal = tot * 2;
+      var existingMeta = {};
+      try { existingMeta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch(e) {}
+      var status = row.status || 'active';
+      if (existingMeta.status === 'active' || existingMeta.status === 'approved' || localStorage.getItem('ttinc_account_approved') === 'true') {
+        status = 'active';
+      }
       localStorage.setItem('ttinc_inv_meta', JSON.stringify({
         id: row.id,
         total: tot,
         totalCurrentValue: curVal,
         bonus: tot,
-        status: row.status || 'active',
+        status: status,
         planName: row.planName || row.portfolio || 'Explorer'
       }));
     } catch (error) {}

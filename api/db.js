@@ -458,15 +458,23 @@ class PersistentDbConnection {
       }
 
       if (upperSql.startsWith('UPDATE')) {
-        const id = String(params[params.length - 1] || '').trim().toLowerCase();
-        let matched = false;
+        const idParams = params.map(p => String(p || '').trim().toLowerCase());
+        let matchedCount = 0;
         for (const inv of db.investments) {
           const invId = String(inv.id || '').toLowerCase();
+          const cleanInvId = invId.replace(/^dep_/, '');
+          const depInvId = 'dep_' + cleanInvId;
           const invEmail = (inv.user_email || '').toLowerCase();
-          if (invId === id || invEmail === id || id === '' || (id.includes('@') && invEmail === id)) {
-            matched = true;
+
+          const isMatch = idParams.some(p => {
+            if (!p) return false;
+            return invId === p || cleanInvId === p || depInvId === p || (p.includes('@') && invEmail === p);
+          });
+
+          if (isMatch) {
+            matchedCount++;
             if (cleanSql.includes('status=?') || cleanSql.includes('status = ?')) {
-              // params: [status, total, total_current_value, earnings, id/email]
+              // params: [status, total, total_current_value, earnings, ...]
               inv.status = String(params[0] || 'active');
               if (params[1] !== undefined) inv.total = parseFloat(params[1]) || 1000;
               if (params[2] !== undefined) inv.total_current_value = parseFloat(params[2]) || (inv.total * 2);
@@ -475,7 +483,6 @@ class PersistentDbConnection {
                 inv.activated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
               }
             } else if (cleanSql.includes('total=?, total_current_value=?')) {
-              // params from payment submit: [total, total_current_value, proofPath, proofName, reference, id]
               inv.total = parseFloat(params[0] || inv.total || 1000);
               inv.total_current_value = parseFloat(params[1] || (inv.total * 2));
               if (params[2] !== undefined && params[2] !== null) inv.payment_proof_path = String(params[2]);
@@ -494,11 +501,10 @@ class PersistentDbConnection {
               inv.status = 'declined';
             }
             inv.updated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
-            break;
           }
         }
         saveDatabaseSync();
-        return [{ affectedRows: matched ? 1 : 0 }, []];
+        return [{ affectedRows: matchedCount }, []];
       }
 
       if (upperSql.startsWith('DELETE')) {

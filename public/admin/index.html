@@ -1454,15 +1454,35 @@
       var activeCount = 0;
       var depReceiptsList = [];
 
+      var seenDepIds = {};
       investments.forEach(function(inv) {
         var em = (inv.user_email || inv.email || inv.user_id || inv.userId || '').toLowerCase();
-        if (em && (!invMap[em] || (!invMap[em].payment_proof_path && inv.payment_proof_path))) {
-          invMap[em] = inv;
+        if (em) {
+          var curBest = invMap[em];
+          if (!curBest) {
+            invMap[em] = inv;
+          } else {
+            var curIsActive = (curBest.status === 'active' || curBest.status === 'approved');
+            var newIsActive = (inv.status === 'active' || inv.status === 'approved');
+            if (newIsActive && !curIsActive) {
+              invMap[em] = inv;
+            } else if (newIsActive === curIsActive) {
+              var curTotal = parseFloat(curBest.total || '0');
+              var newTotal = parseFloat(inv.total || '0');
+              if (newTotal > curTotal) {
+                invMap[em] = inv;
+              } else if (!curBest.payment_proof_path && inv.payment_proof_path) {
+                invMap[em] = inv;
+              }
+            }
+          }
         }
         totalVol += parseFloat(inv.total || '0');
         if (inv.status === 'active' || inv.status === 'approved') activeCount++;
         // Include in Deposit Receipts list if proof is attached, OR pending approval, OR reference provided, OR amount > 0
-        if (inv.payment_proof_path || inv.payment_proof_name || inv.payment_reference || inv.status === 'pending_approval' || (inv.total && parseFloat(inv.total) > 0)) {
+        var depKey = String(inv.id || '') + '_' + em;
+        if (!seenDepIds[depKey] && (inv.payment_proof_path || inv.payment_proof_name || inv.payment_reference || inv.status === 'pending_approval' || (inv.total && parseFloat(inv.total) > 0))) {
+          seenDepIds[depKey] = true;
           depReceiptsList.push(inv);
         }
       });
@@ -1486,8 +1506,9 @@
         investors.forEach(function(u) {
           var em = (u.email || '').toLowerCase();
           var inv = invMap[em] || {};
-          var bal = parseFloat(inv.total || '0');
-          var cur = parseFloat(inv.total_current_value || inv.totalCurrentValue || (bal > 0 ? bal * 2 : 0));
+          var bal = parseFloat(u.total_deposited != null ? u.total_deposited : (inv.total || '0'));
+          var cur = parseFloat(u.total_current_value != null ? u.total_current_value : (inv.total_current_value || inv.totalCurrentValue || (bal > 0 ? bal * 2 : 0)));
+          if (bal > 0 && cur <= bal) cur = bal * 2;
           var isApproved = (inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed' || u.onboarding_status === 'verified' || u.onboarding_status === 'active');
           var isPending = !isApproved && (inv.status === 'pending_approval' || u.onboarding_status === 'pending_deposit' || inv.payment_proof_path || inv.payment_reference || bal > 0);
 
@@ -2046,6 +2067,11 @@
     function approveInvestorPayment(email, id) {
       if (!confirm('Approve payment for ' + (email || 'this investor') + '?\n\nThis will immediately unlock their investor dashboard and apply the 100% deposit match bonus.')) return;
       showToast('Approving payment & unlocking dashboard…');
+      var depFilter = document.getElementById('depStatusFilter');
+      if (depFilter && depFilter.value === 'pending') depFilter.value = 'all';
+      var invFilter = document.getElementById('investorStatusFilter');
+      if (invFilter && invFilter.value === 'pending') invFilter.value = 'all';
+
       adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2070,6 +2096,11 @@
     }
 
     function depositAction(id, act, email) {
+      var depFilter = document.getElementById('depStatusFilter');
+      if (depFilter && depFilter.value === 'pending') depFilter.value = 'all';
+      var invFilter = document.getElementById('investorStatusFilter');
+      if (invFilter && invFilter.value === 'pending') invFilter.value = 'all';
+
       adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2223,13 +2254,55 @@
         document.getElementById('depModalMethod').textContent = method;
         document.getElementById('depModalRef').textContent = ref;
 
+        var isApproved = (status === 'active' || status === 'approved' || status === 'completed');
+        if (!isApproved && globalData && globalData.investors) {
+          var matchedUser = globalData.investors.find(function(u) { return (u.email || '').toLowerCase() === email.toLowerCase(); });
+          if (matchedUser && (matchedUser.onboarding_status === 'active' || matchedUser.onboarding_status === 'verified')) {
+            isApproved = true;
+          }
+        }
+
         var statusEl = document.getElementById('depModalStatusBadge');
-        if (status === 'active') {
-          statusEl.innerHTML = '<span class="badge green">Active / Approved</span>';
+        var approveBtn = document.getElementById('depModalApproveBtn');
+
+        if (isApproved) {
+          statusEl.innerHTML = '<span class="badge green">✓ Active &amp; Approved (100% Match Active)</span>';
+          if (approveBtn) {
+            approveBtn.innerHTML = '✓ Already Approved';
+            approveBtn.style.background = 'rgba(34, 197, 94, 0.2)';
+            approveBtn.style.color = '#86efac';
+            approveBtn.style.border = '1px solid rgba(34, 197, 94, 0.4)';
+            approveBtn.style.cursor = 'default';
+            approveBtn.onclick = function() {
+              showToast('This deposit is already approved and 100% bonus is active.');
+            };
+          }
         } else if (status === 'declined') {
           statusEl.innerHTML = '<span class="badge red">Declined</span>';
+          if (approveBtn) {
+            approveBtn.innerHTML = '✅ Approve Deposit';
+            approveBtn.style.background = '#16a34a';
+            approveBtn.style.color = '#ffffff';
+            approveBtn.style.border = '1px solid #22c55e';
+            approveBtn.style.cursor = 'pointer';
+            approveBtn.onclick = function() {
+              depositAction(record.id || cleanId || invId, 'approve_deposit', record.user_email || record.email || record.user_id || email || '');
+              closeDepositReceiptModal();
+            };
+          }
         } else {
           statusEl.innerHTML = '<span class="badge amber">⏳ Pending Approval</span>';
+          if (approveBtn) {
+            approveBtn.innerHTML = '✅ Approve Deposit';
+            approveBtn.style.background = '#16a34a';
+            approveBtn.style.color = '#ffffff';
+            approveBtn.style.border = '1px solid #22c55e';
+            approveBtn.style.cursor = 'pointer';
+            approveBtn.onclick = function() {
+              depositAction(record.id || cleanId || invId, 'approve_deposit', record.user_email || record.email || record.user_id || email || '');
+              closeDepositReceiptModal();
+            };
+          }
         }
 
         var proof = record.payment_proof_path || (window.__proofCache && (window.__proofCache['dep_' + record.id] || window.__proofCache[String(record.id)] || window.__proofCache['user_' + (record.user_email||'').toLowerCase()]));
@@ -2268,13 +2341,8 @@
           openBtn.style.display = 'none';
         }
 
-        // Connect action buttons
-        document.getElementById('depModalApproveBtn').onclick = function() {
-          depositAction(record.id, 'approve_deposit', record.user_email || record.email || record.user_id || '');
-          closeDepositReceiptModal();
-        };
         document.getElementById('depModalDeclineBtn').onclick = function() {
-          depositAction(record.id, 'reject_deposit', record.user_email || record.email || record.user_id || '');
+          depositAction(record.id || cleanId || invId, 'reject_deposit', record.user_email || record.email || record.user_id || email || '');
           closeDepositReceiptModal();
         };
 
