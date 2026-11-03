@@ -1,5 +1,6 @@
 // Trading API Handler for Live Algorithmic Trading & Performance Graph
 import { loadPersistentDeposits } from './payment-submit.js';
+import { loadDatabaseSync } from '../db.js';
 
 export const tradingInvestments = {};
 
@@ -12,11 +13,11 @@ export let tradingSettings = {
 
 export function computeTradeValue(inv, now) {
   const tot = Number(inv.total || 0);
-  let curVal = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : 0));
-  if ((inv.status === 'active' || inv.status === 'approved') && (curVal <= tot || curVal === 0) && tot > 0) {
-    curVal = tot * 2;
+  let curVal = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : tot));
+  if (curVal === 0 && tot > 0) {
+    curVal = tot;
   }
-  const balance = curVal || (tot > 0 ? tot * 2 : 0);
+  const balance = curVal || tot;
   if (inv.tradingStatus !== 'active' || !inv.tradingStartedAt) {
     return {
       status: 'idle',
@@ -82,18 +83,35 @@ export function getOrCreateInvestment(id) {
     let curVal = 0;
     let invStatus = 'active';
     try {
-      const diskDeposits = loadPersistentDeposits();
-      const match = diskDeposits.find(d =>
+      const db = loadDatabaseSync();
+      const dbInvs = db.investments || [];
+      const match = dbInvs.find(d =>
         String(d.id) === String(id) ||
         ((d.user_email || d.email) && String(d.user_email || d.email).toLowerCase() === String(id).toLowerCase())
-      ) || diskDeposits.find(d => d.status === 'active' || d.status === 'approved') || (diskDeposits.length > 0 ? diskDeposits[0] : null);
+      ) || dbInvs.find(d => d.status === 'active' || d.status === 'approved') || (dbInvs.length > 0 ? dbInvs[0] : null);
       if (match) {
         depositTotal = parseFloat(match.total != null ? match.total : (match.amount || '0'));
-        curVal = parseFloat(match.totalCurrentValue || match.total_current_value || (depositTotal > 0 ? depositTotal * 2 : '0'));
-        if (curVal <= depositTotal && depositTotal > 0) curVal = depositTotal * 2;
+        curVal = parseFloat(match.totalCurrentValue || match.total_current_value || depositTotal || '0');
+        if (curVal === 0 && depositTotal > 0) curVal = depositTotal;
         invStatus = match.status || 'active';
       }
     } catch (e) {}
+
+    if (depositTotal <= 0) {
+      try {
+        const diskDeposits = loadPersistentDeposits();
+        const match = diskDeposits.find(d =>
+          String(d.id) === String(id) ||
+          ((d.user_email || d.email) && String(d.user_email || d.email).toLowerCase() === String(id).toLowerCase())
+        ) || diskDeposits.find(d => d.status === 'active' || d.status === 'approved') || (diskDeposits.length > 0 ? diskDeposits[0] : null);
+        if (match) {
+          depositTotal = parseFloat(match.total != null ? match.total : (match.amount || '0'));
+          curVal = parseFloat(match.totalCurrentValue || match.total_current_value || depositTotal || '0');
+          if (curVal === 0 && depositTotal > 0) curVal = depositTotal;
+          invStatus = match.status || 'active';
+        }
+      } catch (e) {}
+    }
 
     inv = {
       id,

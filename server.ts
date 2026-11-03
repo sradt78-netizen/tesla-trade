@@ -26,7 +26,7 @@ const PORT = 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-import { getDbConnection } from './api/db.js';
+import { getDbConnection, loadDatabaseSync } from './api/db.js';
 
 function getAdminPassword() {
   return process.env.ADMIN_PASSWORD || process.env.TT_ADMIN_PASSWORD || 'Heartofwisdom101@$';
@@ -223,6 +223,33 @@ function resolveTradingInvestment(id: string, email?: string) {
   if (inv && inv.total > 0) return inv;
 
   try {
+    const db = loadDatabaseSync();
+    const dbInvs = db.investments || [];
+    const foundDb = dbInvs.find((d: any) =>
+      String(d.id) === String(id) ||
+      (email && (d.user_email || d.email || '').toLowerCase() === email.toLowerCase()) ||
+      ((d.user_email || d.email) && String(d.user_email || d.email).toLowerCase() === String(id).toLowerCase())
+    ) || dbInvs.find((d: any) => d.status === 'active' || d.status === 'approved') || (dbInvs.length > 0 ? dbInvs[0] : null);
+
+    if (foundDb) {
+      const tot = Number(foundDb.total != null ? foundDb.total : (foundDb.amount != null ? foundDb.amount : 0));
+      let curVal = Number(foundDb.totalCurrentValue != null ? foundDb.totalCurrentValue : (foundDb.total_current_value != null ? foundDb.total_current_value : tot));
+      inv = {
+        id: foundDb.id || id,
+        status: foundDb.status || 'active',
+        total: tot,
+        totalCurrentValue: curVal,
+        tradingStatus: inv?.tradingStatus || 'idle',
+        tradingAmount: inv?.tradingAmount || 0,
+        tradingStartedAt: inv?.tradingStartedAt || null
+      };
+      mockTradingInvestments[id] = inv;
+      if (foundDb.id) mockTradingInvestments[foundDb.id] = inv;
+      return inv;
+    }
+  } catch (e) {}
+
+  try {
     const diskDeposits = loadPersistentDeposits();
     const found = diskDeposits.find((d: any) =>
       String(d.id) === String(id) ||
@@ -232,8 +259,7 @@ function resolveTradingInvestment(id: string, email?: string) {
 
     if (found) {
       const tot = Number(found.total != null ? found.total : (found.amount != null ? found.amount : 0));
-      let curVal = Number(found.totalCurrentValue || found.total_current_value || (tot > 0 ? tot * 2 : 0));
-      if (curVal <= tot && tot > 0) curVal = tot * 2;
+      let curVal = Number(found.totalCurrentValue != null ? found.totalCurrentValue : (found.total_current_value != null ? found.total_current_value : tot));
       inv = {
         id: found.id || id,
         status: found.status || 'active',
@@ -258,11 +284,8 @@ function resolveTradingInvestment(id: string, email?: string) {
 
 function computeTradeValue(inv: any, now: number) {
   const tot = Number(inv.total || 0);
-  let curVal = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : 0));
-  if ((inv.status === 'active' || inv.status === 'approved') && (curVal <= tot || curVal === 0) && tot > 0) {
-    curVal = tot * 2;
-  }
-  const balance = curVal || (tot > 0 ? tot * 2 : 0);
+  let curVal = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : tot));
+  const balance = curVal != null ? curVal : tot;
   if (inv.tradingStatus !== 'active' || !inv.tradingStartedAt) {
     return {
       status: 'idle',
@@ -352,8 +375,7 @@ app.post('/api/investments/:id/trading/start', (req, res) => {
   const inv = resolveTradingInvestment(id, req.query.email as string);
   const amount = Number(req.body.amount || 0);
   const tot = Number(inv.total || 0);
-  let available = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : tot * 2));
-  if (available <= tot && tot > 0) available = tot * 2;
+  let available = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : tot));
   if (available <= 0) {
     return res.status(409).json({ error: 'You have no available funds. Top up your account before starting a trade.' });
   }
@@ -375,8 +397,7 @@ app.post('/api/investments/:id/trading/stop', (req, res) => {
   }
   const active = computeTradeValue(inv, now);
   const tot = Number(inv.total || 0);
-  let balance = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : tot * 2));
-  if (balance <= tot && tot > 0) balance = tot * 2;
+  let balance = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : tot));
   inv.totalCurrentValue = Number((balance - inv.tradingAmount + active.tradeValue).toFixed(2));
   inv.tradingStatus = 'idle';
   inv.tradingAmount = 0;
@@ -397,14 +418,13 @@ app.get('/api/wallet', (req, res) => {
     d.status === 'active' || d.status === 'approved'
   ) || (diskDeposits.length > 0 ? diskDeposits[0] : null);
   const total = Number(found?.total != null ? found.total : (found?.amount || 0));
-  let totalCurrentValue = Number(found?.totalCurrentValue || found?.total_current_value || (total > 0 ? total * 2 : 0));
-  if (totalCurrentValue <= total && total > 0) totalCurrentValue = total * 2;
+  let totalCurrentValue = Number(found?.totalCurrentValue != null ? found.totalCurrentValue : (found?.total_current_value != null ? found.total_current_value : total));
   return res.json({
     email,
     connected: true,
     total,
     totalCurrentValue,
-    bonus: total,
+    bonus: 0,
     availableBalance: totalCurrentValue
   });
 });
@@ -416,14 +436,13 @@ app.get(['/api/investments/:id/chart-data', '/api/investments/chart-data', '/api
 
   const found = resolveTradingInvestment(id, email);
   const tot = Number(found.total || 0);
-  let curVal = Number(found.totalCurrentValue || (tot > 0 ? tot * 2 : 0));
-  if (curVal <= tot && tot > 0) curVal = tot * 2;
+  let curVal = Number(found.totalCurrentValue != null ? found.totalCurrentValue : tot);
   const inv = {
     id: found.id || id || 'sim_inv_1',
     status: found.status || 'active',
     total: tot,
     totalCurrentValue: curVal,
-    bonus: tot,
+    bonus: 0,
     roi_percent: found.roi_percent || found.roiPercent || 70,
     plan_name: found.plan_name || found.planName || found.portfolio || 'Tesla · Explorer',
     created_at: found.created_at || found.createdAt

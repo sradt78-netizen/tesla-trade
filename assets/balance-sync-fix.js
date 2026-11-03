@@ -2,9 +2,9 @@
   'use strict';
 
   /*
-   * Keep the investor overview/dashboard synchronized with admin credits & 100% deposit bonus.
-   * Re-reads the investor's balance with cache busting, keeps localStorage synced,
-   * and ensures the full balance (deposit + 100% match bonus) reflects in the wallet.
+   * Keep the investor overview/dashboard synchronized with authentic balances and admin status.
+   * Re-reads the investor's balance with cache busting and keeps localStorage synced
+   * without artificial balance doubling or fake match bonuses.
    */
   var _origFetch = window.fetch;
   if (_origFetch) {
@@ -16,22 +16,21 @@
             var meta = {};
             try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
             var p = Number(meta.total != null ? meta.total : (meta.amount != null ? meta.amount : 0));
-            var c = Number(meta.totalCurrentValue || (p > 0 ? p * 2 : 0));
-            if (c <= p && p > 0) c = p * 2;
+            var c = Number(meta.totalCurrentValue != null ? meta.totalCurrentValue : p);
             var synthData = {
               id: localStorage.getItem('ttinc_investment_id') || 'inv_active_1',
               status: (localStorage.getItem('ttinc_account_approved') === 'true' || meta.status === 'active' || meta.status === 'approved') ? 'active' : (meta.status || 'pending_approval'),
               total: p,
               totalCurrentValue: c,
               total_current_value: c,
-              bonus: p,
+              bonus: 0,
               planName: meta.planName || 'Explorer',
               portfolio: [
                 { id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: Math.round(p * 0.5) },
                 { id: 'nvda', name: 'NVIDIA Corp.', ticker: 'NVDA', investedAmount: Math.round(p * 0.3) },
                 { id: 'aapl', name: 'Apple Inc.', ticker: 'AAPL', investedAmount: Math.round(p * 0.2) }
               ],
-              earnings: { tsla: Math.round(p * 1.0), nvda: Math.round(p * 0.6), aapl: Math.round(p * 0.4) }
+              earnings: { tsla: Math.round(p * 0.5), nvda: Math.round(p * 0.3), aapl: Math.round(p * 0.2) }
             };
             return new Response(JSON.stringify(synthData), {
               status: 200,
@@ -58,14 +57,12 @@
                   modified = true;
                 }
               }
-              var c = Number(data.totalCurrentValue || data.total_current_value || (p > 0 ? p * 2 : 0));
-              if (c <= p && p > 0) {
-                c = p * 2;
-                data.totalCurrentValue = c;
-                data.total_current_value = c;
-                data.bonus = p;
-                modified = true;
-              }
+              var c = Number(data.totalCurrentValue != null ? data.totalCurrentValue : (data.total_current_value != null ? data.total_current_value : p));
+              data.totalCurrentValue = c;
+              data.total_current_value = c;
+              data.bonus = 0;
+              modified = true;
+
               if (!Array.isArray(data.portfolio) || data.portfolio.length === 0) {
                 data.portfolio = [
                   { id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: Math.round(p * 0.5) },
@@ -75,7 +72,7 @@
                 modified = true;
               }
               if (!data.earnings || typeof data.earnings !== 'object') {
-                data.earnings = { tsla: Math.round(p * 1.0), nvda: Math.round(p * 0.6), aapl: Math.round(p * 0.4) };
+                data.earnings = { tsla: Math.round(p * 0.5), nvda: Math.round(p * 0.3), aapl: Math.round(p * 0.2) };
                 modified = true;
               }
               if (modified) {
@@ -127,7 +124,7 @@
     var initLdr = document.getElementById('ttinc-initial-loader');
     if (initLdr) initLdr.remove();
 
-    // 1. Directly patch rendered React elements if they are at 0 or missing bonus
+    // 1. Directly patch rendered React elements
     var allElements = document.querySelectorAll('*');
     for (var i = 0; i < allElements.length; i++) {
       var el = allElements[i];
@@ -140,17 +137,8 @@
           if (valNode) {
             valNode.textContent = formatMoney(current);
           }
-          // Attach bonus pill inside the balance header if not already present
-          if (!parent.querySelector('#ttinc-balance-bonus-pill')) {
-            var pill = document.createElement('div');
-            pill.id = 'ttinc-balance-bonus-pill';
-            pill.style.cssText = 'display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:4px 10px;border-radius:9999px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);color:#4ade80;font-size:12px;font-weight:600;';
-            pill.innerHTML = '<span>✦</span><span>100% Match Applied: <strong>+' + formatMoney(bonus) + '</strong> (Principal: ' + formatMoney(principal) + ')</span>';
-            parent.appendChild(pill);
-          } else {
-            var existingPill = parent.querySelector('#ttinc-balance-bonus-pill');
-            existingPill.innerHTML = '<span>✦</span><span>100% Match Applied: <strong>+' + formatMoney(bonus) + '</strong> (Principal: ' + formatMoney(principal) + ')</span>';
-          }
+          var oldPill = parent.querySelector('#ttinc-balance-bonus-pill');
+          if (oldPill) oldPill.remove();
         }
       }
 
@@ -159,7 +147,7 @@
       }
     }
 
-    // 2. Patch stat cards in overview and dashboard (Invested, Current Value, Portfolios, KYC Level, Status)
+    // 2. Patch stat cards in overview and dashboard (Invested, Current Value, Status)
     var statCards = document.querySelectorAll('.grid > div');
     for (var j = 0; j < statCards.length; j++) {
       var card = statCards[j];
@@ -172,10 +160,6 @@
         }
         if (labelTxt === 'Current Value' && (valueNode.textContent === '$0.00' || valueNode.textContent === '$0')) {
           valueNode.textContent = formatMoney(current);
-        }
-        if (labelTxt === 'Gain/Loss' && (valueNode.textContent === '$0.00' || valueNode.textContent === '$0' || valueNode.textContent === '+0.00%')) {
-          valueNode.textContent = '+' + formatMoney(bonus);
-          valueNode.style.color = '#4ade80';
         }
         if (labelTxt === 'Status' && (valueNode.textContent === 'No Investment' || valueNode.textContent === 'Pending')) {
           valueNode.textContent = 'Active';
@@ -195,8 +179,8 @@
         walletCard.innerHTML =
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:12px;">' +
             '<div>' +
-              '<h3 style="font-size:15px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#fff;margin:0 0 4px;">Investor Wallet &amp; Deposit Match</h3>' +
-              '<p style="color:#94a3b8;font-size:12px;margin:0;">Authoritative account ledger reflecting deposited capital, credited bonus, and liquid trading funds.</p>' +
+              '<h3 style="font-size:15px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#fff;margin:0 0 4px;">Investor Wallet Ledger</h3>' +
+              '<p style="color:#94a3b8;font-size:12px;margin:0;">Authoritative account ledger reflecting deposited capital and liquid trading funds.</p>' +
             '</div>' +
             '<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:9999px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#4ade80;font-size:11px;font-weight:700;text-transform:uppercase;">' +
               '<span style="width:6px;height:6px;border-radius:50%;background:#22c55e;"></span>Active &amp; Funded' +
@@ -206,22 +190,17 @@
             '<div style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;">' +
               '<div style="color:#94a3b8;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Total Wallet Balance</div>' +
               '<div data-wallet-total style="font-family:monospace;font-size:22px;font-weight:700;color:#fff;">' + formatMoney(current) + '</div>' +
-              '<div style="color:#4ade80;font-size:11px;margin-top:4px;">100% Match Included</div>' +
+              '<div style="color:#22c55e;font-size:11px;margin-top:4px;">Authentic Balance</div>' +
             '</div>' +
             '<div style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;">' +
               '<div style="color:#94a3b8;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Deposited Principal</div>' +
               '<div data-wallet-principal style="font-family:monospace;font-size:22px;font-weight:700;color:#fff;">' + formatMoney(principal) + '</div>' +
               '<div style="color:#94a3b8;font-size:11px;margin-top:4px;">Verified Principal</div>' +
             '</div>' +
-            '<div style="background:rgba(0,0,0,0.4);border:1px solid rgba(34,197,94,0.2);border-radius:12px;padding:14px;background:linear-gradient(180deg, rgba(34,197,94,0.06) 0%, rgba(0,0,0,0.4) 100%);">' +
-              '<div style="color:#4ade80;font-size:11px;text-transform:uppercase;margin-bottom:4px;font-weight:600;">100% Match Bonus</div>' +
-              '<div data-wallet-bonus style="font-family:monospace;font-size:22px;font-weight:700;color:#4ade80;">+' + formatMoney(bonus) + '</div>' +
-              '<div style="color:#86efac;font-size:11px;margin-top:4px;">Credited &amp; Tradeable</div>' +
-            '</div>' +
             '<div style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;">' +
               '<div style="color:#94a3b8;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Available for Trade / Withdraw</div>' +
               '<div data-wallet-available style="font-family:monospace;font-size:22px;font-weight:700;color:#fff;">' + formatMoney(current) + '</div>' +
-              '<div style="color:#e31937;font-size:11px;margin-top:4px;">Full Balance Available</div>' +
+              '<div style="color:#e31937;font-size:11px;margin-top:4px;">Liquid Funds</div>' +
             '</div>' +
           '</div>';
 
@@ -239,8 +218,6 @@
         if (totNode) totNode.textContent = formatMoney(current);
         var princNode = existingCard.querySelector('[data-wallet-principal]');
         if (princNode) princNode.textContent = formatMoney(principal);
-        var bonusNode = existingCard.querySelector('[data-wallet-bonus]');
-        if (bonusNode) bonusNode.textContent = '+' + formatMoney(bonus);
         var availNode = existingCard.querySelector('[data-wallet-available]');
         if (availNode) availNode.textContent = formatMoney(current);
       }
@@ -280,12 +257,9 @@
       var current = Number(
         investment.totalCurrentValue != null
           ? investment.totalCurrentValue
-          : (investment.total_current_value != null ? investment.total_current_value : (principal > 0 ? principal * 2 : 0))
+          : (investment.total_current_value != null ? investment.total_current_value : principal)
       );
-      if (current <= principal && principal > 0) {
-        current = principal * 2;
-      }
-      var bonus = Number(investment.bonus != null ? investment.bonus : principal);
+      var bonus = 0;
 
       if (!Number.isFinite(principal) || !Number.isFinite(current)) return;
 
@@ -303,13 +277,12 @@
         if (Number.isFinite(storedCurrent)) oldCurrent = storedCurrent;
         if (principal <= 0 && storedPrincipal > 0) {
           principal = storedPrincipal;
-          current = storedCurrent || (principal * 2);
-          bonus = principal;
+          current = storedCurrent || principal;
         }
         oldMeta.id = investmentId || oldMeta.id || 'sim_inv_1';
         oldMeta.total = principal;
         oldMeta.totalCurrentValue = current;
-        oldMeta.bonus = bonus;
+        oldMeta.bonus = 0;
         if (investment.status === 'active' || investment.status === 'approved' || localStorage.getItem('ttinc_account_approved') === 'true') {
           oldMeta.status = 'active';
         }
@@ -346,11 +319,10 @@
     try {
       var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
       if (meta && meta.total) {
-        var p = Number(meta.total || 1000);
-        var c = Number(meta.totalCurrentValue || (p * 2));
-        var b = Number(meta.bonus || p);
+        var p = Number(meta.total);
+        var c = Number(meta.totalCurrentValue != null ? meta.totalCurrentValue : p);
         isPatching = true;
-        patchVisibleWalletDom(p, c, b);
+        patchVisibleWalletDom(p, c, 0);
       }
     } catch (e) {} finally {
       isPatching = false;

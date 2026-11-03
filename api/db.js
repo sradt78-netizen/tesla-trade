@@ -99,7 +99,7 @@ export function loadDatabase() {
         const t = parseFloat(inv.total);
         inv.total = !isNaN(t) && t > 0 ? t : 0;
         const cv = parseFloat(inv.total_current_value);
-        inv.total_current_value = !isNaN(cv) && cv > 0 ? cv : (inv.total > 0 ? inv.total * 2 : 0);
+        inv.total_current_value = !isNaN(cv) && cv > 0 ? cv : (inv.total > 0 ? inv.total : 0);
       });
     }
   }
@@ -108,6 +108,8 @@ export function loadDatabase() {
   saveDatabaseSync();
   return memoryDb;
 }
+
+export const loadDatabaseSync = loadDatabase;
 
 // Synchronous save
 export function saveDatabaseSync() {
@@ -445,8 +447,8 @@ class PersistentDbConnection {
         // Numeric normalization
         const parsedTotal = parseFloat(newInv.total != null ? newInv.total : 0);
         newInv.total = !isNaN(parsedTotal) && parsedTotal >= 0 ? parsedTotal : 0;
-        const parsedVal = parseFloat(newInv.total_current_value != null ? newInv.total_current_value : (newInv.total * 2));
-        newInv.total_current_value = !isNaN(parsedVal) && parsedVal >= 0 ? parsedVal : (newInv.total * 2);
+        const parsedVal = parseFloat(newInv.total_current_value != null ? newInv.total_current_value : newInv.total);
+        newInv.total_current_value = !isNaN(parsedVal) && parsedVal >= 0 ? parsedVal : newInv.total;
         newInv.user_email = String(newInv.user_email || '').toLowerCase().trim();
         if (cleanSql.includes('"active"') || cleanSql.includes("'active'")) {
           newInv.status = 'active';
@@ -488,19 +490,19 @@ class PersistentDbConnection {
               if (params[2] !== undefined) {
                 const cv = parseFloat(params[2]);
                 if (!isNaN(cv) && cv > 0) inv.total_current_value = cv;
-                else if (inv.total > 0) inv.total_current_value = inv.total * 2;
+                else if (inv.total > 0) inv.total_current_value = inv.total;
               }
               if (params[3] !== undefined) {
                 const earn = parseFloat(params[3]);
                 if (!isNaN(earn) && earn >= 0) inv.earnings = earn;
-                else inv.earnings = inv.total;
+                else inv.earnings = 0;
               }
               if (inv.status === 'active') {
                 inv.activated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
               }
             } else if (cleanSql.includes('total=?, total_current_value=?')) {
               inv.total = parseFloat(params[0] || inv.total || 1000);
-              inv.total_current_value = parseFloat(params[1] || (inv.total * 2));
+              inv.total_current_value = parseFloat(params[1] || inv.total || 0);
               if (params[2] !== undefined && params[2] !== null) inv.payment_proof_path = String(params[2]);
               if (params[3] !== undefined && params[3] !== null) inv.payment_proof_name = String(params[3]);
               if (params[4] !== undefined && params[4] !== null) inv.payment_reference = String(params[4]);
@@ -510,8 +512,8 @@ class PersistentDbConnection {
             } else if (cleanSql.includes('status="active"') || cleanSql.includes("status='active'")) {
               inv.status = 'active';
               inv.total = parseFloat(inv.total || 1000);
-              inv.total_current_value = inv.total * 2;
-              inv.earnings = inv.total;
+              inv.total_current_value = inv.total;
+              inv.earnings = 0;
               inv.activated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
             } else if (cleanSql.includes('status="declined"') || cleanSql.includes("status='declined'")) {
               inv.status = 'declined';

@@ -30,9 +30,8 @@
     try {
       var tot = Number(row.total || 0);
       var curVal = Number(
-        row.totalCurrentValue != null ? row.totalCurrentValue : (row.total_current_value != null ? row.total_current_value : (tot > 0 ? tot * 2 : 0))
+        row.totalCurrentValue != null ? row.totalCurrentValue : (row.total_current_value != null ? row.total_current_value : tot)
       );
-      if (curVal <= tot && tot > 0) curVal = tot * 2;
       var existingMeta = {};
       try { existingMeta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch(e) {}
       var status = row.status || 'active';
@@ -43,7 +42,7 @@
         id: row.id,
         total: tot,
         totalCurrentValue: curVal,
-        bonus: tot,
+        bonus: 0,
         status: status,
         planName: row.planName || row.portfolio || 'Explorer'
       }));
@@ -87,8 +86,7 @@
       }).then(function (r) { return r.ok ? r.json() : null; }).then(function (acc) {
         if (acc && (acc.hasActiveInvestment || acc.status === 'active') && acc.activeInvestmentId) {
           var actTot = Number(acc.total != null ? acc.total : 0);
-          var actCur = Number(acc.totalCurrentValue || (actTot > 0 ? actTot * 2 : 0));
-          if (actCur <= actTot && actTot > 0) actCur = actTot * 2;
+          var actCur = Number(acc.totalCurrentValue != null ? acc.totalCurrentValue : actTot);
           return {
             id: acc.activeInvestmentId,
             total: actTot,

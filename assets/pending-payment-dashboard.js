@@ -276,10 +276,10 @@
       if (data && data.total) meta.total = Number(data.total);
       if (data && data.totalCurrentValue) {
         meta.totalCurrentValue = Number(data.totalCurrentValue);
-        meta.bonus = Number(data.bonus || data.total || 0);
+        meta.bonus = 0;
       } else if (meta.total) {
-        meta.totalCurrentValue = Number(meta.total) * 2;
-        meta.bonus = Number(meta.total);
+        meta.totalCurrentValue = Number(meta.total);
+        meta.bonus = 0;
       }
       if (data && data.planName) meta.planName = data.planName;
       localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
@@ -391,10 +391,10 @@
             if (data.total) meta.total = Number(data.total);
             if (data.totalCurrentValue) {
               meta.totalCurrentValue = Number(data.totalCurrentValue);
-              meta.bonus = Number(data.bonus || data.total || 0);
+              meta.bonus = 0;
             } else if (meta.total) {
-              meta.totalCurrentValue = Number(meta.total) * 2;
-              meta.bonus = Number(meta.total);
+              meta.totalCurrentValue = Number(meta.total);
+              meta.bonus = 0;
             }
             if (data.planName) meta.planName = data.planName;
             localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));

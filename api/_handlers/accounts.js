@@ -172,7 +172,6 @@ export default async function handler(req, res) {
             const anyMatch = allD.find(d => (d.user_email || d.email || d.user_id || '').toLowerCase().trim() === email);
             if (anyMatch && anyMatch.total) foundAmount = parseFloat(anyMatch.total);
           } catch(e) {}
-          if (!foundAmount) foundAmount = 200;
           const defaultInv = {
             id: 'dep_' + email.replace(/[^a-z0-9]/g, '_'),
             tx_id: 'TX' + Date.now().toString(36).toUpperCase(),
@@ -184,11 +183,11 @@ export default async function handler(req, res) {
             plan_label: 'Explorer',
             plan_name: 'Explorer',
             total: foundAmount,
-            total_current_value: foundAmount * 2,
-            totalCurrentValue: foundAmount * 2,
-            bonus: foundAmount,
-            availableBalance: foundAmount * 2,
-            walletBalance: foundAmount * 2,
+            total_current_value: foundAmount,
+            totalCurrentValue: foundAmount,
+            bonus: 0,
+            availableBalance: foundAmount,
+            walletBalance: foundAmount,
             canWithdraw: true,
             status: 'active',
             method: 'Crypto',
@@ -204,7 +203,7 @@ export default async function handler(req, res) {
       hasAccount = true;
     }
 
-    let status = 'none';
+    let status = userAdminApproved ? 'active' : 'none';
     let activeInvestmentId = null;
     let pendingDepositTotal = 0;
     const pendingPayments = [];
@@ -212,14 +211,13 @@ export default async function handler(req, res) {
     // Format all investments with proper values
     const formattedInvestments = userInvestments.map(inv => {
       const depAmt = parseFloat(inv.total != null ? inv.total : (inv.amount != null ? inv.amount : 0));
-      let val = parseFloat(inv.total_current_value != null ? inv.total_current_value : (inv.totalCurrentValue != null ? inv.totalCurrentValue : (depAmt * 2)));
-      if (val <= depAmt && depAmt > 0) val = depAmt * 2;
+      let val = parseFloat(inv.total_current_value != null ? inv.total_current_value : (inv.totalCurrentValue != null ? inv.totalCurrentValue : depAmt));
       return {
         ...inv,
         total: depAmt,
         totalCurrentValue: val,
         total_current_value: val,
-        status: inv.status || 'active'
+        status: userAdminApproved ? 'active' : (inv.status || 'active')
       };
     });
 
@@ -261,9 +259,8 @@ export default async function handler(req, res) {
       ? parseFloat(activeInv.total != null ? activeInv.total : 0)
       : (firstValidInv ? parseFloat(firstValidInv.total != null ? firstValidInv.total : 0) : 0);
     let activeVal = activeInv
-      ? parseFloat(activeInv.totalCurrentValue || activeInv.total_current_value || (activeTotal > 0 ? activeTotal * 2 : 0))
-      : (activeTotal > 0 ? activeTotal * 2 : 0);
-    if (activeVal <= activeTotal && activeTotal > 0) activeVal = activeTotal * 2;
+      ? parseFloat(activeInv.totalCurrentValue != null ? activeInv.totalCurrentValue : (activeInv.total_current_value != null ? activeInv.total_current_value : activeTotal))
+      : (firstValidInv ? parseFloat(firstValidInv.totalCurrentValue != null ? firstValidInv.totalCurrentValue : firstValidInv.total) : activeTotal);
 
     const resolvedActiveId = activeInvestmentId || (status === 'active' ? (firstValidInv ? firstValidInv.id : 'dep_active') : null);
 
@@ -274,12 +271,12 @@ export default async function handler(req, res) {
       investmentStatus: status,
       status: status,
       id: resolvedActiveId || (pendingPayments[0] ? pendingPayments[0].id : null) || 'dep_active',
-      hasActiveInvestment: status === 'active',
+      hasActiveInvestment: status === 'active' || userAdminApproved,
       activeInvestmentId: resolvedActiveId,
       total: activeTotal,
       totalCurrentValue: activeVal,
       total_current_value: activeVal,
-      bonus: activeTotal,
+      bonus: 0,
       pendingDepositTotal: status === 'active' ? 0 : pendingDepositTotal,
       pendingPayments: status === 'active' ? [] : pendingPayments,
       investments: formattedInvestments

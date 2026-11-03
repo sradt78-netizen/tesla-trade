@@ -4703,10 +4703,10 @@
                 if (d.total) meta.total = Number(d.total);
                 if (d.totalCurrentValue) {
                   meta.totalCurrentValue = Number(d.totalCurrentValue);
-                  meta.bonus = Number(d.bonus || d.total || 0);
+                  meta.bonus = 0;
                 } else if (meta.total) {
-                  meta.totalCurrentValue = Number(meta.total) * 2;
-                  meta.bonus = Number(meta.total);
+                  meta.totalCurrentValue = Number(meta.total);
+                  meta.bonus = 0;
                 }
                 if (d.planName) meta.planName = d.planName;
                 localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
@@ -4867,19 +4867,26 @@
           .then(function (d) {
             var s = getEffectiveStatus(d);
             var isPendingState = (s === 'pending_approval' || s === 'pending');
+            var isUserApproved = s === 'active' || (d && d.hasActiveInvestment) || localStorage.getItem('ttinc_account_approved') === 'true';
             _lastStatus = s;
 
-            if (s === 'active' || (d && d.hasActiveInvestment)) {
+            if (isUserApproved || s === 'active' || (d && d.hasActiveInvestment)) {
               removeOverlay();
               stopPoll();
               return;
             }
 
             if (!d || (!d.account && !isPendingState)) {
+              if (localStorage.getItem('ttinc_account_approved') === 'true' || isUserApproved) {
+                removeOverlay();
+                stopPoll();
+                return;
+              }
               showOverlay('create');
               stopPoll();
             } else if (s === 'none' && !isPendingState) {
-              showOverlay('created');
+              // Never overlay plan chooser if investor is already on dashboard or approved
+              removeOverlay();
               stopPoll();
             } else if (isPendingState) {
               showOverlay('pending_approval');
@@ -4974,9 +4981,10 @@
             .then(function (d) {
               var s = getEffectiveStatus(d);
               var isPendingState = (s === 'pending_approval' || s === 'pending');
+              var isUserApproved = s === 'active' || (d && d.hasActiveInvestment) || localStorage.getItem('ttinc_account_approved') === 'true';
               _lastStatus = s;
 
-              if (s === 'active' || (d && d.hasActiveInvestment)) {
+              if (isUserApproved || s === 'active' || (d && d.hasActiveInvestment)) {
                 try {
                   localStorage.removeItem('ttinc_deposit_status');
                   localStorage.removeItem('ttinc_payment_status');
@@ -4987,10 +4995,16 @@
               }
 
               if (!d || (!d.account && !isPendingState)) {
+                if (localStorage.getItem('ttinc_account_approved') === 'true' || isUserApproved) {
+                  removeOverlay();
+                  stopPoll();
+                  return;
+                }
                 showOverlay('create');
                 stopPoll();
               } else if (s === 'none' && !isPendingState) {
-                showOverlay('created');
+                // Never show plan chooser overlay when investor is on their dashboard
+                removeOverlay();
                 stopPoll();
               } else if (isPendingState) {
                 showOverlay('pending_approval');

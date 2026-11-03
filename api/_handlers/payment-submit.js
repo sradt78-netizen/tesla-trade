@@ -305,12 +305,9 @@ export default async function handler(req, res) {
 
       const isApproved = userAdminApproved || found.status === 'active' || found.status === 'approved' || found.status === 'completed';
       const tot = Number(found.total != null ? found.total : (found.amount != null ? found.amount : 0));
-      let curVal = Number(found.totalCurrentValue || found.total_current_value || (tot > 0 ? tot * 2 : 0));
-      if (isApproved && (curVal <= tot || curVal === 0) && tot > 0) {
-        curVal = tot * 2;
-      }
-      if (!curVal || isNaN(curVal)) curVal = tot * 2;
-      const bonusMatch = tot;
+      let curVal = Number(found.totalCurrentValue || found.total_current_value || tot);
+      if (curVal === 0 && tot > 0) curVal = tot;
+      const bonusMatch = 0;
 
       return res.status(200).json({
         ...found,
@@ -339,11 +336,8 @@ export default async function handler(req, res) {
     all = all.map(item => {
       const st = (item.status || 'active').toLowerCase();
       const tot = Number(item.total != null ? item.total : (item.amount != null ? item.amount : 0));
-      let curVal = Number(item.totalCurrentValue || item.total_current_value || 0);
-      if ((st === 'active' || st === 'approved' || st === 'completed' || !st) && (curVal <= tot || curVal === 0) && tot > 0) {
-        curVal = tot * 2;
-      }
-      if (!curVal) curVal = tot * 2;
+      let curVal = Number(item.totalCurrentValue || item.total_current_value || tot);
+      if (curVal === 0 && tot > 0) curVal = tot;
       return {
         ...item,
         status: (st === 'approved' || st === 'completed' || !st) ? 'active' : st,
@@ -355,7 +349,7 @@ export default async function handler(req, res) {
         total: tot,
         totalCurrentValue: curVal,
         total_current_value: curVal,
-        bonus: tot,
+        bonus: 0,
         earnings: {
           tsla: curVal,
           ...(typeof item.earnings === 'object' && item.earnings ? item.earnings : {})

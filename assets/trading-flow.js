@@ -68,14 +68,14 @@
         if (first && first.id) {
           localStorage.setItem('ttinc_investment_id', first.id);
           try {
-            var tot = Number(first.total || 1000);
-            var curVal = Number(first.totalCurrentValue || first.total_current_value || (tot * 2));
-            if (curVal <= tot && tot > 0) curVal = tot * 2;
+            var tot = Number(first.total || 0);
+            var curVal = Number(first.totalCurrentValue != null ? first.totalCurrentValue : (first.total_current_value != null ? first.total_current_value : tot));
+            if (curVal === 0 && tot > 0) curVal = tot;
             localStorage.setItem('ttinc_inv_meta', JSON.stringify({
               id: first.id,
               total: tot,
               totalCurrentValue: curVal,
-              bonus: tot,
+              bonus: 0,
               status: first.status || 'active',
               planName: first.planName || first.portfolio || 'Explorer'
             }));
@@ -171,7 +171,7 @@
             '<strong id="ttinc-modal-wallet-balance" style="font-family:\'SF Mono\',Monaco,Consolas,monospace;font-size:20px;color:#fff;">$0.00</strong>' +
           '</div>' +
           '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:999px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);color:#4ade80;font-size:11px;font-weight:700;">' +
-            '✦ 100% Match Applied' +
+            '<span style="width:6px;height:6px;border-radius:50%;background:#22c55e;"></span>Ready to Trade' +
           '</span>' +
         '</div>' +
         '<div class="ttinc-alloc-grid">' +
@@ -248,9 +248,9 @@
     if (!available || available <= 0) {
       try {
         var metaObj = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-        if (metaObj.totalCurrentValue) available = Number(metaObj.totalCurrentValue);
-        else if (metaObj.total) available = Number(metaObj.total) * 2;
-        else if (localStorage.getItem('ttinc_deposit_amount')) available = Number(localStorage.getItem('ttinc_deposit_amount')) * 2;
+        if (metaObj.totalCurrentValue != null) available = Number(metaObj.totalCurrentValue);
+        else if (metaObj.total != null) available = Number(metaObj.total);
+        else if (localStorage.getItem('ttinc_deposit_amount')) available = Number(localStorage.getItem('ttinc_deposit_amount'));
       } catch (e) {}
     }
     available = Math.max(0, Number(available || 0));

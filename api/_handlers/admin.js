@@ -860,12 +860,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Valid email and positive amount required.' });
       }
 
-      // 100% Matching Deposit Bonus Policy
-      const bonusMatch = amount;
-      const bonusCredited = amount * 2; // investor amount + 100% bonus
-
       let updatedTotal = amount;
-      let updatedCurrentValue = bonusCredited;
+      let updatedCurrentValue = amount;
       let targetInvId = 'dep_' + Date.now().toString(36);
 
       // Check persistent disk deposits first
@@ -875,13 +871,13 @@ export default async function handler(req, res) {
         if (found) {
           targetInvId = found.id;
           const prevTotal = parseFloat(found.total || '0');
-          const prevVal = parseFloat(found.total_current_value || found.totalCurrentValue || (prevTotal > 0 ? prevTotal * 2 : 0));
+          const prevVal = parseFloat(found.total_current_value || found.totalCurrentValue || prevTotal);
           updatedTotal = prevTotal + amount;
-          updatedCurrentValue = prevVal + bonusCredited;
+          updatedCurrentValue = prevVal + amount;
           found.total = updatedTotal;
           found.total_current_value = updatedCurrentValue;
           found.totalCurrentValue = updatedCurrentValue;
-          found.earnings = updatedCurrentValue - updatedTotal;
+          found.earnings = 0;
           found.status = 'active';
           savePersistentDeposit(found);
         } else {
@@ -898,7 +894,7 @@ export default async function handler(req, res) {
             total: updatedTotal,
             total_current_value: updatedCurrentValue,
             totalCurrentValue: updatedCurrentValue,
-            earnings: bonusMatch,
+            earnings: 0,
             status: 'active',
             method: 'Admin Credit',
             created_at: new Date().toISOString()
@@ -1060,13 +1056,11 @@ export default async function handler(req, res) {
             if (!approvedDepositAmount && !isNaN(amt) && amt > 0) approvedDepositAmount = amt;
             found.status = status;
             if (status === 'active') {
-              const curTotal = approvedDepositAmount || amt || 200;
-              const bonusMatch = curTotal;
-              const doubleVal = curTotal * 2;
+              const curTotal = approvedDepositAmount || amt || 0;
               found.total = curTotal;
-              found.total_current_value = doubleVal;
-              found.totalCurrentValue = doubleVal;
-              found.earnings = bonusMatch;
+              found.total_current_value = curTotal;
+              found.totalCurrentValue = curTotal;
+              found.earnings = 0;
             }
             savePersistentDeposit(found);
           }
@@ -1080,12 +1074,11 @@ export default async function handler(req, res) {
           if (!approvedDepositAmount && !isNaN(amt) && amt > 0) approvedDepositAmount = amt;
           mem.status = status;
           if (status === 'active') {
-            const curTotal = approvedDepositAmount || amt || 200;
-            const doubleVal = curTotal * 2;
+            const curTotal = approvedDepositAmount || amt || 0;
             mem.total = curTotal;
-            mem.total_current_value = doubleVal;
-            mem.totalCurrentValue = doubleVal;
-            mem.earnings = curTotal;
+            mem.total_current_value = curTotal;
+            mem.totalCurrentValue = curTotal;
+            mem.earnings = 0;
           }
           if (!foundDeposit) foundDeposit = mem;
         }
@@ -1098,21 +1091,19 @@ export default async function handler(req, res) {
           if (!approvedDepositAmount && !isNaN(amt) && amt > 0) approvedDepositAmount = amt;
           inv.status = status;
           if (status === 'active') {
-            const curTotal = approvedDepositAmount || amt || 200;
-            const doubleVal = curTotal * 2;
+            const curTotal = approvedDepositAmount || amt || 0;
             inv.total = curTotal;
-            inv.total_current_value = doubleVal;
-            inv.totalCurrentValue = doubleVal;
-            inv.earnings = curTotal;
+            inv.total_current_value = curTotal;
+            inv.totalCurrentValue = curTotal;
+            inv.earnings = 0;
           }
           if (!foundDeposit) foundDeposit = inv;
         }
       }
 
       if (!approvedDepositAmount && body.amount) approvedDepositAmount = parseFloat(body.amount);
-      if (!approvedDepositAmount) approvedDepositAmount = (foundDeposit && parseFloat(foundDeposit.total)) || 200;
-      const bonusMatch = approvedDepositAmount;
-      const totalBalanceWithBonus = approvedDepositAmount * 2;
+      if (!approvedDepositAmount) approvedDepositAmount = (foundDeposit && parseFloat(foundDeposit.total)) || 0;
+      const totalBalanceReal = approvedDepositAmount;
 
       // If no deposit was found on disk or memory yet, create an approved record now
       const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || 'investor@teslawealths.org';
@@ -1130,9 +1121,9 @@ export default async function handler(req, res) {
           plan_label: 'Explorer',
           plan_name: 'Explorer',
           total: approvedDepositAmount,
-          total_current_value: totalBalanceWithBonus,
-          totalCurrentValue: totalBalanceWithBonus,
-          earnings: bonusMatch,
+          total_current_value: totalBalanceReal,
+          totalCurrentValue: totalBalanceReal,
+          earnings: 0,
           status: 'active',
           method: 'Crypto',
           created_at: new Date().toISOString()
@@ -1164,14 +1155,14 @@ export default async function handler(req, res) {
         }
       }
 
-      // 5. Sync with algorithmic trading store so trading wallet reflects approved funds + 100% bonus
+      // 5. Sync with algorithmic trading store so trading wallet reflects approved funds
       try {
         const { tradingInvestments } = await import('./trading.js');
         tradingInvestments[effectiveId] = {
           id: effectiveId,
           status: status,
-          total: totalBalanceWithBonus,
-          totalCurrentValue: totalBalanceWithBonus,
+          total: totalBalanceReal,
+          totalCurrentValue: totalBalanceReal,
           tradingStatus: 'idle',
           tradingAmount: 0,
           tradingStartedAt: null
@@ -1189,7 +1180,7 @@ export default async function handler(req, res) {
             `UPDATE investments 
              SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
              WHERE id=? OR id=? OR id=? OR (LOWER(user_email)=? AND (status="pending_approval" OR status="pending"))`,
-            [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, status === 'active' ? bonusMatch : 0, rawId, cleanId, depId, effectiveEmail]
+            [status, approvedDepositAmount, status === 'active' ? totalBalanceReal : approvedDepositAmount, 0, rawId, cleanId, depId, effectiveEmail]
           );
 
           if ((!result || !result.affectedRows) && effectiveEmail) {
@@ -1197,7 +1188,7 @@ export default async function handler(req, res) {
               `UPDATE investments 
                SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
                WHERE LOWER(user_email)=?`,
-              [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, status === 'active' ? bonusMatch : 0, effectiveEmail]
+              [status, approvedDepositAmount, status === 'active' ? totalBalanceReal : approvedDepositAmount, 0, effectiveEmail]
             );
           }
 
@@ -1215,7 +1206,7 @@ export default async function handler(req, res) {
                 [
                   insId, txId, effectiveEmail, (foundDeposit && foundDeposit.user_name) || 'Investor', effectiveEmail,
                   'Tesla · Explorer', 'starter_ai', 'Explorer', 'Explorer',
-                  approvedDepositAmount, totalBalanceWithBonus, bonusMatch,
+                  approvedDepositAmount, totalBalanceReal, 0,
                   'Crypto'
                 ]
               );
