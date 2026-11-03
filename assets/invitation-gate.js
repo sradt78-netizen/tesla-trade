@@ -97,7 +97,9 @@
    * The public shell is invitation-only. Add the lock class before the body
    * is parsed so the homepage cannot flash before the access screen appears.
    */
-  document.documentElement.classList.add('ttinc-invitation-locked');
+  if (!hasSavedAccount()) {
+    document.documentElement.classList.add('ttinc-invitation-locked');
+  }
 
   function pathCode() {
     var pathname = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -257,6 +259,10 @@
   }
 
   function beginAccessCheck() {
+    if (hasSavedAccount()) {
+      unlockPage();
+      return;
+    }
     var code = get();
     if (!code) {
       if (document.readyState === 'loading') {

@@ -97,10 +97,6 @@
       // Never manufacture an active investment from stale browser storage.
       // Clear old identifiers only after the API has answered successfully;
       // preserve them during transient network failures for later recovery.
-      if (!row && cachedInvestmentValidated) {
-        localStorage.removeItem('ttinc_investment_id');
-        localStorage.removeItem('ttinc_inv_meta');
-      }
       if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
       var ldr = document.getElementById('ttinc-initial-loader');
       if (ldr) ldr.remove();
@@ -127,8 +123,6 @@
 
   function holdDashboardRedirect() {
     if (location.pathname !== '/dashboard') return;
-    heldDashboard = true;
-    releaseTimer = setTimeout(releaseHeldDashboard, 1500);
     findInvestment().then(function (row) {
       if (row) {
         setInvestment(row);
@@ -141,14 +135,6 @@
   function wrapHistory(name) {
     var original = window.history[name];
     window.history[name] = function (state, title, url) {
-      var target = pathOf(url);
-      if (heldDashboard && target === '/overview') {
-        heldNavigation = function () {
-          original.call(window.history, state, title, url);
-          window.dispatchEvent(new PopStateEvent('popstate', { state: state }));
-        };
-        return;
-      }
       return original.apply(window.history, arguments);
     };
   }

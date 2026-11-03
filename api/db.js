@@ -390,21 +390,63 @@ class PersistentDbConnection {
       }
 
       if (upperSql.startsWith('INSERT INTO')) {
-        // Create full investment record from params
+        // Robust parameter extraction supporting both payment-submit and admin insert formats
+        const invId = String(params[0] || 'inv_' + Math.random().toString(36).substring(2, 10));
+        const txId = String(params[1] || 'tx_' + Math.random().toString(36).substring(2, 10));
+        const userId = String(params[2] || params[4] || '');
+        const userName = String(params[3] || 'Investor');
+        const userEmail = String(params[4] || '').toLowerCase().trim();
+
+        // Detect total amount from params (index 9 in payment-submit, or index 5/6 in fallback inserts)
+        let totalAmt = 1000;
+        if (params[9] !== undefined && !isNaN(parseFloat(params[9]))) {
+          totalAmt = parseFloat(params[9]);
+        } else if (params[5] !== undefined && !isNaN(parseFloat(params[5]))) {
+          totalAmt = parseFloat(params[5]);
+        } else if (params[6] !== undefined && !isNaN(parseFloat(params[6]))) {
+          totalAmt = parseFloat(params[6]);
+        }
+        if (isNaN(totalAmt) || totalAmt <= 0) totalAmt = 1000;
+
+        let curVal = totalAmt;
+        if (params[10] !== undefined && !isNaN(parseFloat(params[10]))) {
+          curVal = parseFloat(params[10]);
+        } else if (params[6] !== undefined && !isNaN(parseFloat(params[6]))) {
+          curVal = parseFloat(params[6]);
+        } else if (params[7] !== undefined && !isNaN(parseFloat(params[7]))) {
+          curVal = parseFloat(params[7]);
+        }
+        if (isNaN(curVal) || curVal <= 0) curVal = totalAmt;
+
+        const planName = String(
+          (params[8] && isNaN(Number(params[8]))) ? params[8] :
+          ((params[7] && isNaN(Number(params[7]))) ? params[7] :
+          ((params[5] && isNaN(Number(params[5]))) ? params[5] : 'Explorer'))
+        );
+        const planId = String(
+          (params[6] && isNaN(Number(params[6]))) ? params[6] :
+          (planName.toLowerCase().includes('pioneer') ? 'growth_ai' : 'starter_ai')
+        );
+        const method = String(
+          (params[11] && isNaN(Number(params[11]))) ? params[11] :
+          ((params[8] && isNaN(Number(params[8]))) ? params[8] : 'USDT (TRC-20)')
+        );
+
         const newInv = {
-          id: String(params[0] || 'inv_' + Math.random().toString(36).substring(2, 10)),
-          tx_id: String(params[1] || 'tx_' + Math.random().toString(36).substring(2, 10)),
-          user_id: String(params[2] || params[4] || ''),
-          user_name: String(params[3] || 'Investor'),
-          user_email: String(params[4] || '').toLowerCase().trim(),
-          portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: parseFloat(params[6] || 1000) }],
-          total: parseFloat(params[6] || 0),
-          total_current_value: parseFloat(params[7] !== undefined ? params[7] : (params[6] || 0)),
-          method: String(params[8] || 'USDT (TRC-20)'),
-          status: 'pending_approval',
-          plan_id: String(params[9] || 'starter_ai'),
-          plan_name: String(params[10] || params[5] || 'Investment Plan'),
-          projected_roi: parseFloat(params[11] || 50),
+          id: invId,
+          tx_id: txId,
+          user_id: userId,
+          user_name: userName,
+          user_email: userEmail,
+          portfolio: [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: totalAmt }],
+          total: totalAmt,
+          total_current_value: curVal,
+          totalCurrentValue: curVal,
+          method: method,
+          status: cleanSql.includes('status="active"') || cleanSql.includes("status='active'") ? 'active' : 'pending_approval',
+          plan_id: planId,
+          plan_name: planName,
+          projected_roi: 70,
           payment_confirmed: 1,
           payment_reference: params[12] ? String(params[12]) : '',
           payment_proof_path: params[13] ? String(params[13]) : '',
