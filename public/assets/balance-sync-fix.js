@@ -155,11 +155,11 @@
       var valueNode = card.querySelector('.font-mono, .text-lg, .text-xl, .font-bold');
       if (labelNode && valueNode) {
         var labelTxt = (labelNode.textContent || '').trim();
-        if ((labelTxt === 'Invested' || labelTxt === 'Total Invested') && (valueNode.textContent === '$0.00' || valueNode.textContent === '$0')) {
-          valueNode.textContent = formatMoney(principal);
+        if (labelTxt === 'Invested' || labelTxt === 'Total Invested') {
+          if (principal > 0) valueNode.textContent = formatMoney(principal);
         }
-        if (labelTxt === 'Current Value' && (valueNode.textContent === '$0.00' || valueNode.textContent === '$0')) {
-          valueNode.textContent = formatMoney(current);
+        if (labelTxt === 'Current Value') {
+          if (current > 0) valueNode.textContent = formatMoney(current);
         }
         if (labelTxt === 'Status' && (valueNode.textContent === 'No Investment' || valueNode.textContent === 'Pending')) {
           valueNode.textContent = 'Active';
@@ -277,7 +277,9 @@
         if (Number.isFinite(storedCurrent)) oldCurrent = storedCurrent;
         if (principal <= 0 && storedPrincipal > 0) {
           principal = storedPrincipal;
-          current = storedCurrent || principal;
+        }
+        if (Number.isFinite(storedCurrent) && storedCurrent > current) {
+          current = storedCurrent;
         }
         oldMeta.id = investmentId || oldMeta.id || 'sim_inv_1';
         oldMeta.total = principal;

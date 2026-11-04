@@ -664,33 +664,66 @@
     }
 
     var sim = getLocalSimTrade();
+    var u = auth();
+    var stopUrl = '/api/investments/' + encodeURIComponent(lastInvestmentId) + '/trading/stop' + (u && u.email ? '?email=' + encodeURIComponent(u.email) : '');
+
     if (sim && sim.status === 'active') {
       var elapsed = (Date.now() - sim.startedAt) / 1000;
       var gainSteps = Math.floor(elapsed / 2);
       var finalVal = sim.initialAmount * (1 + (gainSteps * 0.0032) + 0.004);
-      var gained = finalVal - sim.initialAmount;
+      var gained = Number((finalVal - sim.initialAmount).toFixed(2));
       saveLocalSimTrade(null);
       history = [];
-      showToast('Trade Closed & Profit Locked ✦', 'Gained ' + money(gained) + ' returned to your wallet balance.');
+
+      var meta = {};
+      try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
+      var oldCur = Number(meta.totalCurrentValue != null ? meta.totalCurrentValue : (meta.total || 0));
+      var newBal = Number((oldCur + gained).toFixed(2));
+      meta.totalCurrentValue = newBal;
+      meta.total_current_value = newBal;
+      localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
+
+      if (typeof window.patchVisibleWalletDom === 'function') {
+        window.patchVisibleWalletDom(meta.total || 0, newBal, 0);
+      }
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('ttinc_balance_sync', { detail: { current: newBal } }));
+
+      showToast('Trade Closed & Profit Locked ✦', 'Gained ' + money(gained) + ' returned to your wallet balance (' + money(newBal) + ').');
       busy = false;
       if (button) {
         button.disabled = false;
         button.textContent = 'Stop Trade & Lock Profit';
       }
-      api('/api/investments/' + encodeURIComponent(lastInvestmentId) + '/trading/stop', {
+      api(stopUrl, {
         method: 'POST',
         body: JSON.stringify({})
       }).catch(function () {});
       return loadState(lastInvestmentId);
     }
 
-    api('/api/investments/' + encodeURIComponent(lastInvestmentId) + '/trading/stop', {
+    api(stopUrl, {
       method: 'POST',
       body: JSON.stringify({})
     }).then(function (data) {
       history = [];
       saveLocalSimTrade(null);
-      showToast('Trade Closed & Profit Locked ✦', 'Your final return has been credited to your portfolio.');
+
+      var meta = {};
+      try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
+      var newBal = Number(data.portfolioBalance != null ? data.portfolioBalance : meta.totalCurrentValue || 0);
+      meta.totalCurrentValue = newBal;
+      meta.total_current_value = newBal;
+      localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
+
+      if (typeof window.patchVisibleWalletDom === 'function') {
+        window.patchVisibleWalletDom(meta.total || 0, newBal, 0);
+      }
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('ttinc_balance_sync', { detail: { current: newBal } }));
+
+      var profitStr = (data.pnl && data.pnl > 0) ? ' (+' + money(data.pnl) + ')' : '';
+      showToast('Trade Closed & Profit Locked ✦', 'Portfolio balance updated to ' + money(newBal) + profitStr + '. Funds available for trade or withdrawal.');
       return loadState(lastInvestmentId);
     }).catch(function (err) {
       showError(err.message);

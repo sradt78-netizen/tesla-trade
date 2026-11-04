@@ -1,1 +1,86 @@
-[]
+[
+  {
+    "id": "dep_mw1ui6sw_0adwq",
+    "tx_id": "TXMW1UI6SWJPW",
+    "user_id": "investor@test.com",
+    "user_email": "investor@test.com",
+    "user_name": "Investor Test",
+    "portfolio": "Investor Test · [object Object]",
+    "plan_id": "standard",
+    "plan_label": [
+      {
+        "id": "tsla",
+        "name": "Tesla, Inc.",
+        "investedAmount": 250
+      }
+    ],
+    "plan_name": [
+      {
+        "id": "tsla",
+        "name": "Tesla, Inc.",
+        "investedAmount": 250
+      }
+    ],
+    "total": 250,
+    "total_current_value": 250,
+    "method": "Bitcoin (BTC)",
+    "payment_reference": "",
+    "payment_proof_path": "",
+    "payment_proof_name": "",
+    "status": "pending_approval",
+    "created_at": "2026-11-04T08:19:08.146Z"
+  },
+  {
+    "id": "dep_mw1u9ssz_lsakg",
+    "tx_id": "TXMW1U9SSZHIH",
+    "user_id": "test@example.com",
+    "user_email": "test@example.com",
+    "user_name": "Test User",
+    "portfolio": "Test User · [object Object]",
+    "plan_id": "standard",
+    "plan_label": [
+      {
+        "id": "tsla",
+        "name": "Tesla, Inc.",
+        "investedAmount": 100
+      }
+    ],
+    "plan_name": [
+      {
+        "id": "tsla",
+        "name": "Tesla, Inc.",
+        "investedAmount": 100
+      }
+    ],
+    "total": 100,
+    "total_current_value": 100,
+    "method": "USDT (TRC-20)",
+    "payment_reference": "",
+    "payment_proof_path": "",
+    "payment_proof_name": "",
+    "status": "pending_approval",
+    "created_at": "2026-11-04T08:12:36.757Z"
+  },
+  {
+    "id": "dep_mw1txkfj_ius0k",
+    "tx_id": "TXMW1TXKFJTSU",
+    "user_id": "dansaki234090@gmail.com",
+    "user_email": "dansaki234090@gmail.com",
+    "user_name": "Investor",
+    "portfolio": "Investor · Explorer",
+    "plan_id": "starter_ai",
+    "plan_label": "Explorer",
+    "plan_name": "Explorer",
+    "total": 500,
+    "total_current_value": 500.86,
+    "method": "USDT (TRC-20)",
+    "payment_reference": "TESTREF123",
+    "payment_proof_path": "",
+    "payment_proof_name": "",
+    "status": "active",
+    "created_at": "2026-11-04T08:03:06.033Z",
+    "totalCurrentValue": 500.86,
+    "earnings": 0.86,
+    "email": "dansaki234090@gmail.com"
+  }
+]

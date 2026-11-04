@@ -9,7 +9,7 @@ import multer from 'multer';
 import adminHandler from './api/_handlers/admin.js';
 import dbcheckHandler from './api/_handlers/dbcheck.js';
 import paymentSettingsHandler from './api/_handlers/payment-settings.js';
-import paymentSubmitHandler, { loadPersistentDeposits } from './api/_handlers/payment-submit.js';
+import paymentSubmitHandler, { loadPersistentDeposits, savePersistentDeposit } from './api/_handlers/payment-submit.js';
 import otpHandler from './api/_handlers/otp.js';
 import authHandler from './api/_handlers/auth.js';
 import supabaseConfigHandler from './api/_handlers/supabase-config.js';
@@ -299,34 +299,29 @@ function computeTradeValue(inv: any, now: number) {
   }
   const elapsed = Math.max(0, now - Number(inv.tradingStartedAt));
   const amount = Number(inv.tradingAmount || 0);
-  const cycle = serverTradingSettings.profitIntervalSeconds + serverTradingSettings.lossIntervalSeconds;
-  const inCycle = cycle > 0 ? elapsed % cycle : 0;
-  const isProfit = inCycle < serverTradingSettings.profitIntervalSeconds;
-  const phase = isProfit ? 'profit' : 'loss';
 
-  const gain = isProfit
-    ? amount * (serverTradingSettings.profitRatePercent / 100)
-    : -amount * (serverTradingSettings.lossRatePercent / 100);
+  // Progressive institutional algo return: steady, positive, compounding
+  // Starts with immediate positive return and gently climbs, always profitable
+  const baseGrowthPercent = Math.min(18.0, 0.75 + (elapsed * 0.08));
+  const microTick = Math.sin(elapsed * 0.8) * 0.04;
+  const gainPercent = Math.max(0.25, baseGrowthPercent + microTick);
+  const gain = amount * (gainPercent / 100);
   const tradeValue = Math.max(0, Number((amount + gain).toFixed(2)));
   const pnl = Number((tradeValue - amount).toFixed(2));
   const pnlPercent = amount > 0 ? Number(((pnl / amount) * 100).toFixed(2)) : 0;
 
-  // Generate 20+ data points for smooth, fluctuating graph display from the moment of execution
+  // Generate 20 history points with smooth, realistic upward market curve
   const history: any[] = [];
   const pointsCount = 20;
   for (let k = pointsCount; k >= 0; k--) {
     const secOffset = elapsed - (k * 1.5);
-    const s = Math.max(0, Math.floor(secOffset));
-    const sInCycle = cycle > 0 ? (s % cycle) : 0;
-    const sIsProfit = sInCycle < serverTradingSettings.profitIntervalSeconds;
-    const jitter = (Math.sin(k * 0.7) * 0.0035) + ((pointsCount - k) * 0.001);
-    const pointVal = sIsProfit
-      ? amount * (1 + jitter + (serverTradingSettings.profitRatePercent / 100))
-      : amount * (1 + jitter - (serverTradingSettings.lossRatePercent / 100));
+    const s = Math.max(0, secOffset);
+    const histGrowth = Math.max(0.15, 0.35 + (s * 0.08) + (Math.sin(k * 0.6) * 0.03));
+    const pointVal = amount * (1 + (histGrowth / 100));
     history.push({
       timestamp: (Number(inv.tradingStartedAt) + secOffset) * 1000,
       value: Math.max(0.01, Number(pointVal.toFixed(2))),
-      trend: sIsProfit ? 'profit' : 'loss'
+      trend: 'profit'
     });
   }
   if (history.length > 0) {
@@ -339,7 +334,7 @@ function computeTradeValue(inv: any, now: number) {
     tradeValue,
     pnl,
     pnlPercent,
-    phase,
+    phase: 'profit',
     history
   };
 }
@@ -388,24 +383,75 @@ app.post('/api/investments/:id/trading/start', (req, res) => {
   return res.json({ success: true, trade: computeTradeValue(inv, now) });
 });
 
-app.post('/api/investments/:id/trading/stop', (req, res) => {
+app.post('/api/investments/:id/trading/stop', async (req, res) => {
   const id = req.params.id;
   const now = Number(req.query.now || Math.floor(Date.now() / 1000));
-  let inv = mockTradingInvestments[id];
+  let inv = resolveTradingInvestment(id, req.query.email as string);
   if (!inv || inv.tradingStatus !== 'active') {
     return res.status(409).json({ error: 'There is no active trade to stop.' });
   }
   const active = computeTradeValue(inv, now);
   const tot = Number(inv.total || 0);
   let balance = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : tot));
-  inv.totalCurrentValue = Number((balance - inv.tradingAmount + active.tradeValue).toFixed(2));
+  const finalBalance = Number((balance - inv.tradingAmount + active.tradeValue).toFixed(2));
+
+  inv.totalCurrentValue = finalBalance;
   inv.tradingStatus = 'idle';
   inv.tradingAmount = 0;
   inv.tradingStartedAt = null;
+
+  const targetEmail = (inv.userEmail || inv.email || (req.query.email as string) || '').toLowerCase().trim();
+
+  // 1. Persist to MySQL database
+  try {
+    const conn = await getDbConnection();
+    if (conn) {
+      await conn.query(
+        'UPDATE investments SET total_current_value = ?, earnings = earnings + ?, updated_at = NOW() WHERE id = ? OR LOWER(user_email) = ?',
+        [finalBalance, active.pnl, id, targetEmail]
+      );
+      if (targetEmail) {
+        await conn.query(
+          'UPDATE investor_accounts SET total_current_value = ? WHERE LOWER(email) = ?',
+          [finalBalance, targetEmail]
+        );
+      }
+      await conn.end();
+    }
+  } catch (eDb) {}
+
+  // 2. Persist to disk (data/saved_deposits.json)
+  try {
+    savePersistentDeposit({
+      id: inv.id || id,
+      user_email: targetEmail,
+      email: targetEmail,
+      total_current_value: finalBalance,
+      totalCurrentValue: finalBalance,
+      earnings: active.pnl
+    });
+  } catch (eDisk) {}
+
+  // 3. Persist to data/tesla_trade_db.json
+  try {
+    const db = loadDatabaseSync();
+    if (Array.isArray(db.investments)) {
+      db.investments.forEach((i: any) => {
+        if (String(i.id) === String(id) || (targetEmail && (i.user_email || i.email || '').toLowerCase() === targetEmail)) {
+          i.total_current_value = finalBalance;
+          i.totalCurrentValue = finalBalance;
+          i.earnings = (Number(i.earnings) || 0) + active.pnl;
+        }
+      });
+      fs.writeFileSync(path.resolve(__dirname, 'data/tesla_trade_db.json'), JSON.stringify(db, null, 2), 'utf8');
+    }
+  } catch (eLocal) {}
+
   return res.json({
     success: true,
     stoppedTradeValue: active.tradeValue,
-    portfolioBalance: inv.totalCurrentValue,
+    portfolioBalance: finalBalance,
+    pnl: active.pnl,
     trade: computeTradeValue(inv, now)
   });
 });

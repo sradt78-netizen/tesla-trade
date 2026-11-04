@@ -1448,7 +1448,7 @@
       var isMockEntry = function(emailStr) {
         if (!emailStr) return false;
         var s = String(emailStr).toLowerCase();
-        return s.indexOf('example.com') !== -1 || s.indexOf('test_') !== -1 || s.indexOf('investor_test') !== -1 || s.indexOf('flow_test') !== -1 || s.indexOf('dansaki') !== -1;
+        return s.indexOf('example.com') !== -1 || s.indexOf('test_') !== -1 || s.indexOf('investor_test') !== -1 || s.indexOf('flow_test') !== -1;
       };
       var investors = (data.investors || []).filter(function(u) { return !isMockEntry(u.email); });
       var investments = (data.investments || []).filter(function(i) { return !isMockEntry(i.user_email || i.email || i.user_id); });
@@ -2096,6 +2096,27 @@
       var invFilter = document.getElementById('investorStatusFilter');
       if (invFilter && invFilter.value === 'pending') invFilter.value = 'all';
 
+      // Optimistically update globalData so the row changes to Approved immediately
+      var emTarget = (email || '').toLowerCase().trim();
+      if (window.globalData) {
+        if (Array.isArray(window.globalData.investments)) {
+          window.globalData.investments.forEach(function(i) {
+            var iEm = (i.user_email || i.email || i.user_id || '').toLowerCase().trim();
+            if ((id && String(i.id) === String(id)) || (emTarget && iEm === emTarget)) {
+              i.status = 'active';
+            }
+          });
+        }
+        if (Array.isArray(window.globalData.investors)) {
+          window.globalData.investors.forEach(function(u) {
+            if (emTarget && (u.email || '').toLowerCase().trim() === emTarget) {
+              u.onboarding_status = 'active';
+            }
+          });
+        }
+        renderDashboard(window.globalData);
+      }
+
       adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2124,6 +2145,27 @@
       if (depFilter && depFilter.value === 'pending') depFilter.value = 'all';
       var invFilter = document.getElementById('investorStatusFilter');
       if (invFilter && invFilter.value === 'pending') invFilter.value = 'all';
+
+      // Optimistically update globalData if approving
+      if (act === 'approve_deposit' && window.globalData) {
+        var emTarget = (email || '').toLowerCase().trim();
+        if (Array.isArray(window.globalData.investments)) {
+          window.globalData.investments.forEach(function(i) {
+            var iEm = (i.user_email || i.email || i.user_id || '').toLowerCase().trim();
+            if ((id && String(i.id) === String(id)) || (emTarget && iEm === emTarget)) {
+              i.status = 'active';
+            }
+          });
+        }
+        if (Array.isArray(window.globalData.investors)) {
+          window.globalData.investors.forEach(function(u) {
+            if (emTarget && (u.email || '').toLowerCase().trim() === emTarget) {
+              u.onboarding_status = 'active';
+            }
+          });
+        }
+        renderDashboard(window.globalData);
+      }
 
       adminFetch('/api/admin', {
         method: 'POST',

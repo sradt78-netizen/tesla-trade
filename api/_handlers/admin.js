@@ -655,11 +655,11 @@ export default async function handler(req, res) {
         }
       });
 
-      // Filter out mock or test data so admin dashboard strictly shows real investors
+      // Filter out automated test fixture accounts
       const isMockEmail = (em) => {
         if (!em) return false;
         const s = String(em).toLowerCase().trim();
-        return s.includes('example.com') || s.includes('test_user') || s.includes('investor_test') || s.includes('flow_test') || s.includes('dansaki');
+        return s.includes('example.com') || s.includes('test_user_') || s.includes('investor_test_') || s.includes('flow_test_');
       };
       investors = investors.filter(u => !isMockEmail(u.email));
       investments = investments.filter(i => !isMockEmail(i.user_email || i.email || i.user_id));
@@ -1104,6 +1104,8 @@ export default async function handler(req, res) {
       if (!approvedDepositAmount && body.amount) approvedDepositAmount = parseFloat(body.amount);
       if (!approvedDepositAmount) approvedDepositAmount = (foundDeposit && parseFloat(foundDeposit.total)) || 0;
       const totalBalanceReal = approvedDepositAmount;
+      const bonusMatch = 0;
+      const totalBalanceWithBonus = totalBalanceReal;
 
       // If no deposit was found on disk or memory yet, create an approved record now
       const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || 'investor@teslawealths.org';
@@ -1131,6 +1133,18 @@ export default async function handler(req, res) {
         savePersistentDeposit(freshDep);
         inMemoryDeposits.unshift(freshDep);
         mockStore.investments.unshift(freshDep);
+      }
+
+      // Also ensure all deposits for this email in inMemoryDeposits and saved_deposits are marked active
+      if (effectiveEmail && status === 'active') {
+        for (const mem of inMemoryDeposits) {
+          const mEmail = String(mem.user_email || mem.email || mem.user_id || '').toLowerCase().trim();
+          if (mEmail === effectiveEmail) {
+            mem.status = 'active';
+            mem.total_current_value = mem.total || approvedDepositAmount;
+            mem.totalCurrentValue = mem.total || approvedDepositAmount;
+          }
+        }
       }
 
       // 4. Update investor account status in mockStore and persistent disk storage
@@ -1168,6 +1182,49 @@ export default async function handler(req, res) {
           tradingStartedAt: null
         };
       } catch (eTr) {}
+
+      // 5b. Update local persistent tesla_trade_db.json
+      try {
+        const { loadDatabaseSync, saveDatabaseSync } = await import('../db.js');
+        const db = loadDatabaseSync();
+        if (db && Array.isArray(db.investments)) {
+          let foundInDb = false;
+          for (const inv of db.investments) {
+            const iEmail = String(inv.user_email || inv.email || '').toLowerCase().trim();
+            const iId = String(inv.id || '').trim();
+            if (iId === String(rawId) || iId === cleanId || iId === depId || (effectiveEmail && iEmail === effectiveEmail)) {
+              inv.status = status;
+              if (status === 'active') {
+                inv.total = approvedDepositAmount || inv.total || 0;
+                inv.total_current_value = totalBalanceReal;
+                inv.totalCurrentValue = totalBalanceReal;
+              }
+              foundInDb = true;
+            }
+          }
+          if (!foundInDb && status === 'active' && effectiveEmail) {
+            db.investments.unshift({
+              id: effectiveId,
+              user_id: effectiveEmail,
+              user_email: effectiveEmail,
+              user_name: (foundDeposit && foundDeposit.user_name) || 'Investor',
+              portfolio: 'Tesla · Explorer',
+              total: approvedDepositAmount,
+              total_current_value: totalBalanceReal,
+              totalCurrentValue: totalBalanceReal,
+              status: 'active',
+              method: 'Crypto',
+              created_at: new Date().toISOString()
+            });
+          }
+          if (db.investor_accounts && effectiveEmail && status === 'active') {
+            const acc = db.investor_accounts.find(a => (a.email || '').toLowerCase().trim() === effectiveEmail);
+            if (acc) acc.onboarding_status = 'active';
+            else db.investor_accounts.unshift({ email: effectiveEmail, name: 'Investor', onboarding_status: 'active' });
+          }
+          saveDatabaseSync();
+        }
+      } catch (eLocalDb) {}
 
       // 6. Update MySQL Database if available
       let dbSaved = false;
@@ -1221,15 +1278,10 @@ export default async function handler(req, res) {
           if (effectiveEmail && status === 'active') {
             await conn.query('UPDATE investor_accounts SET onboarding_status="active", deposit_match_eligible=1, activated_at=NOW() WHERE LOWER(email)=?', [effectiveEmail]);
             const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
-            const txBonId = 'tx_bonus_' + Math.random().toString(36).substring(2, 9);
             try {
               await conn.query(
                 'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "processed", "Investment deposit approved", NOW())',
                 [txDepId, effectiveId, effectiveEmail, approvedDepositAmount]
-              );
-              await conn.query(
-                'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "bonus", ?, "processed", "100% First Deposit Match Bonus", NOW())',
-                [txBonId, effectiveId, effectiveEmail, bonusMatch]
               );
             } catch (eTx) { console.error('[admin approve] ledger insert failed:', eTx.message); }
           }
@@ -1256,7 +1308,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: true,
         message: status === 'active'
-          ? `Deposit of $${approvedDepositAmount.toFixed(2)} approved with 100% Match Bonus ($${bonusMatch.toFixed(2)})! Total dashboard balance: $${totalBalanceWithBonus.toFixed(2)}.`
+          ? `Deposit of $${approvedDepositAmount.toFixed(2)} approved! Investor dashboard unlocked with verified active balance.`
           : `Deposit receipt updated to ${status}.`,
         status: status,
         total: approvedDepositAmount,
@@ -1380,8 +1432,8 @@ export default async function handler(req, res) {
     if (action === 'purge_mock_data' || action === 'clear_all_test_data') {
       if (isDbConnected && conn) {
         try {
-          await conn.query('DELETE FROM investments WHERE user_email LIKE "%example.com" OR user_email LIKE "%test%" OR user_email LIKE "%dansaki%" OR user_email LIKE "%flow_test%"');
-          await conn.query('DELETE FROM investor_accounts WHERE email LIKE "%example.com" OR email LIKE "%test%" OR email LIKE "%dansaki%" OR email LIKE "%flow_test%"');
+          await conn.query('DELETE FROM investments WHERE user_email LIKE "%example.com" OR user_email LIKE "%test%" OR user_email LIKE "%flow_test%"');
+          await conn.query('DELETE FROM investor_accounts WHERE email LIKE "%example.com" OR email LIKE "%test%" OR email LIKE "%flow_test%"');
           await conn.end();
         } catch (e) {}
       }

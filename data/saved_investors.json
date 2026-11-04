@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "id": "u_mw1ui6sz",
+    "name": "Investor Test",
+    "email": "investor@test.com",
+    "phone": "—",
+    "onboarding_status": "pending_deposit",
+    "registered_at": "2026-11-04T08:19:08.147Z"
+  },
+  {
+    "id": "u_mw1u9st2",
+    "name": "Test User",
+    "email": "test@example.com",
+    "phone": "—",
+    "onboarding_status": "pending_deposit",
+    "registered_at": "2026-11-04T08:12:36.758Z"
+  },
+  {
+    "id": "u_mw1txkfn",
+    "name": "Investor",
+    "email": "dansaki234090@gmail.com",
+    "phone": "—",
+    "onboarding_status": "active",
+    "registered_at": "2026-11-04T08:03:06.035Z"
+  }
+]

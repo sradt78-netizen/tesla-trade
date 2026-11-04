@@ -2199,22 +2199,28 @@
         }
 
         function completeLogin(data) {
-          localStorage.setItem('ttinc_auth', JSON.stringify({
-            email: data.email,
-            name: data.name || data.email
-          }));
-          /*
-           * Authentication and onboarding are separate concerns.  The old
-           * implementation waited for account-status here and sent a user to
-           * /invest when that request returned "none" or failed.  That made a
-           * valid login look like a redirect race, especially while the
-           * dashboard gate was still loading its own status.
-           *
-           * Always enter the dashboard after authentication.  The dashboard
-           * gate owns the account/investment state and can show onboarding
-           * without replacing the authenticated route.
-           */
-          window.location.href = '/overview';
+          var em = (data.email || '').toLowerCase().trim();
+          var nm = data.name || data.email;
+          localStorage.setItem('ttinc_auth', JSON.stringify({ email: em, name: nm }));
+
+          fetch('/api/investments?email=' + encodeURIComponent(em))
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(rows) {
+              if (Array.isArray(rows) && rows.length > 0) {
+                var act = rows.find(function(x) { return x.status === 'active' || x.status === 'approved'; }) || rows[0];
+                if (act && act.id) {
+                  localStorage.setItem('ttinc_investment_id', String(act.id));
+                  localStorage.setItem('ttinc_inv_meta', JSON.stringify(act));
+                  if (act.status === 'active' || act.status === 'approved') {
+                    localStorage.setItem('ttinc_account_approved', 'true');
+                  }
+                }
+              }
+            })
+            .catch(function() {})
+            .finally(function() {
+              window.location.href = '/overview';
+            });
         }
         form.addEventListener('submit', function (event) {
           event.preventDefault();
@@ -10101,45 +10107,10 @@
           + '<button id="ttinc-deposit-confirm-button" type="button" style="width:100%;border:0;border-radius:10px;background:#d4af37;color:#090909;padding:14px;font-size:13px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;">I’VE MADE DEPOSIT — SUBMIT FOR APPROVAL</button>'
           + '</div>';
         document.body.appendChild(action);
-        // The compiled payment screen still has an older submit button. Keep
-        // one submit path so it cannot send a payload missing the plan fields.
-         document.querySelectorAll('button').forEach(function (candidate) {
-           var label = (candidate.textContent || '').trim().toLowerCase();
-           // The compiled bundle has shipped both “I've made payment” and
-           // “I've made the payment” labels. Hide either legacy action so it
-           // cannot bypass the validated confirmation endpoint below.
-           var isLegacyPaymentAction =
-             label.indexOf("i've made payment") === 0 ||
-             label.indexOf("i’ve made payment") === 0 ||
-             label.indexOf("i've made the payment") === 0 ||
-             label.indexOf("i’ve made the payment") === 0;
-           if (isLegacyPaymentAction) candidate.style.display = 'none';
-         });
-
         var button = document.getElementById('ttinc-deposit-confirm-button');
         var error = document.getElementById('ttinc-deposit-confirm-error');
-        button.addEventListener('click', submitPaymentConfirmation);
+        if (button) button.addEventListener('click', submitPaymentConfirmation);
       }
-
-      // Prevent the legacy compiled payment button from ever sending its
-      // incomplete payload if it appears before the compatibility layer's
-      // periodic DOM cleanup runs.
-      document.addEventListener('click', function (event) {
-        if (!paymentRoute()) return;
-        var target = event.target;
-        var button = target && target.closest ? target.closest('button') : null;
-        var label = button ? (button.textContent || '').trim().toLowerCase() : '';
-         var legacyPaymentButton = button && (
-           label.indexOf('made payment') !== -1 ||
-           label.indexOf('made the payment') !== -1
-         );
-        if (!legacyPaymentButton) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        var replacement = document.getElementById('ttinc-deposit-confirm-button');
-        if (!replacement) installDepositConfirmationAction();
-        submitPaymentConfirmation();
-      }, true);
 
       function installInvestmentPaymentMethods() {
         if (!paymentRoute()) {

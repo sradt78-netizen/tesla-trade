@@ -1,6 +1,37 @@
 {
   "investor_accounts": [
     {
+      "email": "investor@test.com",
+      "name": "Investor Test",
+      "phone": "",
+      "age": 0,
+      "onboarding_status": "active",
+      "deposit_match_eligible": 1,
+      "registered_at": "2026-11-04 08:19:08",
+      "created_at": "2026-11-04T08:19:08.145Z"
+    },
+    {
+      "email": "test@example.com",
+      "name": "Test User",
+      "phone": "",
+      "age": 0,
+      "onboarding_status": "active",
+      "deposit_match_eligible": 1,
+      "registered_at": "2026-11-04 08:12:36",
+      "created_at": "2026-11-04T08:12:36.756Z"
+    },
+    {
+      "email": "dansaki234090@gmail.com",
+      "name": "Investor",
+      "phone": "",
+      "age": 0,
+      "onboarding_status": "active",
+      "deposit_match_eligible": 1,
+      "registered_at": "2026-11-04 08:03:06",
+      "created_at": "2026-11-04T08:03:06.033Z",
+      "activated_at": "2026-11-04 08:18:34"
+    },
+    {
       "email": "investor@tesla.com",
       "name": "Tesla Investor",
       "phone": "",
@@ -9,11 +40,110 @@
       "deposit_match_eligible": 1,
       "registered_at": "2026-11-03 09:38:51",
       "created_at": "2026-11-03T09:38:51.792Z",
-      "activated_at": "2026-11-03 09:38:58"
+      "activated_at": "2026-11-03 09:38:58",
+      "total_deposited": 500,
+      "total_current_value": 500,
+      "available_balance": 500
     }
   ],
   "investor_credentials": [],
   "investments": [
+    {
+      "id": "dep_mw1ui6sw_0adwq",
+      "tx_id": "TXMW1UI6SWJPW",
+      "user_id": "investor@test.com",
+      "user_name": "Investor Test",
+      "user_email": "investor@test.com",
+      "portfolio": "Investor Test · [object Object]",
+      "total": 250,
+      "total_current_value": 250,
+      "method": "Bitcoin (BTC)",
+      "status": "pending_approval",
+      "plan_id": "standard",
+      "plan_label": [
+        {
+          "id": "tsla",
+          "name": "Tesla, Inc.",
+          "investedAmount": 250
+        }
+      ],
+      "plan_name": [
+        {
+          "id": "tsla",
+          "name": "Tesla, Inc.",
+          "investedAmount": 250
+        }
+      ],
+      "projected_roi": 70,
+      "payment_confirmed": 1,
+      "payment_reference": "",
+      "payment_proof_path": "",
+      "payment_proof_name": "receipt.jpg",
+      "payment_submitted_at": "2026-11-04 08:19:08",
+      "created_at": "2026-11-04 08:19:08",
+      "updated_at": "2026-11-04 08:19:08"
+    },
+    {
+      "id": "dep_mw1u9ssz_lsakg",
+      "tx_id": "TXMW1U9SSZHIH",
+      "user_id": "test@example.com",
+      "user_name": "Test User",
+      "user_email": "test@example.com",
+      "portfolio": "Test User · [object Object]",
+      "total": 100,
+      "total_current_value": 100,
+      "method": "USDT (TRC-20)",
+      "status": "pending_approval",
+      "plan_id": "standard",
+      "plan_label": [
+        {
+          "id": "tsla",
+          "name": "Tesla, Inc.",
+          "investedAmount": 100
+        }
+      ],
+      "plan_name": [
+        {
+          "id": "tsla",
+          "name": "Tesla, Inc.",
+          "investedAmount": 100
+        }
+      ],
+      "projected_roi": 70,
+      "payment_confirmed": 1,
+      "payment_reference": "",
+      "payment_proof_path": "",
+      "payment_proof_name": "receipt.jpg",
+      "payment_submitted_at": "2026-11-04 08:12:36",
+      "created_at": "2026-11-04 08:12:36",
+      "updated_at": "2026-11-04 08:12:36"
+    },
+    {
+      "id": "dep_mw1txkfj_ius0k",
+      "tx_id": "TXMW1TXKFJTSU",
+      "user_id": "dansaki234090@gmail.com",
+      "user_name": "Investor",
+      "user_email": "dansaki234090@gmail.com",
+      "portfolio": "Investor · Explorer",
+      "total": 500,
+      "total_current_value": 500.86,
+      "method": "USDT (TRC-20)",
+      "status": "active",
+      "plan_id": "starter_ai",
+      "plan_label": "Explorer",
+      "plan_name": "Explorer",
+      "projected_roi": 70,
+      "payment_confirmed": 1,
+      "payment_reference": "TESTREF123",
+      "payment_proof_path": "",
+      "payment_proof_name": "receipt.jpg",
+      "payment_submitted_at": "2026-11-04 08:03:06",
+      "created_at": "2026-11-04 08:03:06",
+      "updated_at": "2026-11-04 08:18:50",
+      "earnings": 0.86,
+      "activated_at": "2026-11-04 08:18:34",
+      "totalCurrentValue": 500.86
+    },
     {
       "id": "dep_mw0hwv80_h8bct",
       "tx_id": "TXMW0HWV80LAC",
@@ -41,6 +171,51 @@
     }
   ],
   "account_transactions": [
+    {
+      "id": 8,
+      "user_email": "act_dwviko6",
+      "transaction_type": "dep_mw1ui6sw_0adwq",
+      "amount": null,
+      "status": "pending",
+      "description": "250",
+      "created_at": "2026-11-04T08:19:08.145Z"
+    },
+    {
+      "id": 7,
+      "user_email": "tx_91wobxw",
+      "transaction_type": "dep_mw1txkfj_ius0k",
+      "amount": null,
+      "status": "pending",
+      "description": "500",
+      "created_at": "2026-11-04T08:18:34.887Z"
+    },
+    {
+      "id": 6,
+      "user_email": "act_t0tuhm0",
+      "transaction_type": "dep_mw1u9ssz_lsakg",
+      "amount": null,
+      "status": "pending",
+      "description": "100",
+      "created_at": "2026-11-04T08:12:36.756Z"
+    },
+    {
+      "id": 5,
+      "user_email": "tx_rcninim",
+      "transaction_type": "dep_mw1txkfj_ius0k",
+      "amount": null,
+      "status": "pending",
+      "description": "500",
+      "created_at": "2026-11-04T08:03:44.139Z"
+    },
+    {
+      "id": 4,
+      "user_email": "act_n6f19yq",
+      "transaction_type": "dep_mw1txkfj_ius0k",
+      "amount": null,
+      "status": "pending",
+      "description": "500",
+      "created_at": "2026-11-04T08:03:06.033Z"
+    },
     {
       "id": 3,
       "user_email": "tx_bonus_b45n4zs",
@@ -107,6 +282,16 @@
   },
   "user_action_logs": [],
   "analytics_clicks": [
+    {
+      "id": 4,
+      "ip_address": "105.113.84.8",
+      "referrer": "https://ais-dev-mqdntyabuzludcpc2tgdsu-955060356844.europe-west2.run.app/",
+      "landing_page": "/api/track",
+      "campaign_source": "referral",
+      "device_type": "mobile",
+      "user_agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36",
+      "created_at": "2026-11-04 07:55:03"
+    },
     {
       "id": 3,
       "ip_address": "38.248.89.67",

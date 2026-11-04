@@ -129,7 +129,7 @@
   }
 
   function holdDashboardRedirect() {
-    if (location.pathname !== '/dashboard') return;
+    if (location.pathname !== '/dashboard' && location.pathname !== '/overview') return;
     findInvestment().then(function (row) {
       if (row) {
         setInvestment(row);
