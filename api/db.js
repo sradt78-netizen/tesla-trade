@@ -247,6 +247,52 @@ export async function checkMySqlHealth(force = false) {
 
 // ── MySQL Emulation Layer ───────────────────────────────────────
 /**
+function parseInsertValues(cleanSql, params) {
+  const match = cleanSql.match(/insert\s+into\s+[^(]+\s*\(([^)]+)\)\s*values\s*\((.+)\)/is);
+  if (!match || !match[1] || !match[2]) return null;
+  const cols = match[1].split(',').map(c => c.trim().toLowerCase().replace(/[`"']/g, ''));
+  const valString = match[2].trim();
+  const valTokens = [];
+  let currentTok = '';
+  let inQuote = false;
+  let quoteChar = '';
+  for (let i = 0; i < valString.length; i++) {
+    const ch = valString[i];
+    if (inQuote) {
+      if (ch === quoteChar) inQuote = false;
+      else currentTok += ch;
+    } else if (ch === '"' || ch === "'") {
+      inQuote = true;
+      quoteChar = ch;
+    } else if (ch === ',') {
+      valTokens.push(currentTok.trim());
+      currentTok = '';
+    } else {
+      currentTok += ch;
+    }
+  }
+  if (currentTok.trim()) valTokens.push(currentTok.trim());
+
+  const result = {};
+  let pIdx = 0;
+  cols.forEach((col, idx) => {
+    const tok = valTokens[idx];
+    if (tok === '?') {
+      if (params[pIdx] !== undefined) {
+        result[col] = params[pIdx++];
+      }
+    } else if (tok !== undefined) {
+      if (tok.toUpperCase() === 'NOW()') {
+        result[col] = new Date().toISOString();
+      } else {
+        result[col] = tok.replace(/^["']|["']$/g, '');
+      }
+    }
+  });
+  return result;
+}
+
+/**
  * Creates an emulated MySQL connection that operates on the persistent store
  * with full query parsing and execution.
  */
@@ -301,16 +347,18 @@ class PersistentDbConnection {
         const phone = params[2] !== undefined ? String(params[2]) : '';
         const age = params[3] !== undefined ? parseInt(params[3], 10) : 0;
 
-        let status = 'active';
+        let status = 'pending_deposit';
         if (cleanSql.includes('plan_selection')) status = 'plan_selection';
         if (cleanSql.includes('pending_approval')) status = 'pending_approval';
+        if (cleanSql.includes('pending_deposit')) status = 'pending_deposit';
+        if (cleanSql.includes('"active"') || cleanSql.includes("'active'")) status = 'active';
 
         let existing = db.investor_accounts.find(u => (u.email || '').toLowerCase() === email);
         if (existing) {
           if (name && name !== 'Investor') existing.name = name;
           if (phone) existing.phone = phone;
           if (age) existing.age = age;
-          if (status !== 'active' || existing.onboarding_status === 'registered') {
+          if (status === 'active' || existing.onboarding_status === 'registered') {
             existing.onboarding_status = status;
           }
           existing.updated_at = new Date().toISOString();
@@ -429,7 +477,10 @@ class PersistentDbConnection {
           updated_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
         };
 
-        if (colMatch && colMatch[1]) {
+        const parsedVals = parseInsertValues(cleanSql, params);
+        if (parsedVals) {
+          Object.assign(newInv, parsedVals);
+        } else if (colMatch && colMatch[1]) {
           const cols = colMatch[1].split(',').map(c => c.trim().toLowerCase().replace(/[`"']/g, ''));
           cols.forEach((col, idx) => {
             if (params[idx] !== undefined && params[idx] !== null) {
@@ -625,7 +676,7 @@ class PersistentDbConnection {
     // ── ACCOUNT TRANSACTIONS ──────────────────────────────────────
     if (cleanSql.includes('account_transactions')) {
       if (upperSql.startsWith('SELECT')) {
-        let rows = [...db.account_transactions];
+        let rows = [...(db.account_transactions || [])];
         if (cleanSql.includes('user_email')) {
           const email = String(params[0] || '').toLowerCase().trim();
           rows = rows.filter(r => (r.user_email || '').toLowerCase() === email);
@@ -634,26 +685,58 @@ class PersistentDbConnection {
       }
 
       if (upperSql.startsWith('INSERT INTO')) {
+        const colMatch = cleanSql.match(/insert\s+into\s+account_transactions\s*\(([^)]+)\)/i);
         const newTx = {
-          id: db.account_transactions.length + 1,
-          user_email: String(params[0] || '').toLowerCase().trim(),
-          transaction_type: String(params[1] || 'deposit'),
-          amount: parseFloat(params[2] || 0),
-          status: 'pending',
-          description: String(params[3] || 'Transaction'),
+          id: 'tx_' + Math.random().toString(36).substring(2, 9),
+          investment_id: '',
+          user_email: '',
+          type: 'deposit',
+          amount: 0,
+          status: 'processed',
+          note: 'Transaction',
           created_at: new Date().toISOString()
         };
+
+        const parsedVals = parseInsertValues(cleanSql, params);
+        if (parsedVals) {
+          Object.assign(newTx, parsedVals);
+        } else if (colMatch && colMatch[1]) {
+          const cols = colMatch[1].split(',').map(c => c.trim().toLowerCase().replace(/[`"']/g, ''));
+          cols.forEach((col, idx) => {
+            if (params[idx] !== undefined && params[idx] !== null) {
+              newTx[col] = params[idx];
+            }
+          });
+        } else {
+          newTx.id = params[0] || newTx.id;
+          newTx.user_email = params[1] || '';
+          newTx.amount = parseFloat(params[2] || 0);
+        }
+
+        if (cleanSql.includes('"deposit"') || cleanSql.includes("'deposit'")) newTx.type = 'deposit';
+        if (cleanSql.includes('"profit"') || cleanSql.includes("'profit'")) newTx.type = 'profit';
+        if (cleanSql.includes('"withdrawal"') || cleanSql.includes("'withdrawal'")) newTx.type = 'withdrawal';
+        if (cleanSql.includes('"processed"') || cleanSql.includes("'processed'")) newTx.status = 'processed';
+        if (cleanSql.includes('"pending"') || cleanSql.includes("'pending'")) newTx.status = 'pending';
+        if (cleanSql.includes('"completed"') || cleanSql.includes("'completed'")) newTx.status = 'completed';
+
+        newTx.user_email = String(newTx.user_email || '').toLowerCase().trim();
+        newTx.amount = parseFloat(newTx.amount != null ? newTx.amount : 0);
+        newTx.type = newTx.type || newTx.transaction_type || 'deposit';
+        newTx.created_at = newTx.created_at || new Date().toISOString();
+
+        if (!Array.isArray(db.account_transactions)) db.account_transactions = [];
         db.account_transactions.unshift(newTx);
         saveDatabaseSync();
-        return [{ affectedRows: 1 }, []];
+        return [{ affectedRows: 1, insertId: newTx.id }, []];
       }
 
       if (upperSql.startsWith('UPDATE')) {
-        const id = params[0];
-        const tx = db.account_transactions.find(t => String(t.reference_id) === String(id) || String(t.id) === String(id));
+        const id = String(params[params.length - 1] || '');
+        const tx = (db.account_transactions || []).find(t => String(t.reference_id) === id || String(t.id) === id || String(t.investment_id) === id);
         if (tx) {
-          if (cleanSql.includes('status="processed"')) tx.status = 'processed';
-          if (cleanSql.includes('status="declined"')) tx.status = 'declined';
+          if (cleanSql.includes('status="processed"') || cleanSql.includes("status='processed'")) tx.status = 'processed';
+          if (cleanSql.includes('status="declined"') || cleanSql.includes("status='declined'")) tx.status = 'declined';
           saveDatabaseSync();
         }
         return [{ affectedRows: 1 }, []];

@@ -391,59 +391,27 @@
   }
 
   function getLocalSimTrade() {
-    try {
-      return JSON.parse(localStorage.getItem(SIM_STORAGE_KEY) || 'null');
-    } catch (e) {
-      return null;
-    }
+    return null;
   }
 
   function saveLocalSimTrade(trade) {
-    if (!trade) localStorage.removeItem(SIM_STORAGE_KEY);
-    else localStorage.setItem(SIM_STORAGE_KEY, JSON.stringify(trade));
+    localStorage.removeItem(SIM_STORAGE_KEY);
   }
 
   function render(container, state) {
     var trade = state && state.trade ? state.trade : {};
-    var sim = getLocalSimTrade();
+    var u = auth() || {};
 
-    // Merge simulation if active
-    if (sim && sim.status === 'active') {
-      var elapsed = (Date.now() - sim.startedAt) / 1000;
-      var gainSteps = Math.floor(elapsed / 2);
-      var currentVal = sim.initialAmount * (1 + (gainSteps * 0.0032) + (Math.sin(elapsed) * 0.0015));
-      var pnlVal = currentVal - sim.initialAmount;
-      var pnlPct = (pnlVal / sim.initialAmount) * 100;
-
-      trade = {
-        status: 'active',
-        availableBalance: sim.availableBalance,
-        tradeValue: currentVal,
-        pnl: pnlVal,
-        pnlPercent: pnlPct,
-        phase: 'profit',
-        history: sim.history || []
-      };
-
-      if (!trade.history.length || Date.now() - (trade.history[trade.history.length - 1].timestamp || 0) > 1500) {
-        trade.history.push({ timestamp: Date.now(), value: currentVal });
-        if (trade.history.length > 50) trade.history.shift();
-        sim.history = trade.history;
-        saveLocalSimTrade(sim);
-      }
+    var available = Number(trade.availableBalance != null ? trade.availableBalance : 0);
+    if (available <= 0) {
+      try {
+        var metaObj = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
+        if (metaObj.totalCurrentValue != null) available = Number(metaObj.totalCurrentValue);
+        else if (metaObj.total != null) available = Number(metaObj.total);
+      } catch (e) {}
     }
+    available = Math.max(0, available);
 
-    var metaVal = 0;
-    try {
-      var metaObj = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-      if (metaObj.totalCurrentValue) metaVal = Number(metaObj.totalCurrentValue);
-      else if (metaObj.total) metaVal = Number(metaObj.total) * 2;
-      else if (localStorage.getItem('ttinc_deposit_amount')) metaVal = Number(localStorage.getItem('ttinc_deposit_amount')) * 2;
-    } catch (e) {}
-    var available = Number(trade.availableBalance != null && trade.availableBalance > 0 ? trade.availableBalance : metaVal);
-    if (!trade.status && metaVal > 0 && available < metaVal) {
-      available = metaVal;
-    }
     var active = trade.status === 'active';
     var phase = trade.phase === 'loss' ? 'loss' : 'profit';
     var pnl = Number(trade.pnl || 0);
@@ -451,41 +419,9 @@
     var points = Array.isArray(trade.history) ? trade.history.slice() : [];
 
     if (active) {
-      if (points.length > 1) {
-        if (!history.length) {
-          history = points.slice(-60);
-        } else {
-          var latest = points[points.length - 1];
-          if (history[history.length - 1].timestamp !== latest.timestamp) {
-            history.push(latest);
-          }
-        }
-      } else if (points.length === 1) {
-        if (!history.length) {
-          history = [
-            { timestamp: points[0].timestamp - 1500, value: points[0].value * 0.998 },
-            points[0]
-          ];
-        } else {
-          var latestOne = points[0];
-          if (history[history.length - 1].timestamp !== latestOne.timestamp) {
-            history.push(latestOne);
-          }
-        }
-      } else {
-        if (!history.length) {
-          var baseVal = Number(trade.tradeValue || trade.tradingAmount || 100);
-          var nowT = Date.now();
-          for (var pIdx = 15; pIdx >= 0; pIdx--) {
-            history.push({
-              timestamp: nowT - (pIdx * 1500),
-              value: Number((baseVal * (1 + (Math.sin(pIdx * 0.7) * 0.0035))).toFixed(2))
-            });
-          }
-        }
+      if (points.length > 0) {
+        history = points.slice(-60);
       }
-      history = history.slice(-60);
-      points = history;
     } else {
       history = [];
     }
@@ -500,7 +436,6 @@
         '<div class="ttinc-trade-balance">' +
           '<span style="color:#d4af37;font-weight:700;">Available Wallet</span>' +
           '<strong>' + money(available) + '</strong>' +
-          '<div style="font-size:10px;color:#22c55e;font-weight:700;margin-top:3px;letter-spacing:0.5px;">✦ 100% Match Applied</div>' +
         '</div>' +
       '</div>';
 
@@ -576,7 +511,9 @@
   }
 
   function loadState(investmentId) {
-    return api('/api/investments/' + encodeURIComponent(investmentId) + '/trading-state')
+    var u = auth();
+    var emailParam = (u && u.email) ? ('?email=' + encodeURIComponent(u.email)) : '';
+    return api('/api/investments/' + encodeURIComponent(investmentId) + '/trading-state' + emailParam)
       .then(function (data) {
         var shell = document.getElementById(shellId);
         if (shell) render(shell, data);
@@ -606,40 +543,16 @@
     busy = true;
     modal.querySelector('.ttinc-confirm').textContent = 'Starting Engine…';
 
+    var u = auth();
     findInvestmentId().then(function (id) {
       lastInvestmentId = id || 'sim_inv_1';
-      var now = Date.now();
-      var initHist = [];
-      var baseVal = amount;
-      for (var k = 20; k >= 0; k--) {
-        var t = now - (k * 1500);
-        var jitter = (Math.sin(k * 0.7) * 0.0035) + ((20 - k) * 0.001);
-        initHist.push({ timestamp: t, value: Number((baseVal * (1 + jitter)).toFixed(2)) });
-      }
-      saveLocalSimTrade({
-        status: 'active',
-        initialAmount: amount,
-        availableBalance: Math.max(0, available - amount),
-        startedAt: now,
-        history: initHist
-      });
-      history = initHist.slice();
-
-      return api('/api/investments/' + encodeURIComponent(lastInvestmentId) + '/trading/start', {
+      var emailParam = (u && u.email) ? ('?email=' + encodeURIComponent(u.email)) : '';
+      return api('/api/investments/' + encodeURIComponent(lastInvestmentId) + '/trading/start' + emailParam, {
         method: 'POST',
-        body: JSON.stringify({ amount: Number(amount.toFixed(2)) })
-      }).then(function (res) {
-        if (res && res.trade && Array.isArray(res.trade.history) && res.trade.history.length > 1) {
-          history = res.trade.history.slice();
-          var s = getLocalSimTrade();
-          if (s) {
-            s.history = history;
-            saveLocalSimTrade(s);
-          }
-        }
-        return res;
-      }).catch(function () {
-        return { success: true };
+        body: JSON.stringify({
+          amount: Number(amount.toFixed(2)),
+          email: (u && u.email) || ''
+        })
       });
     }).then(function () {
       modal.style.display = 'none';
@@ -663,51 +576,14 @@
       button.textContent = 'Locking Profit…';
     }
 
-    var sim = getLocalSimTrade();
     var u = auth();
     var stopUrl = '/api/investments/' + encodeURIComponent(lastInvestmentId) + '/trading/stop' + (u && u.email ? '?email=' + encodeURIComponent(u.email) : '');
 
-    if (sim && sim.status === 'active') {
-      var elapsed = (Date.now() - sim.startedAt) / 1000;
-      var gainSteps = Math.floor(elapsed / 2);
-      var finalVal = sim.initialAmount * (1 + (gainSteps * 0.0032) + 0.004);
-      var gained = Number((finalVal - sim.initialAmount).toFixed(2));
-      saveLocalSimTrade(null);
-      history = [];
-
-      var meta = {};
-      try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
-      var oldCur = Number(meta.totalCurrentValue != null ? meta.totalCurrentValue : (meta.total || 0));
-      var newBal = Number((oldCur + gained).toFixed(2));
-      meta.totalCurrentValue = newBal;
-      meta.total_current_value = newBal;
-      localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
-
-      if (typeof window.patchVisibleWalletDom === 'function') {
-        window.patchVisibleWalletDom(meta.total || 0, newBal, 0);
-      }
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new CustomEvent('ttinc_balance_sync', { detail: { current: newBal } }));
-
-      showToast('Trade Closed & Profit Locked ✦', 'Gained ' + money(gained) + ' returned to your wallet balance (' + money(newBal) + ').');
-      busy = false;
-      if (button) {
-        button.disabled = false;
-        button.textContent = 'Stop Trade & Lock Profit';
-      }
-      api(stopUrl, {
-        method: 'POST',
-        body: JSON.stringify({})
-      }).catch(function () {});
-      return loadState(lastInvestmentId);
-    }
-
     api(stopUrl, {
       method: 'POST',
-      body: JSON.stringify({})
+      body: JSON.stringify({ email: (u && u.email) || '' })
     }).then(function (data) {
       history = [];
-      saveLocalSimTrade(null);
 
       var meta = {};
       try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}

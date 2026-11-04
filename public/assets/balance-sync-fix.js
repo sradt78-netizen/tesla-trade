@@ -40,10 +40,15 @@
           return res.clone().json().then(function (data) {
             if (data && typeof data === 'object') {
               var modified = false;
-              var isUserApproved = (data.status === 'approved' || data.status === 'verified' || data.status === 'active' || localStorage.getItem('ttinc_account_approved') === 'true');
+              var isUserPending = (data.status === 'pending_approval' || data.status === 'pending' || localStorage.getItem('ttinc_deposit_status') === 'pending_approval');
+              var isUserApproved = !isUserPending && (data.status === 'approved' || data.status === 'verified' || data.status === 'active');
               if (isUserApproved) {
                 data.status = 'active';
                 data.canWithdraw = true;
+                modified = true;
+              } else if (isUserPending) {
+                data.status = 'pending_approval';
+                data.canWithdraw = false;
                 modified = true;
               }
               var p = Number(data.total != null ? data.total : (data.amount != null ? data.amount : 0));
@@ -161,9 +166,15 @@
         if (labelTxt === 'Current Value') {
           if (current > 0) valueNode.textContent = formatMoney(current);
         }
-        if (labelTxt === 'Status' && (valueNode.textContent === 'No Investment' || valueNode.textContent === 'Pending')) {
-          valueNode.textContent = 'Active';
-          valueNode.style.color = '#4ade80';
+        if (labelTxt === 'Status') {
+          var depStatus = localStorage.getItem('ttinc_deposit_status') || '';
+          if (depStatus === 'pending_approval' || valueNode.textContent === 'Pending' || valueNode.textContent === 'Pending Approval') {
+            valueNode.textContent = 'Pending Approval';
+            valueNode.style.color = '#fde047';
+          } else if (valueNode.textContent === 'No Investment' && principal > 0) {
+            valueNode.textContent = 'Active';
+            valueNode.style.color = '#4ade80';
+          }
         }
       }
     }
@@ -223,6 +234,7 @@
       }
     }
   }
+  window.patchVisibleWalletDom = patchVisibleWalletDom;
 
   function readBalance() {
     if (!isBalancePage()) {

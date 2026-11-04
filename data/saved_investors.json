@@ -1,10 +1,18 @@
 [
   {
+    "id": "u_mw1wnmhv",
+    "name": "Test Investor",
+    "email": "investor_test_suite@domain.com",
+    "phone": "—",
+    "onboarding_status": "active",
+    "registered_at": "2026-11-04T09:19:20.995Z"
+  },
+  {
     "id": "u_mw1ui6sz",
     "name": "Investor Test",
     "email": "investor@test.com",
     "phone": "—",
-    "onboarding_status": "pending_deposit",
+    "onboarding_status": "active",
     "registered_at": "2026-11-04T08:19:08.147Z"
   },
   {

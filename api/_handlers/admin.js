@@ -28,7 +28,7 @@ export function savePersistentInvestor(account) {
       name: account.name || (idx >= 0 ? list[idx].name : 'Investor'),
       email: cleanEmail,
       phone: account.phone || (idx >= 0 ? list[idx].phone : '—'),
-      onboarding_status: account.onboarding_status || (idx >= 0 ? list[idx].onboarding_status : 'active'),
+      onboarding_status: account.onboarding_status || (idx >= 0 ? list[idx].onboarding_status : 'pending_deposit'),
       registered_at: account.registered_at || (idx >= 0 ? list[idx].registered_at : new Date().toISOString())
     };
     if (idx >= 0) {
@@ -1221,6 +1221,22 @@ export default async function handler(req, res) {
             const acc = db.investor_accounts.find(a => (a.email || '').toLowerCase().trim() === effectiveEmail);
             if (acc) acc.onboarding_status = 'active';
             else db.investor_accounts.unshift({ email: effectiveEmail, name: 'Investor', onboarding_status: 'active' });
+          }
+          if (effectiveEmail && status === 'active' && approvedDepositAmount > 0) {
+            if (!Array.isArray(db.account_transactions)) db.account_transactions = [];
+            const exists = db.account_transactions.some(t => String(t.investment_id) === String(effectiveId) && t.type === 'deposit');
+            if (!exists) {
+              db.account_transactions.unshift({
+                id: 'tx_' + Math.random().toString(36).substring(2, 9),
+                investment_id: effectiveId,
+                user_email: effectiveEmail,
+                type: 'deposit',
+                amount: approvedDepositAmount,
+                status: 'processed',
+                note: 'Investment deposit approved',
+                created_at: new Date().toISOString()
+              });
+            }
           }
           saveDatabaseSync();
         }

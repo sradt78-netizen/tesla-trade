@@ -30,14 +30,9 @@
 
   function isDepositPendingLocal() {
     try {
-      if (localStorage.getItem('ttinc_account_approved') === 'true') return false;
-      var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-      if (meta.status === 'active' || meta.status === 'approved') return false;
-      var curAuth = auth() || {};
-      if (curAuth.onboardingState === 'completed' || curAuth.onboarding_status === 'verified' || curAuth.onboarding_status === 'active') return false;
       var dep = localStorage.getItem('ttinc_deposit_status');
       var pay = localStorage.getItem('ttinc_payment_status');
-      if (dep === 'active' || pay === 'active' || dep === 'approved' || pay === 'approved') return false;
+      var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
       if (dep === 'pending_approval' || pay === 'pending_approval' ||
         meta.status === 'pending_approval' || meta.status === 'pending') {
         return true;
@@ -260,7 +255,7 @@
         '</div>' +
         '<h2 style="font-size:24px;font-weight:900;color:#ffffff;margin:0 0 10px;">Deposit Approved!</h2>' +
         '<p style="font-size:14px;color:#86efac;margin:0 0 20px;line-height:1.5;">' +
-          'Your deposit has been verified by the administrator. 100% Match Bonus applied. Unlocking your dashboard…' +
+          'Your deposit has been verified by the administrator. Unlocking your dashboard…' +
         '</p>' +
       '</div>';
 
@@ -271,6 +266,8 @@
       localStorage.removeItem('ttinc_deposit_plan');
       localStorage.removeItem('ttinc_deposit_method');
       localStorage.setItem('ttinc_account_approved', 'true');
+      var curAuth = auth() || {};
+      localStorage.setItem('ttinc_account_approved_email', curAuth.email || '');
       var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
       meta.status = 'active';
       if (data && data.total) meta.total = Number(data.total);
@@ -338,7 +335,15 @@
       return;
     }
 
-    if (localStorage.getItem('ttinc_account_approved') === 'true') {
+    var current = auth();
+    if (!current || !current.email) {
+      removeLock();
+      if (typeof callback === 'function') callback(false);
+      return;
+    }
+
+    var localApprovedEmail = localStorage.getItem('ttinc_account_approved_email') || '';
+    if (localStorage.getItem('ttinc_account_approved') === 'true' && localApprovedEmail === current.email && !isDepositPendingLocal()) {
       removeLock();
       removeBanner();
       if (pollTimer) {
@@ -346,13 +351,6 @@
         pollTimer = null;
       }
       if (typeof callback === 'function') callback(true);
-      return;
-    }
-
-    var current = auth();
-    if (!current || !current.email) {
-      removeLock();
-      if (typeof callback === 'function') callback(false);
       return;
     }
 

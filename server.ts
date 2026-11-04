@@ -219,73 +219,103 @@ let serverTradingSettings = {
 };
 
 function resolveTradingInvestment(id: string, email?: string) {
-  let inv = mockTradingInvestments[id];
-  if (inv && inv.total > 0) return inv;
+  const cleanEmail = String(email || '').toLowerCase().trim();
+  const cleanId = String(id || '').trim();
 
+  // 1. Direct memory lookup by email
+  if (cleanEmail && mockTradingInvestments[cleanEmail]) {
+    return mockTradingInvestments[cleanEmail];
+  }
+  // 2. Direct memory lookup by id
+  if (cleanId && mockTradingInvestments[cleanId]) {
+    return mockTradingInvestments[cleanId];
+  }
+
+  // 3. Search database for an active/approved investment for THIS user
+  let foundDb: any = null;
   try {
     const db = loadDatabaseSync();
     const dbInvs = db.investments || [];
-    const foundDb = dbInvs.find((d: any) =>
-      String(d.id) === String(id) ||
-      (email && (d.user_email || d.email || '').toLowerCase() === email.toLowerCase()) ||
-      ((d.user_email || d.email) && String(d.user_email || d.email).toLowerCase() === String(id).toLowerCase())
-    ) || dbInvs.find((d: any) => d.status === 'active' || d.status === 'approved') || (dbInvs.length > 0 ? dbInvs[0] : null);
-
-    if (foundDb) {
-      const tot = Number(foundDb.total != null ? foundDb.total : (foundDb.amount != null ? foundDb.amount : 0));
-      let curVal = Number(foundDb.totalCurrentValue != null ? foundDb.totalCurrentValue : (foundDb.total_current_value != null ? foundDb.total_current_value : tot));
-      inv = {
-        id: foundDb.id || id,
-        status: foundDb.status || 'active',
-        total: tot,
-        totalCurrentValue: curVal,
-        tradingStatus: inv?.tradingStatus || 'idle',
-        tradingAmount: inv?.tradingAmount || 0,
-        tradingStartedAt: inv?.tradingStartedAt || null
-      };
-      mockTradingInvestments[id] = inv;
-      if (foundDb.id) mockTradingInvestments[foundDb.id] = inv;
-      return inv;
+    if (cleanEmail) {
+      foundDb = dbInvs.find((d: any) =>
+        (d.user_email || d.email || '').toLowerCase().trim() === cleanEmail &&
+        (d.status === 'active' || d.status === 'approved')
+      );
+      if (!foundDb) {
+        foundDb = dbInvs.find((d: any) =>
+          (d.user_email || d.email || '').toLowerCase().trim() === cleanEmail
+        );
+      }
+    } else if (cleanId && cleanId !== 'sim_inv_1' && cleanId !== 'dep_active') {
+      foundDb = dbInvs.find((d: any) => String(d.id) === cleanId);
     }
   } catch (e) {}
 
-  try {
-    const diskDeposits = loadPersistentDeposits();
-    const found = diskDeposits.find((d: any) =>
-      String(d.id) === String(id) ||
-      (email && (d.user_email || d.email || '').toLowerCase() === email.toLowerCase()) ||
-      ((d.user_email || d.email) && String(d.user_email || d.email).toLowerCase() === String(id).toLowerCase())
-    ) || diskDeposits.find((d: any) => d.status === 'active' || d.status === 'approved') || (diskDeposits.length > 0 ? diskDeposits[0] : null);
-
-    if (found) {
-      const tot = Number(found.total != null ? found.total : (found.amount != null ? found.amount : 0));
-      let curVal = Number(found.totalCurrentValue != null ? found.totalCurrentValue : (found.total_current_value != null ? found.total_current_value : tot));
-      inv = {
-        id: found.id || id,
-        status: found.status || 'active',
-        total: tot,
-        totalCurrentValue: curVal,
-        tradingStatus: inv?.tradingStatus || 'idle',
-        tradingAmount: inv?.tradingAmount || 0,
-        tradingStartedAt: inv?.tradingStartedAt || null
-      };
-      mockTradingInvestments[id] = inv;
-      if (found.id) mockTradingInvestments[found.id] = inv;
-      return inv;
-    }
-  } catch (e) {}
-
-  if (!inv) {
-    inv = { id, status: 'active', total: 0, totalCurrentValue: 0, tradingStatus: 'idle', tradingAmount: 0, tradingStartedAt: null };
-    mockTradingInvestments[id] = inv;
+  // 4. Search disk deposits (saved_deposits.json)
+  if (!foundDb) {
+    try {
+      const diskDeposits = loadPersistentDeposits();
+      if (cleanEmail) {
+        foundDb = diskDeposits.find((d: any) =>
+          (d.user_email || d.email || '').toLowerCase().trim() === cleanEmail &&
+          (d.status === 'active' || d.status === 'approved')
+        );
+        if (!foundDb) {
+          foundDb = diskDeposits.find((d: any) =>
+            (d.user_email || d.email || '').toLowerCase().trim() === cleanEmail
+          );
+        }
+      } else if (cleanId && cleanId !== 'sim_inv_1' && cleanId !== 'dep_active') {
+        foundDb = diskDeposits.find((d: any) => String(d.id) === cleanId);
+      }
+    } catch (e) {}
   }
-  return inv;
+
+  if (foundDb) {
+    const isAct = foundDb.status === 'active' || foundDb.status === 'approved';
+    const tot = isAct ? Number(foundDb.total != null ? foundDb.total : (foundDb.amount != null ? foundDb.amount : 0)) : 0;
+    let curVal = isAct ? Number(foundDb.totalCurrentValue != null ? foundDb.totalCurrentValue : (foundDb.total_current_value != null ? foundDb.total_current_value : tot)) : 0;
+
+    const inv = {
+      id: foundDb.id || cleanId || ('dep_' + Date.now().toString(36)),
+      userEmail: cleanEmail || (foundDb.user_email || foundDb.email || ''),
+      email: cleanEmail || (foundDb.user_email || foundDb.email || ''),
+      status: foundDb.status || (isAct ? 'active' : 'pending_approval'),
+      total: tot,
+      totalCurrentValue: curVal,
+      total_current_value: curVal,
+      tradingStatus: 'idle',
+      tradingAmount: 0,
+      tradingStartedAt: null
+    };
+    if (cleanEmail) mockTradingInvestments[cleanEmail] = inv;
+    if (inv.id) mockTradingInvestments[inv.id] = inv;
+    return inv;
+  }
+
+  // Never fall back to another user's investment. Return isolated idle object.
+  const emptyInv = {
+    id: cleanId || 'sim_inv_1',
+    userEmail: cleanEmail,
+    email: cleanEmail,
+    status: 'none',
+    total: 0,
+    totalCurrentValue: 0,
+    total_current_value: 0,
+    tradingStatus: 'idle',
+    tradingAmount: 0,
+    tradingStartedAt: null
+  };
+  if (cleanEmail) mockTradingInvestments[cleanEmail] = emptyInv;
+  if (cleanId) mockTradingInvestments[cleanId] = emptyInv;
+  return emptyInv;
 }
 
 function computeTradeValue(inv: any, now: number) {
   const tot = Number(inv.total || 0);
   let curVal = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : tot));
   const balance = curVal != null ? curVal : tot;
+
   if (inv.tradingStatus !== 'active' || !inv.tradingStartedAt) {
     return {
       status: 'idle',
@@ -300,27 +330,24 @@ function computeTradeValue(inv: any, now: number) {
   const elapsed = Math.max(0, now - Number(inv.tradingStartedAt));
   const amount = Number(inv.tradingAmount || 0);
 
-  // Progressive institutional algo return: steady, positive, compounding
-  // Starts with immediate positive return and gently climbs, always profitable
-  const baseGrowthPercent = Math.min(18.0, 0.75 + (elapsed * 0.08));
-  const microTick = Math.sin(elapsed * 0.8) * 0.04;
-  const gainPercent = Math.max(0.25, baseGrowthPercent + microTick);
-  const gain = amount * (gainPercent / 100);
-  const tradeValue = Math.max(0, Number((amount + gain).toFixed(2)));
-  const pnl = Number((tradeValue - amount).toFixed(2));
+  // Smooth, continuous positive profit compounding: ~0.5% after 5s, ~2% after 20s
+  const growthRate = Math.min(25.0, 0.4 + (elapsed * 0.08));
+  const gain = Number((amount * (growthRate / 100)).toFixed(2));
+  const tradeValue = Number((amount + gain).toFixed(2));
+  const pnl = gain;
   const pnlPercent = amount > 0 ? Number(((pnl / amount) * 100).toFixed(2)) : 0;
 
-  // Generate 20 history points with smooth, realistic upward market curve
+  // Generate smooth chart points
   const history: any[] = [];
   const pointsCount = 20;
   for (let k = pointsCount; k >= 0; k--) {
     const secOffset = elapsed - (k * 1.5);
     const s = Math.max(0, secOffset);
-    const histGrowth = Math.max(0.15, 0.35 + (s * 0.08) + (Math.sin(k * 0.6) * 0.03));
-    const pointVal = amount * (1 + (histGrowth / 100));
+    const histGrowth = Math.max(0.1, 0.2 + (s * 0.08));
+    const pointVal = Number((amount * (1 + (histGrowth / 100))).toFixed(2));
     history.push({
       timestamp: (Number(inv.tradingStartedAt) + secOffset) * 1000,
-      value: Math.max(0.01, Number(pointVal.toFixed(2))),
+      value: pointVal,
       trend: 'profit'
     });
   }
@@ -371,6 +398,9 @@ app.post('/api/investments/:id/trading/start', (req, res) => {
   const amount = Number(req.body.amount || 0);
   const tot = Number(inv.total || 0);
   let available = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : (inv.total_current_value != null ? inv.total_current_value : tot));
+  if (inv.status !== 'active' && inv.status !== 'approved') {
+    return res.status(403).json({ error: 'Your account is pending administrator approval before you can trade.' });
+  }
   if (available <= 0) {
     return res.status(409).json({ error: 'You have no available funds. Top up your account before starting a trade.' });
   }
@@ -396,6 +426,7 @@ app.post('/api/investments/:id/trading/stop', async (req, res) => {
   const finalBalance = Number((balance - inv.tradingAmount + active.tradeValue).toFixed(2));
 
   inv.totalCurrentValue = finalBalance;
+  inv.total_current_value = finalBalance;
   inv.tradingStatus = 'idle';
   inv.tradingAmount = 0;
   inv.tradingStartedAt = null;
@@ -414,6 +445,11 @@ app.post('/api/investments/:id/trading/stop', async (req, res) => {
         await conn.query(
           'UPDATE investor_accounts SET total_current_value = ? WHERE LOWER(email) = ?',
           [finalBalance, targetEmail]
+        );
+        const txId = 'tx_pnl_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
+        await conn.query(
+          'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "profit", ?, "processed", "Algorithmic trading profit", NOW())',
+          [txId, inv.id || id, targetEmail, active.pnl]
         );
       }
       await conn.end();
@@ -443,6 +479,17 @@ app.post('/api/investments/:id/trading/stop', async (req, res) => {
           i.earnings = (Number(i.earnings) || 0) + active.pnl;
         }
       });
+      if (!Array.isArray(db.account_transactions)) db.account_transactions = [];
+      db.account_transactions.unshift({
+        id: 'tx_pnl_' + Date.now(),
+        investment_id: inv.id || id,
+        user_email: targetEmail,
+        type: 'profit',
+        amount: active.pnl,
+        status: 'completed',
+        note: 'Algorithmic trading profit locked',
+        created_at: new Date().toISOString()
+      });
       fs.writeFileSync(path.resolve(__dirname, 'data/tesla_trade_db.json'), JSON.stringify(db, null, 2), 'utf8');
     }
   } catch (eLocal) {}
@@ -458,16 +505,19 @@ app.post('/api/investments/:id/trading/stop', async (req, res) => {
 
 app.get('/api/wallet', (req, res) => {
   const email = String(req.query.email || '').toLowerCase().trim();
+  if (!email) {
+    return res.json({ email: '', connected: false, total: 0, totalCurrentValue: 0, bonus: 0, availableBalance: 0 });
+  }
   const diskDeposits = loadPersistentDeposits();
   const found = diskDeposits.find((d: any) =>
-    (email && (d.user_email || d.email || '').toLowerCase() === email) ||
-    d.status === 'active' || d.status === 'approved'
-  ) || (diskDeposits.length > 0 ? diskDeposits[0] : null);
+    (d.user_email || d.email || '').toLowerCase() === email &&
+    (d.status === 'active' || d.status === 'approved')
+  );
   const total = Number(found?.total != null ? found.total : (found?.amount || 0));
   let totalCurrentValue = Number(found?.totalCurrentValue != null ? found.totalCurrentValue : (found?.total_current_value != null ? found.total_current_value : total));
   return res.json({
     email,
-    connected: true,
+    connected: !!found,
     total,
     totalCurrentValue,
     bonus: 0,

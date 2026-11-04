@@ -19,6 +19,7 @@
   function labelForType(type) {
     return ({
       deposit: 'Deposit',
+      bonus: 'Deposit bonus',
       withdrawal: 'Withdrawal',
       return: 'Investment return',
       profit: 'Trading profit',
@@ -67,7 +68,7 @@
     var totalWithdrawals = items.filter(function (item) { return item.type === 'withdrawal'; })
       .reduce(function (sum, item) { return sum + Number(item.amount || 0); }, 0);
     var totalCredits = items.filter(function (item) {
-      return item.type === 'deposit' || item.type === 'return' || item.type === 'profit';
+      return item.type === 'deposit' || item.type === 'return' || item.type === 'profit' || item.type === 'bonus';
     }).reduce(function (sum, item) { return sum + Number(item.amount || 0); }, 0);
     var totalDebits = items.filter(function (item) {
       return item.type === 'withdrawal' || item.type === 'loss' || item.type === 'fee';
@@ -77,14 +78,14 @@
     var content = items.length
       ? items.map(function (item) {
           var type = String(item.type || '').toLowerCase();
-          var positive = type === 'deposit' || type === 'return' || type === 'profit';
+          var positive = type === 'deposit' || type === 'return' || type === 'profit' || type === 'bonus';
           return (
             '<div style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1.1fr 1fr;align-items:center;gap:12px;padding:15px 16px;border-bottom:1px solid #171717;">' +
               '<div style="display:flex;align-items:center;gap:9px;color:#fff;font-size:13px;min-width:0;">' +
                 '<span style="width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;background:' + (positive ? '#064e3b' : '#450a0a') + ';color:' + (positive ? '#34d399' : '#f87171') + ';font-size:15px;">' + (positive ? '+' : '−') + '</span>' +
                 '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(labelForType(type)) + '</span>' +
               '</div>' +
-              '<div style="font-size:12px;color:#94a3b8;">' + escapeHtml(formatDate(item.createdAt)) + '</div>' +
+              '<div style="font-size:12px;color:#94a3b8;">' + escapeHtml(formatDate(item.createdAt || item.created_at)) + '</div>' +
               '<div style="font-family:monospace;font-size:14px;font-weight:700;color:' + (positive ? '#34d399' : '#f87171') + ';">' + (positive ? '+' : '−') + money(item.amount) + '</div>' +
               '<div style="font-size:12px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(item.method || item.note || '—') + '</div>' +
               '<div><span style="display:inline-block;padding:5px 8px;border-radius:999px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;' + statusColors(item.status) + ';">' + escapeHtml(statusLabel(item.status)) + '</span></div>' +

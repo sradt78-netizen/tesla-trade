@@ -267,11 +267,6 @@ export default async function handler(req, res) {
           return (xId.length > 4 && cleanQId.includes(xId)) || (cleanQId.length > 4 && xId.includes(cleanQId));
         });
       }
-      // If single deposit exists, link it
-      if (!found && all.length === 1) {
-        found = all[0];
-      }
-
       // Check if user is active in persistent investors
       try {
         const { loadPersistentInvestors } = await import('./admin.js');
@@ -285,16 +280,13 @@ export default async function handler(req, res) {
         }
       } catch (eP) {}
 
-      if (!found) {
-        // If an investor was approved or seeking active deposit, match by email, active status, or latest deposit
-        const emailMatch = qEmail ? all.find(x => (x.user_email || x.email || '').toLowerCase().trim() === qEmail) : null;
-        const activeFallback = all.find(x => x.status === 'active' || x.status === 'approved');
-        found = emailMatch || activeFallback || (all.length > 0 ? all[0] : null);
+      if (!found && qEmail) {
+        found = all.find(x => (x.user_email || x.email || '').toLowerCase().trim() === qEmail);
       }
 
       if (!found) {
         return res.status(200).json({
-          id: String(qId || 'dep_active'),
+          id: String(qId || 'dep_none'),
           status: userAdminApproved ? 'active' : 'none',
           total: 0,
           totalCurrentValue: 0,
