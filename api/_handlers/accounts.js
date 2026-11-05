@@ -477,7 +477,9 @@ export default async function handler(req, res) {
         success: true,
         status: persistedStatus,
         email,
-        name
+        name,
+        phone,
+        age: Number.isFinite(age) ? age : 0
       });
     }
   }
