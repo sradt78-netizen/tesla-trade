@@ -76,6 +76,8 @@
     var account = {
       email: payload.email,
       name: payload.name,
+      phone: payload.phone || '',
+      age: Number(payload.age || 0),
       createdAt: new Date().toISOString()
     };
     try {
@@ -99,6 +101,8 @@
       localStorage.setItem('ttinc_auth', JSON.stringify({
         email: email,
         name: name,
+        phone: String(account.phone || ''),
+        age: Number(account.age || 0),
         onboardingState: 'plan_selection'
       }));
       sessionStorage.removeItem('ttinc_social_onboarding');
@@ -185,12 +189,16 @@
       .then(function () {
         saveBrowserAuth({
           email: email,
-          name: name || email.split('@')[0]
+          name: name || email.split('@')[0],
+          phone: phone,
+          age: age || ageFromDate(dob)
         });
         try { sessionStorage.removeItem('ttinc_registration_pending'); } catch (error) {}
         handoffToInvestment({
           email: email,
-          name: name || email.split('@')[0]
+          name: name || email.split('@')[0],
+          phone: phone,
+          age: age || ageFromDate(dob)
         });
       })
       .catch(function (error) {
