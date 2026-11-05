@@ -87,6 +87,7 @@ export default async function handler(req, res) {
         : states.some(s => ['pending','pending_approval'].includes(s))
           ? 'pending_approval'
           : 'none';
+      onboardingStatus = investmentStatus;
       await conn.end();
 
     } catch (e) {
@@ -268,7 +269,8 @@ export default async function handler(req, res) {
         ? 'active'
         : states.some(s => ['pending','pending_approval'].includes(s))
           ? 'pending_approval'
-          : 'none';
+  : 'none';
+      onboardingStatus = investmentStatus;
       await conn.end();
     } catch (e) {
       console.error('[auth social-session] database lookup failed:', e.message);
