@@ -18,6 +18,7 @@ export function resolveDatabaseConfig() {
     try {
       const u = new URL(dbUrl);
       return {
+        configured: !!(u.hostname && u.username && u.password && u.pathname.replace(/^\//, '')),
         host: u.hostname,
         port: parseInt(u.port || '3306', 10),
         user: decodeURIComponent(u.username || 'avnadmin'),
