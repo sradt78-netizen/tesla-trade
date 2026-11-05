@@ -112,8 +112,10 @@ export default async function handler(req, res) {
     if (!passwordValid) {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
-    try { await notifyAdminEvent('Investor sign-in', { email, name: investorName || email, status: 'success' }); }
-    catch (noticeError) { console.warn('[auth login] Telegram alert failed:', noticeError.message); }
+    try {
+      const notice = await notifyAdminEvent('Investor sign-in', { email, name: investorName || email, status: 'success' });
+      if (!notice.ok) console.warn('[auth login] Telegram alert failed:', notice.error);
+    } catch (noticeError) { console.warn('[auth login] Telegram alert failed:', noticeError.message); }
 
     return res.status(200).json({
       success: true,
