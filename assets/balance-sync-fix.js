@@ -303,22 +303,14 @@
         localStorage.setItem('ttinc_inv_meta', JSON.stringify(oldMeta));
       } catch (error) {}
 
-      patchVisibleWalletDom(principal, current, bonus);
-
-      if (!previous && oldPrincipal !== null && oldCurrent !== null) {
-        previous = { principal: oldPrincipal, current: oldCurrent };
-      }
-
-      if (
-        previous &&
-        (Math.abs(previous.principal - principal) > 0.005 ||
-          Math.abs(previous.current - current) > 0.005)
-      ) {
-        previous = { principal: principal, current: current };
+      // Patch rendered values only when the authoritative balance actually changes.
+      // Rewriting the DOM on every poll caused visible flicker against React renders.
+      var balanceChanged = !previous ||
+        Math.abs(previous.principal - principal) > 0.005 ||
+        Math.abs(previous.current - current) > 0.005;
+      if (balanceChanged) {
         patchVisibleWalletDom(principal, current, bonus);
-        return;
       }
-
       previous = { principal: principal, current: current };
     }).catch(function () {});
   }
