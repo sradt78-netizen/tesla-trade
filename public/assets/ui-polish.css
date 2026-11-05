@@ -91,3 +91,17 @@ button:not(:disabled):active { transform: scale(0.98); }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+
+/* ---- Premium refinement: restrained contrast, hierarchy and clarity ----- */
+:root { color-scheme: dark; }
+body { background-image: radial-gradient(ellipse at 12% 0%, rgba(227,25,55,.10), transparent 34%), radial-gradient(ellipse at 88% 18%, rgba(212,175,55,.07), transparent 30%); }
+#root button, #root a, #root input, #root select, #root textarea { -webkit-tap-highlight-color: transparent; }
+#root input, #root select, #root textarea { border-color: rgba(255,255,255,.12); transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+#root input:focus, #root select:focus, #root textarea:focus { border-color: rgba(227,25,55,.72) !important; box-shadow: 0 0 0 3px rgba(227,25,55,.12); outline: none; }
+#root button:not(:disabled) { box-shadow: 0 4px 14px rgba(0,0,0,.16); }
+#root button:not(:disabled):hover { filter: brightness(1.08); }
+#root table thead th { letter-spacing: .045em; text-transform: uppercase; font-size: .68rem; }
+#root table tbody tr:nth-child(even) { background: rgba(255,255,255,.012); }
+#root [role="dialog"], #root [data-state="open"] { backdrop-filter: blur(12px); }
+@media (max-width: 640px) { #root button { min-height: 40px; } #root input, #root select { min-height: 42px; } }
