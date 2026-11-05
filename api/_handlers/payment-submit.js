@@ -15,7 +15,7 @@ function normalizePaymentMethod(value) {
     usdt: ['usdt', 'tether', 'tether usdt', 'usdt trc 20', 'tether trc 20', 'usdt trc20'],
     eth: ['eth', 'ethereum', 'ethereum erc 20', 'ethereum erc20'],
     btc: ['btc', 'bitcoin'],
-    bank: ['bank', 'bank transfer', 'bank wire', 'bank wire transfer', 'wire transfer']
+    bank: ['bank', 'bank transfer', 'bank wire', 'bank wire transfer', 'wire transfer', 'wire / sepa transfer', 'sepa transfer']
   };
   for (const [key, names] of Object.entries(aliases)) {
     if (names.includes(normalized)) return key;
