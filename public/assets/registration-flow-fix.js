@@ -139,7 +139,7 @@
       pending.phone || '';
     var dob = firstValue(['input[type="date"]'], root) || pending.dob || '';
     var ageField = firstField(['#ttinc-register-age', 'input[type="number"]'], root);
-    var age = ageField ? Number(ageField.value) : 0;
+    var age = ageField ? Number(ageField.value) : Number(pending.age || 0);
     if (!age && dob) age = ageFromDate(dob);
     var password = firstValue(['#ttinc-register-password'], root) || pending.password || '';
     var invitationField = root.querySelector('#ttinc-register-invitation');
@@ -226,6 +226,7 @@
           email: value('input[type="email"]', form).toLowerCase(),
           name: value('input[placeholder="John Smith"]', form),
           phone: value('input[type="tel"]', form),
+          age: Number(value('#ttinc-register-age', form) || value('input[type="number"]', form) || 0),
           dob: value('input[type="date"]', form),
           invitationCode: registrationInvitation
             ? registrationInvitation.value.trim()
