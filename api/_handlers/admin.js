@@ -551,11 +551,20 @@ export default async function handler(req, res) {
           try { const [rows] = await conn.query(sql); return rows; }
           catch (e) { console.error('[admin all_data] query failed:', sql.slice(0, 60), e.message); return fallback; }
         };
-        investors = await safeQuery('SELECT * FROM investor_accounts ORDER BY registered_at DESC', investors);
-        let investmentsFromDb = false;
-        try { const [rows] = await conn.query('SELECT * FROM investments ORDER BY id DESC'); investments = rows; investmentsFromDb = true; }
-        catch (e) { console.error('[admin all_data] investments query failed:', e.message); }
-        dbInvestmentsAuthoritative = investmentsFromDb;
+        try {
+          const [investorRows] = await conn.query('SELECT * FROM investor_accounts ORDER BY registered_at DESC');
+          const [investmentRows] = await conn.query('SELECT * FROM investments ORDER BY id DESC');
+          investors = investorRows;
+          investments = investmentRows;
+          dbInvestmentsAuthoritative = true;
+        } catch (e) {
+          console.error('[admin all_data] authoritative investor query failed:', e.message);
+          await conn.end();
+          return res.status(503).json({
+            success: false,
+            error: 'Investor records could not be loaded from MySQL. Cached or mock investor data was not substituted.'
+          });
+        }
         kyc = await safeQuery('SELECT * FROM kyc_submissions ORDER BY created_at DESC', kyc);
         orders = await safeQuery('SELECT * FROM ev_orders ORDER BY created_at DESC LIMIT 100', orders);
         withdrawals = await safeQuery('SELECT * FROM withdrawals ORDER BY created_at DESC', withdrawals);
