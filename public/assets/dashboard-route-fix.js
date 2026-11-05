@@ -42,7 +42,7 @@
         id: row.id,
         total: tot,
         totalCurrentValue: curVal,
-        bonus: 0,
+        bonus: Number(row.bonus != null ? row.bonus : (row.bonus_balance != null ? row.bonus_balance : (existingMeta.bonus || 0))),
         status: status,
         planName: row.planName || row.portfolio || 'Explorer'
       }));
