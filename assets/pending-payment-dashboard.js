@@ -356,7 +356,12 @@
           return;
         }
 
-        var hasActive = data.hasActiveInvestment || data.status === 'active' || data.investmentStatus === 'active' || data.status === 'approved' || data.investmentStatus === 'approved';
+        var approvedInvestmentId = data.activeInvestmentId || data.id || null;
+        var hasActive = !!approvedInvestmentId && (
+          data.hasActiveInvestment === true || data.status === 'active' ||
+          data.investmentStatus === 'active' || data.status === 'approved' ||
+          data.investmentStatus === 'approved'
+        );
         serverApproved = !!hasActive;
         var isPending = data.status === 'pending_approval' || data.investmentStatus === 'pending_approval' ||
           (!hasActive && Array.isArray(data.pendingPayments) && data.pendingPayments.length > 0);
@@ -382,7 +387,8 @@
             if (data.planName) meta.planName = data.planName;
             localStorage.setItem('ttinc_inv_meta', JSON.stringify(meta));
 
-            var invId = data.activeInvestmentId || data.id || localStorage.getItem('ttinc_investment_id') || 'sim_inv_1';
+            var invId = data.activeInvestmentId || data.id;
+            if (!invId) throw new Error('The approved investment ID is missing; dashboard access remains locked.');
             localStorage.setItem('ttinc_investment_id', String(invId));
 
             var curAuth = auth() || {};
