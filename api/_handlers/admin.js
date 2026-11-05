@@ -992,7 +992,7 @@ export default async function handler(req, res) {
 
       if (isDbConnected && conn) {
         try {
-          const [invRows] = await conn.query('SELECT * FROM investments WHERE id=? LIMIT 1', [email]);
+          const [invRows] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC LIMIT 1', [email]);
           if (invRows.length > 0) {
             await conn.query('UPDATE investments SET total=?, total_current_value=?, earnings=?, status="active" WHERE id=?', [updatedTotal, updatedCurrentValue, updatedCurrentValue - updatedTotal, invRows[0].id]);
           } else {
