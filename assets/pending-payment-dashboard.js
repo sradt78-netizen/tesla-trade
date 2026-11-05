@@ -342,17 +342,7 @@
       return;
     }
 
-    var localApprovedEmail = localStorage.getItem('ttinc_account_approved_email') || '';
-    if (localStorage.getItem('ttinc_account_approved') === 'true' && localApprovedEmail === current.email && !isDepositPendingLocal()) {
-      removeLock();
-      removeBanner();
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-      if (typeof callback === 'function') callback(true);
-      return;
-    }
+    // Always verify approval against the server; local flags may be stale after admin changes.
 
     // If local state says deposit pending, lock immediately to avoid flicker
     if (isDepositPendingLocal()) {
