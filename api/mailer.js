@@ -318,7 +318,7 @@ export async function sendPaymentDeclinedEmail(toEmail, toName, { amount, planNa
   const html = emailWrapper(`
     <h2 style="margin:0 0 16px 0;font-size:20px;color:#ef4444;font-weight:700;">Investment Deposit Update</h2>
     <p style="margin:0 0 16px 0;color:#94a3b8;">Hello <strong>${safeName}</strong>,</p>
-    <p style="margin:0 0 16px 0;color:#cbd5e1;">We were unable to verify your deposit of ${fmtAmt} for ${planName || 'your selected plan'} with the provided transaction proof.</p>
+    <p style="margin:0 0 16px 0;color:#cbd5e1;">We were unable to verify your deposit of ${fmtAmt} for ${escapeHtml(planName || 'your selected plan')} with the provided transaction proof.</p>
     <p style="margin:0 0 16px 0;color:#94a3b8;font-size:13px;">Please verify your transaction details, confirm the correct network or address was used, and re-submit your receipt from the Deposit section or contact support for assistance.</p>
     <div style="text-align:center;margin:24px 0 12px 0;">
       <a href="https://teslawealths.org/deposit" style="display:inline-block;background:#27272a;color:#ffffff;text-decoration:none;font-weight:600;font-size:13px;padding:10px 24px;border-radius:6px;border:1px solid #3f3f46;">Go to Deposit Page &rarr;</a>
