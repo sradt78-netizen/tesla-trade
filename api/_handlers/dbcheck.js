@@ -49,20 +49,22 @@ export function resolveDatabaseConfig() {
     'DB_NAME', 'DB_DATABASE', 'MYSQL_DATABASE', 'MYSQLDATABASE', 'MYSQL_DB', 'TT_DB_NAME', 'AIVEN_DATABASE', 'VITE_DB_NAME'
   ].find(k => !!cleanString(process.env[k]));
 
-  const host = cleanString(hostKey ? process.env[hostKey] : '') || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com';
-  const port = parseInt(cleanString(portKey ? process.env[portKey] : '') || '28487', 10);
-  const user = cleanString(userKey ? process.env[userKey] : '') || 'avnadmin';
-  const password = cleanString(passKey ? process.env[passKey] : '') || 'AVNS_eN3hQrUWcOL7PRQXP_i';
-  const database = cleanString(dbKey ? process.env[dbKey] : '') || 'defaultdb';
+  const host = cleanString(hostKey ? process.env[hostKey] : '');
+  const port = parseInt(cleanString(portKey ? process.env[portKey] : '') || '3306', 10);
+  const user = cleanString(userKey ? process.env[userKey] : '');
+  const password = cleanString(passKey ? process.env[passKey] : '');
+  const database = cleanString(dbKey ? process.env[dbKey] : '');
+  const configured = !!(host && user && password && database);
 
   return {
+    configured,
     host,
     port,
     user,
     password,
     database,
     ssl: { rejectUnauthorized: false },
-    source: hostKey ? `Vercel (${hostKey})` : 'Default Aiven Cluster'
+    source: configured ? `Vercel (${hostKey || 'DATABASE_URL'})` : 'Database environment variables required'
   };
 }
 
