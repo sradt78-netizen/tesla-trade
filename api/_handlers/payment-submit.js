@@ -178,204 +178,105 @@ export default async function handler(req, res) {
   const parsedUrl = new URL(req.url || '/', 'http://localhost');
   if (req.method === 'GET') {
     const qEmail = cleanString(req.query?.email || parsedUrl.searchParams.get('email')).toLowerCase();
-    const idMatch = parsedUrl.pathname.match(/\/api\/investments\/([^/?]+)/);
-    const qId = idMatch ? idMatch[1] : (req.params?.id || parsedUrl.searchParams.get('id'));
+    const idMatch = parsedUrl.pathname.match(/\\/api\\/investments\\/([^/?]+)/);
+    const qId = idMatch ? decodeURIComponent(idMatch[1]) : (req.params?.id || parsedUrl.searchParams.get('id'));
     const cleanQId = qId ? String(qId).replace(/^dep_/, '').trim() : '';
     const depQId = cleanQId ? ('dep_' + cleanQId) : '';
 
-    let dbRows = [];
-    let userAdminApproved = false;
-    let bonusByInvestment = Object.create(null);
+    if (!qId && !qEmail) {
+      return res.status(400).json({ error: 'Investor email or investment ID is required.' });
+    }
+
+    let conn;
     try {
-      const conn = await getDbConnection();
+      conn = await getDbConnection();
+      let rows = [];
       if (qId) {
-        const [rows] = await conn.query('SELECT * FROM investments WHERE id=? OR id=? OR id=? LIMIT 1', [qId, cleanQId, depQId]);
-        dbRows = rows;
-      } else if (qEmail) {
-        const [rows] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC', [qEmail]);
-        dbRows = rows;
-      } else {
-        const [rows] = await conn.query('SELECT * FROM investments ORDER BY id DESC');
-        dbRows = rows;
-      }
-      const checkEmail = qEmail || (dbRows[0] && (dbRows[0].user_email || dbRows[0].email));
-      if (checkEmail) {
-        const [acc] = await conn.query('SELECT onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [checkEmail.toLowerCase()]);
-        if (acc.length > 0 && (acc[0].onboarding_status === 'active' || acc[0].onboarding_status === 'approved' || acc[0].onboarding_status === 'verified')) {
-          userAdminApproved = true;
+        const ids = [...new Set([String(qId), cleanQId, depQId].filter(Boolean))];
+        const placeholders = ids.map(() => '?').join(',');
+        let sql = 'SELECT * FROM investments WHERE id IN (' + placeholders + ')';
+        const args = ids.slice();
+        if (qEmail) {
+          sql += ' AND LOWER(user_email)=?';
+          args.push(qEmail);
         }
+        sql += ' ORDER BY created_at DESC LIMIT 1';
+        const [foundRows] = await conn.query(sql, args);
+        rows = foundRows;
+      } else {
+        const [foundRows] = await conn.query(
+          'SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY created_at DESC',
+          [qEmail]
+        );
+        rows = foundRows;
+      }
+
+      const ledgerEmail = qEmail || String(rows[0]?.user_email || '').toLowerCase();
+      const bonusByInvestment = Object.create(null);
+      if (ledgerEmail) {
         const [bonusRows] = await conn.query(
           "SELECT investment_id, COALESCE(SUM(amount), 0) AS bonus FROM account_transactions WHERE LOWER(user_email)=? AND type='bonus' AND status='processed' GROUP BY investment_id",
-          [checkEmail.toLowerCase()]
+          [ledgerEmail]
         );
-        for (const bonusRow of bonusRows) bonusByInvestment[String(bonusRow.investment_id)] = Number(bonusRow.bonus || 0);
+        for (const bonusRow of bonusRows) {
+          bonusByInvestment[String(bonusRow.investment_id)] = Number(bonusRow.bonus || 0);
+        }
       }
       await conn.end();
-    } catch (e) {}
+      conn = null;
 
-    // The JSON-backed database is also used by local/mock deployments; read its
-    // ledger when MySQL is unavailable so the bonus remains consistent there.
-    try {
-      const { loadDatabaseSync } = await import('../db.js');
-      const localDb = loadDatabaseSync();
-      const ledger = Array.isArray(localDb && localDb.account_transactions) ? localDb.account_transactions : [];
-      if (!Object.keys(bonusByInvestment).length) {
-        for (const tx of ledger) {
-          if (String(tx.user_email || '').toLowerCase() !== String(qEmail || (dbRows[0] && dbRows[0].user_email) || '').toLowerCase()) continue;
-          if (tx.type !== 'bonus' || tx.status !== 'processed') continue;
-          const key = String(tx.investment_id || '');
-          bonusByInvestment[key] = Number(bonusByInvestment[key] || 0) + Number(tx.amount || 0);
-        }
-      }
-    } catch (eLocalLedger) {}
-
-    let all = Array.isArray(dbRows) ? [...dbRows] : [];
-
-    // Merge persistent file storage and promote approved status
-    try {
-      const diskDeposits = loadPersistentDeposits();
-      for (const d of diskDeposits) {
-        const exIdx = all.findIndex(x => String(x.id) === String(d.id));
-        if (exIdx >= 0 && dbRows.some(r => String(r.id) === String(d.id))) {
-          // MySQL row is authoritative
-        } else if (exIdx >= 0) {
-          const isAct = d.status === 'active' || d.status === 'approved' || all[exIdx].status === 'active' || all[exIdx].status === 'approved';
-          all[exIdx] = { ...all[exIdx], ...d, status: isAct ? 'active' : (d.status || all[exIdx].status) };
-        } else {
-          all.push(d);
-        }
-      }
-    } catch (e) {}
-
-    // Merge in-memory and mockStore
-    try {
-      const { mockStore } = await import('./admin.js');
-      const storeInvs = mockStore.investments || [];
-      for (const m of inMemoryDeposits) {
-        const exIdx = all.findIndex(x => String(x.id) === String(m.id));
-        if (exIdx >= 0 && dbRows.some(r => String(r.id) === String(m.id))) {
-        } else if (exIdx >= 0) {
-          const isAct = m.status === 'active' || m.status === 'approved' || all[exIdx].status === 'active' || all[exIdx].status === 'approved';
-          all[exIdx] = { ...all[exIdx], ...m, status: isAct ? 'active' : (m.status || all[exIdx].status) };
-        } else {
-          all.push(m);
-        }
-      }
-      for (const s of storeInvs) {
-        const exIdx = all.findIndex(x => String(x.id) === String(s.id));
-        if (exIdx >= 0 && dbRows.some(r => String(r.id) === String(s.id))) {
-        } else if (exIdx >= 0) {
-          const isAct = s.status === 'active' || s.status === 'approved' || all[exIdx].status === 'active' || all[exIdx].status === 'approved';
-          all[exIdx] = { ...all[exIdx], ...s, status: isAct ? 'active' : (s.status || all[exIdx].status) };
-        } else {
-          all.push(s);
-        }
-      }
-    } catch (e) {}
-
-    if (qId) {
-      let found = all.find(x => {
-        const xId = String(x.id || '').trim();
-        const xClean = xId.replace(/^dep_/, '');
-        return xId === String(qId) || xId === cleanQId || xId === depQId || xClean === cleanQId;
-      });
-      if (!found && (qEmail || String(qId).includes('@'))) {
-        const targetEm = (qEmail || String(qId).replace(/^dep_/, '')).toLowerCase().trim();
-        found = all.find(x => (x.user_email || x.email || x.user_id || '').toLowerCase().trim() === targetEm && (x.status === 'active' || x.status === 'approved'))
-             || all.find(x => (x.user_email || x.email || x.user_id || '').toLowerCase().trim() === targetEm);
-      }
-      if (!found && cleanQId) {
-        found = all.find(x => (x.tx_id && String(x.tx_id).toLowerCase() === cleanQId.toLowerCase()) || (x.payment_reference && String(x.payment_reference).toLowerCase() === cleanQId.toLowerCase()));
-      }
-      if (!found && cleanQId) {
-        found = all.find(x => {
-          const xId = String(x.id || '').toLowerCase();
-          return (xId.length > 4 && cleanQId.includes(xId)) || (cleanQId.length > 4 && xId.includes(cleanQId));
-        });
-      }
-      // Check if user is active in persistent investors
-      try {
-        const { loadPersistentInvestors } = await import('./admin.js');
-        const pInvs = loadPersistentInvestors();
-        const pEmail = (found && (found.user_email || found.email || found.user_id)) || qEmail || (String(qId).includes('@') ? String(qId).replace(/^dep_/, '') : '');
-        if (pEmail) {
-          const matchP = pInvs.find(u => (u.email || '').toLowerCase().trim() === pEmail.toLowerCase().trim());
-          if (matchP && (matchP.onboarding_status === 'active' || matchP.onboarding_status === 'approved' || matchP.onboarding_status === 'verified')) {
-            userAdminApproved = true;
-          }
-        }
-      } catch (eP) {}
-
-      if (!found && qEmail) {
-        found = all.find(x => (x.user_email || x.email || '').toLowerCase().trim() === qEmail);
-      }
-
-      if (!found) {
-        return res.status(200).json({
-          id: String(qId || 'dep_none'),
-          status: userAdminApproved ? 'active' : 'none',
-          total: 0,
-          totalCurrentValue: 0,
-          bonus: 0,
-          planName: 'Explorer'
-        });
-      }
-
-      const isApproved = userAdminApproved || found.status === 'active' || found.status === 'approved' || found.status === 'completed';
-      const tot = Number(found.total != null ? found.total : (found.amount != null ? found.amount : 0));
-      let curVal = Number(found.totalCurrentValue || found.total_current_value || tot);
-      if (curVal === 0 && tot > 0) curVal = tot;
-      const bonusMatch = Number(bonusByInvestment[String(found.id)] || found.bonus || found.bonus_balance || 0);
-
-      return res.status(200).json({
-        ...found,
-        status: isApproved ? 'active' : (found.status || 'pending_approval'),
-        portfolio: Array.isArray(found.portfolio) && found.portfolio.length > 0
-          ? found.portfolio
-          : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot }],
-        planName: found.planName || found.plan_name || found.plan_label || 'Explorer',
-        txId: found.txId || found.tx_id || ('TX' + Date.now().toString(36).toUpperCase()),
-        canWithdraw: isApproved,
-        total: tot,
-        totalCurrentValue: curVal,
-        total_current_value: curVal,
-        bonus: bonusMatch,
-        earnings: {
-          tsla: curVal,
-          ...(typeof found.earnings === 'object' && found.earnings ? found.earnings : {})
-        }
-      });
-    }
-
-    if (qEmail) {
-      all = all.filter(x => (x.user_email || x.email || '').toLowerCase() === qEmail);
-    }
-
-    all = all.map(item => {
-      const st = (item.status || 'active').toLowerCase();
-      const tot = Number(item.total != null ? item.total : (item.amount != null ? item.amount : 0));
-      let curVal = Number(item.totalCurrentValue || item.total_current_value || tot);
-      if (curVal === 0 && tot > 0) curVal = tot;
-      return {
-        ...item,
-        status: (st === 'approved' || st === 'completed' || !st) ? 'active' : st,
-        portfolio: Array.isArray(item.portfolio) && item.portfolio.length > 0
-          ? item.portfolio
-          : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot }],
-        planName: item.planName || item.plan_name || item.plan_label || 'Pioneer',
-        canWithdraw: st === 'active' || st === 'approved' || st === 'completed',
-        total: tot,
-        totalCurrentValue: curVal,
-        total_current_value: curVal,
-        bonus: Number(bonusByInvestment[String(item.id)] || item.bonus || item.bonus_balance || 0),
-        earnings: {
-          tsla: curVal,
-          ...(typeof item.earnings === 'object' && item.earnings ? item.earnings : {})
-        }
+      const formatInvestment = (item) => {
+        const rawStatus = String(item.status || 'pending_approval').toLowerCase();
+        const isApproved = ['active', 'approved', 'completed'].includes(rawStatus);
+        const total = Number(item.total != null ? item.total : (item.amount != null ? item.amount : 0));
+        let currentValue = Number(item.total_current_value != null ? item.total_current_value : (item.totalCurrentValue != null ? item.totalCurrentValue : total));
+        if (!Number.isFinite(currentValue) || currentValue < 0) currentValue = total;
+        if (currentValue === 0 && total > 0 && isApproved) currentValue = total;
+        const bonus = Number(bonusByInvestment[String(item.id)] || 0);
+        return {
+          ...item,
+          status: isApproved ? 'active' : rawStatus,
+          portfolio: Array.isArray(item.portfolio) && item.portfolio.length > 0
+            ? item.portfolio
+            : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: total }],
+          planName: item.planName || item.plan_name || item.plan_label || 'Explorer',
+          txId: item.txId || item.tx_id || '',
+          canWithdraw: isApproved,
+          total,
+          totalCurrentValue: currentValue,
+          total_current_value: currentValue,
+          bonus,
+          earnings: typeof item.earnings === 'object' && item.earnings
+            ? item.earnings
+            : { tsla: currentValue }
+        };
       };
-    });
 
-    return res.status(200).json(all);
+      if (qId) {
+        if (!rows.length) {
+          return res.status(404).json({
+            id: String(qId),
+            status: 'none',
+            total: 0,
+            totalCurrentValue: 0,
+            bonus: 0,
+            canWithdraw: false
+          });
+        }
+        return res.status(200).json(formatInvestment(rows[0]));
+      }
+
+      return res.status(200).json(rows.map(formatInvestment));
+    } catch (error) {
+      if (conn) {
+        try { await conn.end(); } catch (closeError) {}
+      }
+      console.error('[investments] authoritative MySQL lookup failed:', error.message);
+      return res.status(503).json({
+        success: false,
+        error: 'Investment status is temporarily unavailable. Cached or mock records were not used.'
+      });
+    }
   }
 
   try {
@@ -513,6 +414,10 @@ export default async function handler(req, res) {
       dbSaved = true;
     } catch (dbErr) {
       console.warn('DB payment submit notice (persisting to disk & memory):', dbErr.message);
+    }
+
+    if (!dbSaved) {
+      return res.status(503).json({ success: false, error: 'Payment receipt could not be saved to the investor database. Please retry; no pending or approved balance was created.' });
     }
 
     const depositRecord = {
