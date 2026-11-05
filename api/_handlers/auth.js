@@ -19,9 +19,6 @@ function parseJsonBody(req) {
   });
 }
 
-// In-memory fallback credentials store when DB is offline or in development
-const inMemoryCredentials = new Map();
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -93,20 +90,11 @@ export default async function handler(req, res) {
       await conn.end();
 
     } catch (e) {
-      // Memory fallback check
-      credential = inMemoryCredentials.get(email);
-      if (!credential) {
-        try {
-          const { mockStore } = await import('./admin.js');
-          const mockUser = mockStore.investors.find(u => u.email.toLowerCase() === email);
-          if (mockUser) {
-            investorName = mockUser.name;
-          }
-        } catch (errM) {}
-      }
-      if (!credential) {
-        return res.status(401).json({ success: false, message: 'Invalid email or password. Please register or check credentials.' });
-      }
+      console.error('[auth login] database lookup failed:', e.message);
+      return res.status(503).json({
+        success: false,
+        message: 'Login is temporarily unavailable because the account database could not be reached. Please try again.'
+      });
     }
 
     // Verify password hash
@@ -158,12 +146,11 @@ export default async function handler(req, res) {
     } catch (e) { return res.status(401).json({ success: false, message: 'Verification token invalid or expired.' }); }
 
     const hash = bcryptjs.hashSync(password, 10);
-    inMemoryCredentials.set(email, { email, password_hash: hash });
-
     let userName = 'Investor';
+    let conn = null;
 
     try {
-      const conn = await getDbConnection();
+      conn = await getDbConnection();
 
       // Ensure investor_credentials table exists
       await conn.query(`
@@ -190,8 +177,16 @@ export default async function handler(req, res) {
       if (acc.length > 0 && acc[0].name) userName = acc[0].name;
 
       await conn.end();
+      conn = null;
     } catch (e) {
-      console.warn('Set-password DB warning, stored in memory:', e.message);
+      console.error('[auth set-password] durable credential save failed:', e.message);
+      if (conn) {
+        try { await conn.end(); } catch (closeError) {}
+      }
+      return res.status(503).json({
+        success: false,
+        message: 'Your password could not be saved to the account database. Please retry; your account has not been activated for sign-in.'
+      });
     }
 
     return res.status(200).json({
@@ -276,23 +271,11 @@ export default async function handler(req, res) {
           : persistedOnboarding;
       await conn.end();
     } catch (e) {
-      try {
-        const { mockStore } = await import('./admin.js');
-        const found = mockStore.investors.find(u => u.email.toLowerCase() === email);
-        if (found) {
-          found.name = name;
-          found.onboarding_status = found.onboarding_status || 'pending_approval';
-        } else {
-          mockStore.investors.unshift({
-            id: Date.now(),
-            name,
-            email,
-            phone: '—',
-            onboarding_status: 'pending_approval',
-            registered_at: new Date().toISOString()
-          });
-        }
-      } catch (e2) {}
+      console.error('[auth social-session] database lookup failed:', e.message);
+      return res.status(503).json({
+        success: false,
+        message: 'Social sign-in is temporarily unavailable because the account database could not be reached. Please retry.'
+      });
     }
 
     return res.status(200).json({
