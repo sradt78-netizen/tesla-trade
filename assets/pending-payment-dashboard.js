@@ -343,6 +343,7 @@
       showLockedScreen();
     }
 
+    serverApproved = false;
     fetch('/api/account-status?email=' + encodeURIComponent(current.email), {
       credentials: 'same-origin',
       cache: 'no-store'
