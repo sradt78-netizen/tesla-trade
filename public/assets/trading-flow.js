@@ -432,9 +432,7 @@
     var html =
       '<div class="ttinc-trade-top">' +
         '<div>' +
-          '<div class="ttinc-trade-kicker"><span class="glow-dot"></span> Demo Trading Engine</div>' +
-          '<div class="ttinc-trade-title">Simulated Trading (Demo)</div>' +
-          '<p class="ttinc-trade-copy">Paper-trading simulation only. Admin-configured profit/loss rates and phase intervals drive the demo balance; this is not a live market execution feed.</p>' +
+          '<p class="ttinc-trade-copy">Paper-trading simulation only. Balances are simulated and are not live market executions.</p>' +
         '</div>' +
         '<div class="ttinc-trade-balance">' +
           '<span style="color:#d4af37;font-weight:700;">Available Wallet</span>' +
