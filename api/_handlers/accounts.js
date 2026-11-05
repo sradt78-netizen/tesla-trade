@@ -260,16 +260,23 @@ export default async function handler(req, res) {
       if (Array.isArray(txs) && txs.length > 0) results = txs;
     } catch (e) {}
 
-    // Fallback: check persistent json db if empty
-    if (results.length === 0) {
-      try {
-        const { loadDatabaseSync } = await import('../db.js');
-        const db = loadDatabaseSync();
-        if (db && Array.isArray(db.account_transactions)) {
-          results = db.account_transactions.filter(t => (t.user_email || '').toLowerCase().trim() === email);
+    // Merge persistent transactions as a fallback source even when MySQL returned
+    // some rows. Previously, one MySQL row suppressed all JSON-backed history.
+    try {
+      const { loadDatabaseSync } = await import('../db.js');
+      const db = loadDatabaseSync();
+      if (db && Array.isArray(db.account_transactions)) {
+        const fallbackRows = db.account_transactions.filter(t => (t.user_email || '').toLowerCase().trim() === email);
+        const seen = new Set(results.map(t => String(t.id || t.reference_id || '')));
+        for (const tx of fallbackRows) {
+          const key = String(tx.id || tx.reference_id || '');
+          if (!key || !seen.has(key)) {
+            results.push(tx);
+            if (key) seen.add(key);
+          }
         }
-      } catch (e2) {}
-    }
+      }
+    } catch (e2) {}
 
     try {
       const { loadPersistentDeposits } = await import('./payment-submit.js');
