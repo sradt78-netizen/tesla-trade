@@ -1192,18 +1192,6 @@ export default async function handler(req, res) {
         mockStore.investments.unshift(freshDep);
       }
 
-      // Also ensure all deposits for this email in inMemoryDeposits and saved_deposits are marked active
-      if (effectiveEmail && status === 'active') {
-        for (const mem of inMemoryDeposits) {
-          const mEmail = String(mem.user_email || mem.email || mem.user_id || '').toLowerCase().trim();
-          if (mEmail === effectiveEmail) {
-            mem.status = 'active';
-            mem.total_current_value = totalBalanceWithBonus;
-            mem.totalCurrentValue = totalBalanceWithBonus;
-          }
-        }
-      }
-
       // 4. Update investor account status in mockStore and persistent disk storage
       if (effectiveEmail && status === 'active') {
         savePersistentInvestor({
