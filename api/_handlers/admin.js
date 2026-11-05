@@ -1156,7 +1156,7 @@ export default async function handler(req, res) {
         ].filter(Boolean))];
         const marks = ids.map(() => '?').join(',');
         const [dbRows] = await conn.query(
-          'SELECT * FROM investments WHERE id IN (' + marks + ') LIMIT 1',
+          "SELECT * FROM investments WHERE id IN (" + marks + ") AND status IN ('pending','pending_approval','awaiting_payment') LIMIT 1",
           ids
         );
         authoritativeDeposit = dbRows[0] || null;
