@@ -45,6 +45,7 @@ export default async function handler(req, res) {
 
     let credential = null;
     let investorName = '';
+    let investmentStatus = 'none';
 
     try {
       const conn = await getDbConnection();
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
         [email]
       );
       const states = investments.map(row => String(row.status || '').toLowerCase());
-      const investmentStatus = states.some(s => ['active','approved','completed'].includes(s))
+      investmentStatus = states.some(s => ['active','approved','completed'].includes(s))
         ? 'active'
         : states.some(s => ['pending','pending_approval'].includes(s))
           ? 'pending_approval'
