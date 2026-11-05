@@ -178,7 +178,7 @@ export default async function handler(req, res) {
   const parsedUrl = new URL(req.url || '/', 'http://localhost');
   if (req.method === 'GET') {
     const qEmail = cleanString(req.query?.email || parsedUrl.searchParams.get('email')).toLowerCase();
-    const idMatch = parsedUrl.pathname.match(/\\/api\\/investments\\/([^/?]+)/);
+    const idMatch = parsedUrl.pathname.match(/\/api\/investments\/([^/?]+)/);
     const qId = idMatch ? decodeURIComponent(idMatch[1]) : (req.params?.id || parsedUrl.searchParams.get('id'));
     const cleanQId = qId ? String(qId).replace(/^dep_/, '').trim() : '';
     const depQId = cleanQId ? ('dep_' + cleanQId) : '';
