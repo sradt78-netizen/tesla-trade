@@ -125,7 +125,7 @@ export async function sendTelegramMessage(htmlContent, customConfig = null) {
  * Accepts a data URI generated from the uploaded receipt; never exposes it publicly.
  */
 export async function sendTelegramPhoto(photoDataUri, caption, fileName = 'deposit-receipt.jpg') {
-  const config = getTelegramConfig();
+  const config = await getTelegramConfig();
   if (!config.botToken || !config.chatId) {
     return { ok: false, error: 'Telegram Bot Token or Chat ID not configured' };
   }
@@ -181,7 +181,7 @@ export async function notifySignup(investor = {}) {
   const name = investor.name || 'Investor';
   const email = investor.email || 'unknown@teslawealths.org';
   const phone = investor.phone || 'Not provided';
-  const ip = investor.ip || '127.0.0.1';
+  const ip = investor.ip || '';
   const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
 
   const message = `
@@ -190,8 +190,7 @@ export async function notifySignup(investor = {}) {
 👤 <b>Name:</b> ${escapeHtml(name)}
 📧 <b>Email:</b> <code>${escapeHtml(email)}</code>
 📱 <b>Phone:</b> <code>${escapeHtml(phone)}</code>
-🌐 <b>IP Address:</b> <code>${escapeHtml(ip)}</code>
-⏰ <b>Time (UTC):</b> ${now}
+${ip ? '🌐 <b>IP Address:</b> <code>' + escapeHtml(ip) + '</code>\\n' : ''}⏰ <b>Time (UTC):</b> ${now}
 
 🔗 <a href="https://teslawealths.org/admin">Open Admin Portal</a>
 `.trim();
@@ -233,7 +232,10 @@ export async function notifyPaymentSubmission(deposit = {}) {
 
   if (deposit.payment_proof_path && String(deposit.payment_proof_path).startsWith('data:image/')) {
     const caption = `💰 <b>DEPOSIT RECEIPT SUBMITTED</b>\n👤 ${escapeHtml(name)} — <code>${escapeHtml(email)}</code>\n💵 <b>${amount} USD</b> · ${escapeHtml(plan)}\n💳 ${escapeHtml(method)} · Ref: <code>${escapeHtml(ref)}</code>\n⚠️ Pending admin review\n<a href="https://teslawealths.org/admin">Open Admin Dashboard</a>`;
-    return sendTelegramPhoto(deposit.payment_proof_path, caption, proofFile);
+    const photoResult = await sendTelegramPhoto(deposit.payment_proof_path, caption, proofFile);
+    if (photoResult.ok) return photoResult;
+    console.warn('[Telegram Bot] Receipt image delivery failed; sending text alert:', photoResult.error);
+    return sendTelegramMessage(message);
   }
   return sendTelegramMessage(message);
 }
@@ -280,7 +282,6 @@ export async function notifyLinkClick(click = {}) {
 
   const source = click.campaign_source || click.source || 'direct';
   const landing = click.landing_page || '/';
-  const ip = click.ip_address || click.ip || '—';
   const device = click.device_type || 'desktop';
   const referrer = click.referrer || 'Direct / None';
 
@@ -290,7 +291,6 @@ export async function notifyLinkClick(click = {}) {
 📢 <b>Source:</b> <code>${escapeHtml(source)}</code>
 📱 <b>Device:</b> ${escapeHtml(device)}
 📍 <b>Landing Page:</b> <code>${escapeHtml(landing)}</code>
-🌐 <b>IP Address:</b> <code>${escapeHtml(ip)}</code>
 🔎 <b>Referrer:</b> <code>${escapeHtml(referrer)}</code>
 `.trim();
 
