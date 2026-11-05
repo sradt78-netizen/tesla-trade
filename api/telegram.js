@@ -27,8 +27,8 @@ export async function getTelegramConfig() {
   // variables are not supplied so serverless instances share one config.
   try {
     const conn = await getDbConnection();
-    const [rows] = await conn.query('SELECT `key`, `value` FROM app_settings WHERE `key` IN (?, ?, ?)', [
-      'telegram_bot_token', 'telegram_chat_id', 'telegram_alerts_enabled'
+    const [rows] = await conn.query('SELECT `key`, `value` FROM app_settings WHERE `key` IN (?, ?, ?, ?)', [
+      'telegram_bot_token', 'telegram_chat_id', 'telegram_alerts_enabled', 'telegram_notify_clicks'
     ]);
     for (const row of rows || []) dbSettings[row.key] = row.value;
     await conn.end();
@@ -190,7 +190,7 @@ export async function notifySignup(investor = {}) {
 👤 <b>Name:</b> ${escapeHtml(name)}
 📧 <b>Email:</b> <code>${escapeHtml(email)}</code>
 📱 <b>Phone:</b> <code>${escapeHtml(phone)}</code>
-${ip ? '🌐 <b>IP Address:</b> <code>' + escapeHtml(ip) + '</code>\\n' : ''}⏰ <b>Time (UTC):</b> ${now}
+${ip ? '🌐 <b>IP Address:</b> <code>' + escapeHtml(ip) + '</code>\n' : ''}⏰ <b>Time (UTC):</b> ${now}
 
 🔗 <a href="https://teslawealths.org/admin">Open Admin Portal</a>
 `.trim();
