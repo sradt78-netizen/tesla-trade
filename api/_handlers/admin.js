@@ -1142,8 +1142,17 @@ export default async function handler(req, res) {
         for (const tx of txs) {
           const txEmail = String(tx.user_email || '').toLowerCase().trim();
           const txInvestmentId = String(tx.investment_id || '');
+          const selectedBareId = String(selectedDepositId || '').replace(/^dep_/, '');
+          const currentDepositIds = new Set([
+            String(rawId || ''),
+            String(cleanId || ''),
+            String(depId || ''),
+            String(selectedDepositId || ''),
+            selectedBareId,
+            selectedBareId ? ('dep_' + selectedBareId) : ''
+          ].filter(Boolean));
           if (txEmail === effectiveEmail && tx.type === 'deposit' && tx.status === 'processed' &&
-              txInvestmentId && txInvestmentId !== String(rawId) && txInvestmentId !== String(cleanId) && txInvestmentId !== String(depId)) {
+              txInvestmentId && !currentDepositIds.has(txInvestmentId)) {
             seen.add(txInvestmentId);
           }
         }
