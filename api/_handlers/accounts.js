@@ -55,6 +55,7 @@ export default async function handler(req, res) {
     let investorName = 'Investor';
     let userInvestments = [];
     let dbRead = false; // true once the database answered; its rows are authoritative
+    let bonusBalance = 0;
 
     let userAdminApproved = false;
 
@@ -79,6 +80,11 @@ export default async function handler(req, res) {
           investorName = invRows[0].user_name;
         }
       }
+      const [bonusRows] = await conn.query(
+        "SELECT COALESCE(SUM(amount), 0) AS bonus FROM account_transactions WHERE LOWER(user_email)=? AND type='bonus' AND status='processed'",
+        [email]
+      );
+      bonusBalance = Number(bonusRows[0]?.bonus || 0);
       dbRead = true;
       await conn.end();
     } catch (dbErr) {}
@@ -233,7 +239,7 @@ export default async function handler(req, res) {
       total: activeTotal,
       totalCurrentValue: activeVal,
       total_current_value: activeVal,
-      bonus: 0,
+      bonus: bonusBalance,
       pendingDepositTotal: status === 'active' ? 0 : pendingDepositTotal,
       pendingPayments: status === 'active' ? [] : pendingPayments,
       investments: formattedInvestments
