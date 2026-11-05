@@ -1106,8 +1106,10 @@ export default async function handler(req, res) {
       if (!approvedDepositAmount && body.amount) approvedDepositAmount = parseFloat(body.amount);
       if (!approvedDepositAmount) approvedDepositAmount = (foundDeposit && parseFloat(foundDeposit.total)) || 0;
       const totalBalanceReal = approvedDepositAmount;
-      const bonusMatch = 0;
-      const totalBalanceWithBonus = totalBalanceReal;
+      // Apply the advertised 100% deposit-match bonus to approved deposits.
+      // Keep principal in `total`; the match is reflected in current wallet value.
+      const bonusMatch = status === 'active' && approvedDepositAmount > 0 ? Number(approvedDepositAmount.toFixed(2)) : 0;
+      const totalBalanceWithBonus = Number((totalBalanceReal + bonusMatch).toFixed(2));
 
       // If no deposit was found on disk or memory yet, create an approved record now
       const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || 'investor@teslawealths.org';
