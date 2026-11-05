@@ -4,7 +4,7 @@ import path from 'path';
 import { getDbConnection } from './dbcheck.js';
 import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
 import { sendPaymentApprovedEmail, sendPaymentDeclinedEmail } from '../mailer.js';
-import { notifyPaymentStatusUpdate } from '../telegram.js';
+import { notifyPaymentStatusUpdate, testTelegramConnection } from '../telegram.js';
 
 const INVESTORS_FILE = path.join(process.cwd(), 'data', 'saved_investors.json');
 
@@ -1526,6 +1526,11 @@ export default async function handler(req, res) {
       }
       mockStore.codes.unshift({ id: Date.now(), code: customCode, status: 'active', source: 'admin', created_at: new Date().toISOString() });
       return res.status(200).json({ success: true, created: customCode, codes: mockStore.codes });
+    }
+
+    if (action === 'test_telegram') {
+      const result = await testTelegramConnection(cleanString(body.bot_token), cleanString(body.chat_id));
+      return res.status(result.success ? 200 : 400).json(result);
     }
 
     // ── 10. SETTINGS SAVE ──────────────────────────────────────────
