@@ -40,8 +40,9 @@
           return res.clone().json().then(function (data) {
             if (data && typeof data === 'object' && !Array.isArray(data)) {
               var modified = false;
-              var isUserPending = (data.status === 'pending_approval' || data.status === 'pending' || localStorage.getItem('ttinc_deposit_status') === 'pending_approval');
-              var isUserApproved = !isUserPending && (data.status === 'approved' || data.status === 'verified' || data.status === 'active');
+              var serverStatus = String(data.status || data.investmentStatus || '').toLowerCase();
+              var isUserPending = (serverStatus === 'pending_approval' || serverStatus === 'pending');
+              var isUserApproved = (serverStatus === 'approved' || serverStatus === 'verified' || serverStatus === 'active');
               if (isUserApproved) {
                 data.status = 'active';
                 data.canWithdraw = true;
@@ -65,7 +66,8 @@
               var c = Number(data.totalCurrentValue != null ? data.totalCurrentValue : (data.total_current_value != null ? data.total_current_value : p));
               data.totalCurrentValue = c;
               data.total_current_value = c;
-              data.bonus = 0;
+              // Preserve the backend's bonus value; do not overwrite it with a fabricated zero.
+              if (data.bonus == null && data.welcomeBonus != null) data.bonus = Number(data.welcomeBonus);
               modified = true;
 
               if (!Array.isArray(data.portfolio) || data.portfolio.length === 0) {
@@ -294,7 +296,8 @@
         oldMeta.id = investmentId || oldMeta.id || 'sim_inv_1';
         oldMeta.total = principal;
         oldMeta.totalCurrentValue = current;
-        oldMeta.bonus = 0;
+        if (investment.bonus != null) oldMeta.bonus = Number(investment.bonus);
+        else if (investment.welcomeBonus != null) oldMeta.bonus = Number(investment.welcomeBonus);
         if (investment.status === 'active' || investment.status === 'approved' || localStorage.getItem('ttinc_account_approved') === 'true') {
           oldMeta.status = 'active';
         }
