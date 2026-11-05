@@ -598,7 +598,7 @@ if ($uri === '/account-status' && $method === 'GET') {
     require_investor_session($email);
 
     $db = get_db();
-    $stAccount = $db->prepare('SELECT email, name, created_at FROM investor_accounts WHERE email=? LIMIT 1');
+    $stAccount = $db->prepare('SELECT email, name, phone, age, created_at FROM investor_accounts WHERE LOWER(email)=? LIMIT 1');
     $stAccount->execute([$email]);
     $account = $stAccount->fetch();
 
@@ -617,6 +617,8 @@ if ($uri === '/account-status' && $method === 'GET') {
         $account = [
             'email' => $email,
             'name' => $investments[0]['user_name'] ?? $email,
+            'phone' => '',
+            'age' => 0,
             'created_at' => $investments[0]['created_at'] ?? null,
         ];
     }
@@ -672,6 +674,8 @@ if ($uri === '/account-status' && $method === 'GET') {
     json_out([
         'account' => (bool)$account,
         'name' => $account['name'] ?? $email,
+        'phone' => $account['phone'] ?? '',
+        'age' => (int)($account['age'] ?? 0),
         'walletBalance' => $walletBalance,
         'welcomeBonus' => $walletBalance >= 100 ? 100.00 : 0.00,
         'investmentStatus' => $status,
