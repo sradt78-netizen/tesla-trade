@@ -7646,11 +7646,6 @@
           var eth    = ps.eth    || {};
           var btc    = ps.btc    || {};
           var bank   = ps.bank   || {};
-          var venmo  = ps.venmo  || {};
-          var cashapp = ps.cashapp || {};
-          var paypal = ps.paypal || {};
-          var alipay = ps.alipay || {};
-          var wechat = ps.wechat || {};
 
           addMethod('🪙', (usdt.label || 'USDT') + ' · ' + (usdt.network || 'TRC-20'),
                     usdt.address, usdt.address,
@@ -7673,11 +7668,6 @@
           }
           addMethod('🏦', bank.label || 'Bank Transfer', bankDetail, bank.account,
                     'Sample details — update in Admin');
-          addMethod('📱', venmo.label  || 'Venmo',      venmo.handle,   venmo.handle,  '@sample-venmo-update-in-admin');
-          addMethod('💵', cashapp.label || 'Cash App',  cashapp.handle, cashapp.handle, '$sampleCashApp-update-in-admin');
-          addMethod('🅿️', paypal.label || 'PayPal',     paypal.handle,  paypal.handle, 'sample-paypal@update-in-admin.example');
-          addMethod('🔷', alipay.label || 'Alipay',     alipay.account, alipay.account, 'sample-alipay-update-in-admin');
-          addMethod('💬', wechat.label || 'WeChat Pay', wechat.account, wechat.account, 'sample-wechat-update-in-admin');
         });
       }
 
@@ -8542,11 +8532,6 @@
           { label: (ps.eth || {}).label || 'Ethereum (ETH)', value: (ps.eth || {}).address },
           { label: (ps.btc || {}).label || 'Bitcoin (BTC)', value: (ps.btc || {}).address },
           { label: (ps.bank || {}).label || 'Bank Transfer', value: buildBankStr(ps.bank || {}) },
-          { label: (ps.venmo || {}).label || 'Venmo', value: (ps.venmo || {}).handle },
-          { label: (ps.cashapp || {}).label || 'Cash App', value: (ps.cashapp || {}).handle },
-          { label: (ps.paypal || {}).label || 'PayPal', value: (ps.paypal || {}).handle },
-          { label: (ps.alipay || {}).label || 'Alipay', value: (ps.alipay || {}).account },
-          { label: (ps.wechat || {}).label || 'WeChat Pay', value: (ps.wechat || {}).account }
         ];
         paymentContainer.innerHTML = methods.map(function (method) {
           return '<div style="display:flex;align-items:flex-start;gap:10px;background:#1a1a1a;border:1px solid #242424;border-radius:10px;padding:10px 12px;margin-bottom:7px;">'
@@ -8661,7 +8646,7 @@
            + '<div id="ts-payment-options-wrap" style="margin-top:12px;">'
              + '<label for="ts-payment-method" style="display:block;color:#888;font-size:11px!important;margin-bottom:6px;">Payment method</label>'
              + '<select id="ts-payment-method" style="width:100%;box-sizing:border-box;background:#151515;border:1px solid #2a2a2a;border-radius:9px;color:#fff;padding:11px 12px;font-size:13px!important;">'
-               + '<option value="usdt">USDT (TRC-20)</option><option value="bank">Bank transfer</option><option value="btc">Bitcoin</option><option value="eth">Ethereum</option><option value="paypal">PayPal</option>'
+               + '<option value="usdt">USDT (TRC-20)</option><option value="bank">Bank transfer</option><option value="btc">Bitcoin</option><option value="eth">Ethereum</option>'
              + '</select>'
            + '</div>'
            /* Payment methods (populated async) */
@@ -8704,11 +8689,6 @@
            { icon: '⬡',  label: (ps.eth   ? ps.eth.label   : null) || 'Ethereum (ETH)',   val: (ps.eth   || {}).address, fallback: 'Sample details — update in Admin' },
            { icon: '₿',  label: (ps.btc   ? ps.btc.label   : null) || 'Bitcoin (BTC)',    val: (ps.btc   || {}).address, fallback: 'Sample details — update in Admin' },
           { icon: '🏦', label: (ps.bank  ? ps.bank.label  : null) || 'Bank Transfer',   val: buildBankStr(ps.bank  || {}), fallback: 'Sample details — update in Admin' },
-           { icon: '📱', label: (ps.venmo ? ps.venmo.label : null) || 'Venmo',           val: (ps.venmo  || {}).handle, fallback: 'Sample details — update in Admin' },
-           { icon: '💵', label: (ps.cashapp ? ps.cashapp.label : null) || 'Cash App',    val: (ps.cashapp || {}).handle, fallback: 'Sample details — update in Admin' },
-           { icon: '🅿️', label: (ps.paypal? ps.paypal.label: null) || 'PayPal',          val: (ps.paypal || {}).handle, fallback: 'Sample details — update in Admin' },
-           { icon: '🔷', label: (ps.alipay? ps.alipay.label: null) || 'Alipay',          val: (ps.alipay || {}).account, fallback: 'Sample details — update in Admin' },
-           { icon: '💬', label: (ps.wechat? ps.wechat.label: null) || 'WeChat Pay',      val: (ps.wechat || {}).account, fallback: 'Sample details — update in Admin' },
         ];
 
         container.innerHTML = '';
@@ -9606,11 +9586,6 @@
         { key: 'eth', label: 'Ethereum (ETH)' },
         { key: 'btc', label: 'Bitcoin (BTC)' },
         { key: 'bank', label: 'Bank Transfer' },
-        { key: 'venmo', label: 'Venmo' },
-        { key: 'cashapp', label: 'Cash App' },
-        { key: 'paypal', label: 'PayPal' },
-        { key: 'alipay', label: 'Alipay' },
-        { key: 'wechat', label: 'WeChat Pay' }
       ];
       var PLAN_OV_ID = 'ttinc-investment-plan-flow';
 
@@ -9746,7 +9721,7 @@
           + '<div style="background:#171305;border:1px solid #4a3c0d;border-radius:12px;'
           + 'padding:12px 14px;color:#b7a96c;font-size:11px;line-height:1.6;margin-bottom:18px;">'
           + 'Projected returns are estimates for the selected plan and are not guaranteed. '
-          + 'All payment methods already available on this website remain unchanged.</div>'
+          + 'Payments are accepted through cryptocurrency or bank transfer only.</div>'
           + cards;
 
         document.body.appendChild(section);
@@ -10156,11 +10131,6 @@
           eth: { address: 'SAMPLE-ETH-ADDRESS-UPDATE-IN-ADMIN' },
           btc: { address: 'SAMPLE-BTC-ADDRESS-UPDATE-IN-ADMIN' },
           bank: { name: 'Sample Bank (Replace in Admin)', account: '0000000000', routing: '000000000', swift: 'SAMPLEXXX' },
-          venmo: { handle: '@sample-venmo-update-in-admin' },
-          cashapp: { handle: '$sampleCashApp-update-in-admin' },
-          paypal: { handle: 'sample-paypal@update-in-admin.example' },
-          alipay: { account: 'sample-alipay-update-in-admin' },
-          wechat: { account: 'sample-wechat-update-in-admin' }
         };
         methods.innerHTML =
           '<div style="background:#111;border:1px solid #252525;border-radius:16px;padding:18px;">' +
@@ -10212,11 +10182,6 @@
                   ].filter(Boolean).join(' · ')
                   : ''
               ), 'Bank details'],
-              ['Venmo', settings.venmo && settings.venmo.handle, 'Handle'],
-              ['Cash App', settings.cashapp && settings.cashapp.handle, 'Handle'],
-              ['PayPal', settings.paypal && settings.paypal.handle, 'Handle'],
-              ['Alipay', settings.alipay && settings.alipay.account, 'Account'],
-              ['WeChat Pay', settings.wechat && settings.wechat.account, 'Account']
             ];
             list.innerHTML = rows.map(function (row) {
               var value = row[1] || 'Not configured — contact support';
