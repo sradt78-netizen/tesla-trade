@@ -1044,7 +1044,7 @@ export default async function handler(req, res) {
         const dCleanId = dId.replace(/^dep_/, '').trim();
         const dEmail = String(d.user_email || d.email || d.user_id || d.userId || '').toLowerCase().trim();
         if (rawId && (dId === String(rawId) || dId === cleanId || dId === depId || dCleanId === cleanId)) return true;
-        if (targetEmail && dEmail === targetEmail) return true;
+        if (!rawId && targetEmail && dEmail === targetEmail) return true;
         return false;
       };
 
@@ -1232,7 +1232,7 @@ export default async function handler(req, res) {
           for (const inv of db.investments) {
             const iEmail = String(inv.user_email || inv.email || '').toLowerCase().trim();
             const iId = String(inv.id || '').trim();
-            if (iId === String(rawId) || iId === cleanId || iId === depId || (effectiveEmail && iEmail === effectiveEmail)) {
+            if (iId === String(rawId) || iId === cleanId || iId === depId || (!rawId && effectiveEmail && iEmail === effectiveEmail)) {
               inv.status = status;
               if (status === 'active') {
                 inv.total = approvedDepositAmount || inv.total || 0;
@@ -1305,8 +1305,8 @@ export default async function handler(req, res) {
           [result] = await conn.query(
             `UPDATE investments 
              SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
-             WHERE id=? OR id=? OR id=? OR (LOWER(user_email)=? AND (status="pending_approval" OR status="pending"))`,
-            [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, rawId, cleanId, depId, effectiveEmail]
+             WHERE id=? OR id=? OR id=? OR (? = "" AND LOWER(user_email)=? AND (status="pending_approval" OR status="pending"))`,
+            [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, rawId, cleanId, depId, rawId, effectiveEmail]
           );
 
           if ((!result || !result.affectedRows) && effectiveEmail) {
