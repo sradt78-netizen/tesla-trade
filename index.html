@@ -1876,6 +1876,14 @@
                       return data;
                     });
                   }).then(function (data) {
+                    [
+                      'ttinc_investment_id',
+                      'ttinc_inv_meta',
+                      'ttinc_account_approved',
+                      'ttinc_account_approved_email',
+                      'ttinc_deposit_status',
+                      'ttinc_payment_status'
+                    ].forEach(function (key) { localStorage.removeItem(key); });
                     localStorage.setItem('ttinc_auth', JSON.stringify({
                       email: data.email || user.email,
                       name: data.name || supabaseUserLabel(user),
@@ -2164,6 +2172,14 @@
                 return data;
               });
             }).then(function () {
+              [
+                'ttinc_investment_id',
+                'ttinc_inv_meta',
+                'ttinc_account_approved',
+                'ttinc_account_approved_email',
+                'ttinc_deposit_status',
+                'ttinc_payment_status'
+              ].forEach(function (key) { localStorage.removeItem(key); });
               localStorage.setItem('ttinc_auth', JSON.stringify({
                 email: email,
                 name: name,
