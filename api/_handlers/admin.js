@@ -1103,8 +1103,15 @@ export default async function handler(req, res) {
         }
       }
 
-      if (!approvedDepositAmount && body.amount) approvedDepositAmount = parseFloat(body.amount);
+      if (!approvedDepositAmount && body.amount != null) approvedDepositAmount = parseFloat(body.amount);
       if (!approvedDepositAmount) approvedDepositAmount = (foundDeposit && parseFloat(foundDeposit.total)) || 0;
+      const effectiveEmail = String(targetEmail || (foundDeposit && (foundDeposit.user_email || foundDeposit.email || foundDeposit.user_id)) || '').toLowerCase().trim();
+      if (status === 'active' && !effectiveEmail) {
+        return res.status(400).json({ success: false, error: 'Investor email is required to approve a deposit.' });
+      }
+      if (status === 'active' && (!Number.isFinite(approvedDepositAmount) || approvedDepositAmount <= 0)) {
+        return res.status(400).json({ success: false, error: 'A valid positive deposit amount is required for approval.' });
+      }
       const totalBalanceReal = approvedDepositAmount;
       // The offer is limited to the first two approved deposits per investor.
       // Use the persistent ledger to determine prior approved deposits; the
