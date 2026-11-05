@@ -26,13 +26,6 @@ const INITIAL_DB = {
   account_transactions: [],
   otps: [],
   app_settings: {
-    wallet_usdt: 'TQn9Y2khEsLJW1ChVWFMSMeSTow5KaxnSE',
-    wallet_btc: 'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq',
-    wallet_eth: '0x71C8F0dF42250c609c1B95B1d141e4B516e889F6',
-    bank_name: 'JPMorgan Chase Institutional',
-    bank_account: '982187263541',
-    bank_routing: '021000021',
-    bank_swift: 'CHASUS33',
     resend_api_key: '',
     resend_from_email: 'onboarding@resend.dev',
     admin_email: 'admin@teslawealths.org',
@@ -181,20 +174,22 @@ export function resolveDatabaseConfig() {
     'DB_NAME', 'DB_DATABASE', 'MYSQL_DATABASE', 'MYSQLDATABASE', 'MYSQL_DB', 'TT_DB_NAME', 'AIVEN_DATABASE', 'VITE_DB_NAME'
   ].find(k => !!clean(process.env[k]));
 
-  const host = clean(hostKey ? process.env[hostKey] : '') || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com';
-  const port = parseInt(clean(portKey ? process.env[portKey] : '') || '28487', 10);
-  const user = clean(userKey ? process.env[userKey] : '') || 'avnadmin';
-  const password = clean(passKey ? process.env[passKey] : '') || 'AVNS_eN3hQrUWcOL7PRQXP_i';
-  const database = clean(dbKey ? process.env[dbKey] : '') || 'defaultdb';
+  const host = clean(hostKey ? process.env[hostKey] : '');
+  const port = parseInt(clean(portKey ? process.env[portKey] : '') || '3306', 10);
+  const user = clean(userKey ? process.env[userKey] : '');
+  const password = clean(passKey ? process.env[passKey] : '');
+  const database = clean(dbKey ? process.env[dbKey] : '');
+  const configured = !!(host && user && password && database);
 
   return {
+    configured,
     host,
     port,
     user,
     password,
     database,
     ssl: { rejectUnauthorized: false },
-    source: hostKey ? `Environment (${hostKey})` : 'Default Cluster'
+    source: configured ? `Environment (${hostKey || 'DATABASE_URL'})` : 'Database environment variables required'
   };
 }
 
@@ -211,6 +206,12 @@ export async function checkMySqlHealth(force = false) {
   const cfg = resolveDatabaseConfig();
   mysqlStatus.config = cfg;
   mysqlStatus.lastTestedAt = now;
+  if (!cfg.configured) {
+    mysqlStatus.tested = true;
+    mysqlStatus.available = false;
+    mysqlStatus.error = 'Database environment variables are incomplete. Configure private database credentials in the deployment environment.';
+    return mysqlStatus;
+  }
 
   try {
     const conn = await mysql.createConnection({
