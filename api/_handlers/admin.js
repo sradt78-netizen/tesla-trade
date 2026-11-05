@@ -1145,8 +1145,8 @@ export default async function handler(req, res) {
           const mEmail = String(mem.user_email || mem.email || mem.user_id || '').toLowerCase().trim();
           if (mEmail === effectiveEmail) {
             mem.status = 'active';
-            mem.total_current_value = mem.total || approvedDepositAmount;
-            mem.totalCurrentValue = mem.total || approvedDepositAmount;
+            mem.total_current_value = totalBalanceWithBonus;
+            mem.totalCurrentValue = totalBalanceWithBonus;
           }
         }
       }
@@ -1200,8 +1200,8 @@ export default async function handler(req, res) {
               inv.status = status;
               if (status === 'active') {
                 inv.total = approvedDepositAmount || inv.total || 0;
-                inv.total_current_value = totalBalanceReal;
-                inv.totalCurrentValue = totalBalanceReal;
+                inv.total_current_value = totalBalanceWithBonus;
+                inv.totalCurrentValue = totalBalanceWithBonus;
               }
               foundInDb = true;
             }
@@ -1310,7 +1310,7 @@ export default async function handler(req, res) {
                 [
                   insId, txId, effectiveEmail, (foundDeposit && foundDeposit.user_name) || 'Investor', effectiveEmail,
                   'Tesla · Explorer', 'starter_ai', 'Explorer', 'Explorer',
-                  approvedDepositAmount, totalBalanceReal, 0,
+                  approvedDepositAmount, totalBalanceWithBonus, 0,
                   'Crypto'
                 ]
               );
