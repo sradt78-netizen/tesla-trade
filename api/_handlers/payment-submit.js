@@ -1,6 +1,8 @@
 import { getDbConnection } from './dbcheck.js';
 import fs from 'fs';
 import path from 'path';
+import { sendPaymentReceivedEmail, sendAdminPaymentAlert } from '../mailer.js';
+import { notifyPaymentSubmission } from '../telegram.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -505,6 +507,18 @@ export default async function handler(req, res) {
         }
       }
     } catch (e) {}
+
+    const notificationPayload = {
+      user_email: email, user_name: userName, total: amount, plan_name: planName,
+      method, payment_reference: ref, payment_proof_path: proofDataUri,
+      payment_proof_name: proofFileName, id: investmentId
+    };
+    const notificationResults = await Promise.allSettled([
+      sendPaymentReceivedEmail(email, userName, { amount, planName, method, reference: ref }),
+      sendAdminPaymentAlert({ userEmail: email, userName, amount, planName, method, reference: ref, investmentId }),
+      notifyPaymentSubmission(notificationPayload)
+    ]);
+    notificationResults.forEach((result) => { if (result.status === 'rejected' || result.value?.ok === false) console.warn('[payment-submit] notification failed:', result.reason || result.value?.error); });
 
     return res.status(200).json({
       success: true,
