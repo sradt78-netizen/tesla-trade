@@ -4809,7 +4809,7 @@
             if (s === _lastStatus) return; // no change
             _lastStatus = s;
 
-            if (s === 'approved' || s === 'verified' || s === 'active') {
+            if (d && d.hasActiveInvestment === true && d.status === 'active' && d.investmentStatus === 'active') {
               _lastStatus = 'active';
               removeOverlay();
               stopPoll();
@@ -4865,7 +4865,7 @@
             if (s === 'active') {
               removeOverlay();
               stopPoll();
-            } else if (s === 'approved' || s === 'verified') {
+            } else if (s === 'pending_approval' || s === 'pending') {
               showOverlay('approved');
               stopPoll();
             } else if (s === 'declined' || s === 'rejected') {
