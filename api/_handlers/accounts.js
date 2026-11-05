@@ -253,11 +253,64 @@ export default async function handler(req, res) {
     try {
       const conn = await getDbConnection();
       const [txs] = await conn.query(
-        'SELECT * FROM account_transactions WHERE LOWER(user_email)=? ORDER BY id DESC LIMIT 100',
+        'SELECT * FROM account_transactions WHERE LOWER(user_email)=? ORDER BY created_at DESC, id DESC LIMIT 250',
         [email]
       );
+      results = Array.isArray(txs) ? txs : [];
+
+      // Older accounts may have funded investment/withdrawal rows created
+      // before the durable ledger write was available. Include those records
+      // when the corresponding ledger entry is absent; never invent amounts.
+      try {
+        const [legacyInvestments] = await conn.query(
+          'SELECT id, tx_id, user_email, total, method, status, created_at, payment_submitted_at FROM investments WHERE LOWER(user_email)=? AND total>0 ORDER BY created_at DESC',
+          [email]
+        );
+        for (const inv of legacyInvestments || []) {
+          const exists = results.some(tx => tx.type === 'deposit' && String(tx.investment_id || '') === String(inv.id));
+          if (!exists) {
+            results.push({
+              id: inv.tx_id || ('legacy-deposit-' + inv.id),
+              investment_id: inv.id,
+              user_email: email,
+              type: 'deposit',
+              amount: Number(inv.total || 0),
+              method: inv.method || '',
+              status: ['active','approved','completed'].includes(String(inv.status || '').toLowerCase()) ? 'processed' :
+                (String(inv.status || '').toLowerCase() === 'declined' ? 'declined' : 'pending'),
+              reference_id: inv.tx_id || null,
+              note: 'Investment deposit',
+              created_at: inv.payment_submitted_at || inv.created_at
+            });
+          }
+        }
+      } catch (legacyDepositError) {
+        console.error('[transactions] legacy deposit lookup failed:', legacyDepositError.message);
+      }
+
+      try {
+        const [legacyWithdrawals] = await conn.query(
+          'SELECT id, investment_id, amount, method, status, created_at FROM withdrawals WHERE LOWER(user_id)=? ORDER BY created_at DESC',
+          [email]
+        );
+        for (const wd of legacyWithdrawals || []) {
+          const exists = results.some(tx => tx.type === 'withdrawal' && String(tx.id || '') === String(wd.id));
+          if (!exists) results.push({
+            id: wd.id,
+            investment_id: wd.investment_id,
+            user_email: email,
+            type: 'withdrawal',
+            amount: Number(wd.amount || 0),
+            method: wd.method || '',
+            status: wd.status || 'pending',
+            note: 'Withdrawal request',
+            created_at: wd.created_at
+          });
+        }
+      } catch (legacyWithdrawalError) {
+        console.error('[transactions] legacy withdrawal lookup failed:', legacyWithdrawalError.message);
+      }
       await conn.end();
-      if (Array.isArray(txs) && txs.length > 0) results = txs;
     } catch (e) {}
 
     // Merge persistent transactions as a fallback source even when MySQL returned
@@ -307,6 +360,9 @@ export default async function handler(req, res) {
       amount: parseFloat(t.amount || '0'),
       status: t.status || 'processed',
       note: t.note || '',
+      method: t.method || '',
+      investment_id: t.investment_id || '',
+      reference_id: t.reference_id || '',
       created_at: t.created_at || new Date().toISOString(),
       createdAt: t.created_at || new Date().toISOString()
     }));
@@ -321,7 +377,7 @@ export default async function handler(req, res) {
       if (!email) return res.status(400).json({ error: 'Email parameter required' });
       try {
         const conn = await getDbConnection();
-        const [acc] = await conn.query('SELECT * FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
+        const [acc] = await conn.query('SELECT email, name, phone, age, onboarding_status, registered_at FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
         const [inv] = await conn.query(`SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY CASE WHEN status IN ('active','approved','completed') THEN 0 WHEN status IN ('pending_approval','pending') THEN 1 ELSE 2 END, id DESC LIMIT 1`, [email]);
         await conn.end();
 
@@ -329,6 +385,8 @@ export default async function handler(req, res) {
           email,
           name: acc[0]?.name || inv[0]?.user_name || 'Investor',
           phone: acc[0]?.phone || '',
+          age: Number(acc[0]?.age || 0),
+          registered_at: acc[0]?.registered_at || null,
           onboarding_status: (inv[0] && ['active','approved','completed'].includes(String(inv[0].status || '').toLowerCase())) ? 'active' : (acc[0]?.onboarding_status || (inv[0] ? inv[0].status : 'pending_deposit')),
           investment: inv[0] || null
         });
