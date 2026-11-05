@@ -153,6 +153,12 @@
     var submit = root.querySelector('#ttinc-register-submit') ||
       root.querySelector('button[type="submit"]');
 
+    if (!phone || !Number.isInteger(age) || age < 18 || age > 120) {
+      completing = false;
+      showError(form, 'Enter your phone number and a valid age (18 or older) before creating the account.');
+      return;
+    }
+
     if (submit) {
       submit.disabled = true;
       submit.textContent = 'Creating account…';
