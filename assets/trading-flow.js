@@ -432,9 +432,9 @@
     var html =
       '<div class="ttinc-trade-top">' +
         '<div>' +
-          '<div class="ttinc-trade-kicker"><span class="glow-dot"></span> Institutional Arbitrage Engine</div>' +
-          '<div class="ttinc-trade-title">Live Algorithmic Trading</div>' +
-          '<p class="ttinc-trade-copy">Deploy funds to Tesla Trade automated high-frequency order-routing. Capitalize on cross-market spreads and Tesla innovation ecosystem yield.</p>' +
+          '<div class="ttinc-trade-kicker"><span class="glow-dot"></span> Demo Trading Engine</div>' +
+          '<div class="ttinc-trade-title">Simulated Trading (Demo)</div>' +
+          '<p class="ttinc-trade-copy">Paper-trading simulation only. Admin-configured profit/loss rates and phase intervals drive the demo balance; this is not a live market execution feed.</p>' +
         '</div>' +
         '<div class="ttinc-trade-balance">' +
           '<span style="color:#d4af37;font-weight:700;">Available Wallet</span>' +
@@ -469,13 +469,13 @@
             '</div>' +
           '</div>' +
           '<div class="ttinc-chart-wrap">' +
-            '<div class="ttinc-chart-badge"><span>⚡ Real-Time Liquidity Feed</span></div>' +
+            '<div class="ttinc-chart-badge"><span>⚡ Simulated Performance Feed</span></div>' +
             '<canvas id="ttinc-trade-canvas" aria-label="Trading performance graph"></canvas>' +
           '</div>' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:12px;">' +
             '<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#64748b;">' +
               '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;"></span>' +
-              'Execution Active · Instant Capital Preservation Lock' +
+              'Demo trade active · simulated P/L' +
             '</div>' +
             '<button class="ttinc-start-btn" type="button" data-start-trading disabled>Start Trade (already active)</button>' +
             '<button class="ttinc-stop-btn" type="button" data-stop-trading>Stop Trade</button>' +
