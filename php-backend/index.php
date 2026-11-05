@@ -518,26 +518,44 @@ if ($uri === '/transactions' && $method === 'GET') {
         "SELECT i.id, i.tx_id, i.total, i.method, i.status, i.created_at,
                 i.payment_submitted_at
          FROM investments i
-         WHERE LOWER(i.user_email)=? AND i.total > 0
-           AND NOT EXISTS (
-             SELECT 1 FROM account_transactions t
-             WHERE t.type='deposit'
-               AND (t.reference_id=i.tx_id OR t.investment_id=i.id)
-           )"
+         WHERE LOWER(i.user_email)=? AND i.total > 0"
     );
     $stInvestments->execute([$email]);
     foreach ($stInvestments->fetchAll() as $row) {
-        $rows[] = cast_transaction([
-            'id'            => 'legacy-deposit-' . $row['id'],
-            'investment_id' => $row['id'],
-            'type'          => 'deposit',
-            'amount'        => $row['total'],
-            'method'        => $row['method'],
-            'status'        => $row['status'] === 'active' ? 'processed' : $row['status'],
-            'reference_id'  => $row['tx_id'],
-            'note'          => 'Initial investor deposit',
-            'created_at'    => $row['payment_submitted_at'] ?: $row['created_at'],
-        ]);
+        $investmentStatus = strtolower((string)$row['status']);
+        $ledgerStatus = in_array($investmentStatus, ['active','approved','completed'], true)
+            ? 'processed'
+            : (in_array($investmentStatus, ['declined','rejected','cancelled'], true) ? 'declined' : 'pending');
+        $existingIndex = null;
+        foreach ($rows as $index => $transaction) {
+            if (($transaction['type'] ?? '') === 'deposit' &&
+                ((string)($transaction['investmentId'] ?? $transaction['investment_id'] ?? '') === (string)$row['id'] ||
+                 (!empty($row['tx_id']) && (string)($transaction['referenceId'] ?? $transaction['reference_id'] ?? '') === (string)$row['tx_id']))) {
+                $existingIndex = $index;
+                break;
+            }
+        }
+        if ($existingIndex !== null) {
+            $rows[$existingIndex]['status'] = $ledgerStatus;
+            if ((float)($rows[$existingIndex]['amount'] ?? 0) <= 0) {
+                $rows[$existingIndex]['amount'] = (float)$row['total'];
+            }
+            if (empty($rows[$existingIndex]['method'])) {
+                $rows[$existingIndex]['method'] = $row['method'];
+            }
+        } else {
+            $rows[] = cast_transaction([
+                'id'            => 'legacy-deposit-' . $row['id'],
+                'investment_id' => $row['id'],
+                'type'          => 'deposit',
+                'amount'        => $row['total'],
+                'method'        => $row['method'],
+                'status'        => $ledgerStatus,
+                'reference_id'  => $row['tx_id'],
+                'note'          => 'Investment deposit',
+                'created_at'    => $row['payment_submitted_at'] ?: $row['created_at'],
+            ]);
+        }
     }
 
     $stWithdrawals = $db->prepare(
