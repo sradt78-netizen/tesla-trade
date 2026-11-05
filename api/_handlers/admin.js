@@ -457,6 +457,10 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (!isDbConnected && !['test_email', 'test_telegram'].includes(action)) {
+      return res.status(503).json({ success: false, error: 'The database is unavailable. This action was not simulated or applied to temporary data.' });
+    }
+
     // ── 0b. GET DEPOSIT RECEIPT DETAILS & FULL IMAGE ───────────────
     if (action === 'get_receipt' || action === 'view_receipt') {
       const rawId = body.id || url.searchParams.get('id') || '';
