@@ -185,6 +185,7 @@ export default async function handler(req, res) {
 
     let dbRows = [];
     let userAdminApproved = false;
+    let bonusByInvestment = Object.create(null);
     try {
       const conn = await getDbConnection();
       if (qId) {
@@ -203,9 +204,28 @@ export default async function handler(req, res) {
         if (acc.length > 0 && (acc[0].onboarding_status === 'active' || acc[0].onboarding_status === 'approved' || acc[0].onboarding_status === 'verified')) {
           userAdminApproved = true;
         }
+        const [bonusRows] = await conn.query(
+          "SELECT investment_id, COALESCE(SUM(amount), 0) AS bonus FROM account_transactions WHERE LOWER(user_email)=? AND type='bonus' AND status='processed' GROUP BY investment_id",
+          [checkEmail.toLowerCase()]
+        );
+        for (const bonusRow of bonusRows) bonusByInvestment[String(bonusRow.investment_id)] = Number(bonusRow.bonus || 0);
       }
       await conn.end();
     } catch (e) {}
+
+    // The JSON-backed database is also used by local/mock deployments; read its
+    // ledger when MySQL is unavailable so the bonus remains consistent there.
+    try {
+      const { loadDatabaseSync } = await import('../db.js');
+      const localDb = loadDatabaseSync();
+      const ledger = Array.isArray(localDb && localDb.account_transactions) ? localDb.account_transactions : [];
+      for (const tx of ledger) {
+        if (String(tx.user_email || '').toLowerCase() !== String(qEmail || (dbRows[0] && dbRows[0].user_email) || '').toLowerCase()) continue;
+        if (tx.type !== 'bonus' || tx.status !== 'processed') continue;
+        const key = String(tx.investment_id || '');
+        bonusByInvestment[key] = Number(bonusByInvestment[key] || 0) + Number(tx.amount || 0);
+      }
+    } catch (eLocalLedger) {}
 
     let all = Array.isArray(dbRows) ? [...dbRows] : [];
 
@@ -303,7 +323,7 @@ export default async function handler(req, res) {
       const tot = Number(found.total != null ? found.total : (found.amount != null ? found.amount : 0));
       let curVal = Number(found.totalCurrentValue || found.total_current_value || tot);
       if (curVal === 0 && tot > 0) curVal = tot;
-      const bonusMatch = 0;
+      const bonusMatch = Number(bonusByInvestment[String(found.id)] || found.bonus || found.bonus_balance || 0);
 
       return res.status(200).json({
         ...found,
@@ -341,11 +361,11 @@ export default async function handler(req, res) {
           ? item.portfolio
           : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot }],
         planName: item.planName || item.plan_name || item.plan_label || 'Pioneer',
-        canWithdraw: true,
+        canWithdraw: st === 'active' || st === 'approved' || st === 'completed',
         total: tot,
         totalCurrentValue: curVal,
         total_current_value: curVal,
-        bonus: 0,
+        bonus: Number(bonusByInvestment[String(item.id)] || item.bonus || item.bonus_balance || 0),
         earnings: {
           tsla: curVal,
           ...(typeof item.earnings === 'object' && item.earnings ? item.earnings : {})
