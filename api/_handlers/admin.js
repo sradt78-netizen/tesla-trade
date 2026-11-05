@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { getDbConnection } from './dbcheck.js';
 import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
-import { sendPaymentApprovedEmail, sendPaymentDeclinedEmail, sendTestEmail, getMailerConfig } from '../mailer.js';
+import { sendPaymentApprovedEmail, sendPaymentDeclinedEmail, sendWithdrawalStatusEmail, sendTestEmail, getMailerConfig } from '../mailer.js';
 import { notifyPaymentStatusUpdate, testTelegramConnection, notifyAdminEvent } from '../telegram.js';
 
 const INVESTORS_FILE = path.join(process.cwd(), 'data', 'saved_investors.json');
@@ -563,7 +563,7 @@ export default async function handler(req, res) {
         }
         kyc = await safeQuery('SELECT * FROM kyc_submissions ORDER BY created_at DESC', kyc);
         orders = await safeQuery('SELECT * FROM ev_orders ORDER BY created_at DESC LIMIT 100', orders);
-        withdrawals = await safeQuery('SELECT * FROM withdrawals ORDER BY created_at DESC', withdrawals);
+        withdrawals = await safeQuery('SELECT w.*, i.user_email, i.user_name FROM withdrawals w LEFT JOIN investments i ON i.id=w.investment_id ORDER BY w.created_at DESC', withdrawals);
         financing = await safeQuery('SELECT * FROM financing_applications ORDER BY created_at DESC', financing);
         codes = await safeQuery('SELECT * FROM invitation_codes ORDER BY created_at DESC', codes);
         clicks = await safeQuery('SELECT * FROM analytics_clicks ORDER BY id DESC LIMIT 50', clicks);
@@ -1484,7 +1484,112 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── 7. KYC APPROVE / REJECT ─────────────────────────────────────
+    // ── 7. WITHDRAWAL PAYOUT REVIEW ─────────────────────────────────
+    if (action === 'approve_withdrawal' || action === 'reject_withdrawal') {
+      if (!isDbConnected || !conn) {
+        return res.status(503).json({ success: false, error: 'Withdrawal decisions require a live database connection. No status or balance was changed.' });
+      }
+      const withdrawalId = String(body.id || '').trim();
+      if (!withdrawalId) return res.status(400).json({ success: false, error: 'Withdrawal request ID is required.' });
+      const nextStatus = action === 'approve_withdrawal' ? 'approved' : 'rejected';
+      let payout = null;
+      let txStarted = false;
+      try {
+        await conn.beginTransaction();
+        txStarted = true;
+        const [rows] = await conn.query(
+          `SELECT w.id, w.investment_id, w.user_name, w.amount, w.method, w.wallet_address, w.status,
+                  i.user_email, i.status AS investment_status, i.total, i.total_current_value, i.trading_status
+           FROM withdrawals w
+           INNER JOIN investments i ON i.id=w.investment_id
+           WHERE w.id=? LIMIT 1 FOR UPDATE`,
+          [withdrawalId]
+        );
+        const row = rows[0];
+        if (!row) {
+          await conn.rollback(); txStarted = false;
+          await conn.end(); conn = null;
+          return res.status(404).json({ success: false, error: 'Withdrawal request not found.' });
+        }
+        if (!['pending', 'processing'].includes(String(row.status || '').toLowerCase())) {
+          await conn.rollback(); txStarted = false;
+          await conn.end(); conn = null;
+          return res.status(409).json({ success: false, error: 'This withdrawal has already been reviewed.' });
+        }
+
+        const amount = Number(row.amount || 0);
+        if (!Number.isFinite(amount) || amount <= 0) throw new Error('Withdrawal record contains an invalid amount.');
+        if (nextStatus === 'approved') {
+          if (!['active', 'approved'].includes(String(row.investment_status || '').toLowerCase())) {
+            throw new Error('The investor account is no longer active. The payout was not approved.');
+          }
+          if (String(row.trading_status || '').toLowerCase() === 'active') {
+            throw new Error('Stop the active trading session before processing this payout.');
+          }
+          const currentBalance = Number(row.total_current_value != null ? row.total_current_value : row.total || 0);
+          if (currentBalance + 0.0001 < amount) {
+            throw new Error('The verified account balance is now lower than this withdrawal request. No payout status or balance was changed.');
+          }
+          const newBalance = Number((currentBalance - amount).toFixed(2));
+          const principal = Number(row.total || 0);
+          const newEarnings = Number(Math.max(0, newBalance - principal).toFixed(2));
+          await conn.query(
+            'UPDATE investments SET total_current_value=?, earnings=? WHERE id=?',
+            [newBalance, newEarnings, row.investment_id]
+          );
+        }
+        await conn.query('UPDATE withdrawals SET status=? WHERE id=?', [nextStatus, withdrawalId]);
+        const ledgerStatus = nextStatus === 'approved' ? 'processed' : 'rejected';
+        const [ledgerResult] = await conn.query(
+          'UPDATE account_transactions SET status=?, note=? WHERE reference_id=? AND type="withdrawal"',
+          [ledgerStatus, nextStatus === 'approved' ? 'Withdrawal payout confirmed by administrator' : 'Withdrawal request rejected by administrator', withdrawalId]
+        );
+        if (!ledgerResult.affectedRows) {
+          throw new Error('The withdrawal transaction ledger could not be updated. No approval was recorded.');
+        }
+        await conn.commit();
+        txStarted = false;
+        payout = {
+          id: withdrawalId,
+          email: String(row.user_email || '').toLowerCase(),
+          name: row.user_name || 'Investor',
+          amount,
+          method: row.method || '',
+          status: nextStatus
+        };
+        await conn.end(); conn = null;
+      } catch (error) {
+        if (conn && txStarted) { try { await conn.rollback(); } catch (rollbackError) {} }
+        txStarted = false;
+        if (conn) { try { await conn.end(); } catch (closeError) {} conn = null; }
+        console.error('[admin withdrawal review] failed:', error.message);
+        return res.status(409).json({ success: false, error: error.message || 'Withdrawal decision could not be saved. No success was recorded.' });
+      }
+
+      const notices = await Promise.allSettled([
+        sendWithdrawalStatusEmail(payout.email, payout.name, {
+          amount: payout.amount, method: payout.method, status: payout.status, reference: payout.id
+        }),
+        notifyAdminEvent('Withdrawal payout decision', {
+          email: payout.email, name: payout.name, amount: payout.amount,
+          status: payout.status, recordId: payout.id
+        })
+      ]);
+      notices.forEach(result => {
+        if (result.status === 'rejected' || result.value?.ok === false) {
+          console.warn('[admin withdrawal review] notification failed:', result.reason || result.value?.error);
+        }
+      });
+      return res.status(200).json({
+        success: true,
+        status: payout.status,
+        message: payout.status === 'approved'
+          ? 'Withdrawal marked as paid and the investor balance was updated.'
+          : 'Withdrawal rejected. The investor balance was not reduced.'
+      });
+    }
+
+    // ── 8. KYC APPROVE / REJECT ─────────────────────────────────────
     if (action === 'approve_kyc' || action === 'reject_kyc') {
       const id = body.id;
       const status = action === 'approve_kyc' ? 'approved' : 'rejected';
