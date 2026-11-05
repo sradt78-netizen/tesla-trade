@@ -1578,8 +1578,9 @@ export default async function handler(req, res) {
   } catch (error) {
     if (conn) try { await conn.end(); } catch (e) {}
     console.error('API Admin Error:', error);
-    return res.status(200).json({
-      success: true,
+    return res.status(500).json({
+      success: false,
+      error: 'Admin API operation failed; success was not confirmed.',
       investors: mockStore.investors,
       investments: mockStore.investments,
       kyc: mockStore.kyc,
