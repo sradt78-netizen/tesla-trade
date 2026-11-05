@@ -227,8 +227,16 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Social session token or email is required.' });
+    if (supabaseUrl && anonKey && accessToken && !email) {
+      return res.status(401).json({ success: false, message: 'The social access token could not be verified.' });
+    }
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ success: false, message: 'A valid social account email is required.' });
+    }
+    // In production, never trust an email supplied by the browser as proof of
+    // identity. Require the provider token to be verified by Supabase.
+    if (process.env.NODE_ENV === 'production' && !(supabaseUrl && anonKey && accessToken)) {
+      return res.status(401).json({ success: false, message: 'Social sign-in verification is not configured.' });
     }
 
     // Upsert account, then resolve its actual persisted investment state.
