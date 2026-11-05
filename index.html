@@ -4597,7 +4597,7 @@
         if (status === 'create') return buildCreateAccountScreen();
         if (status === 'created') return buildPlanChooserScreen();
         if (status === 'status_error') return buildStatusErrorScreen();
-        var isApproved = (status === 'approved' || status === 'verified' || status === 'active');
+        var isApproved = (status === 'approved' || status === 'active');
         var isPending  = (status === 'pending_approval' || status === 'pending');
         var isDeclined = (status === 'declined' || status === 'rejected' || status === 'cancelled');
         if (isApproved) return null;
@@ -4698,7 +4698,7 @@
       // ── poll /api/my-status ────────────────────────────────────
       function getEffectiveStatus(d) {
         var s = (d && (d.investmentStatus || d.status)) ? (d.investmentStatus || d.status) : 'none';
-        var hasActive = (d && d.hasActiveInvestment) || s === 'active' || s === 'approved' || s === 'verified';
+        var hasActive = (d && d.hasActiveInvestment) || s === 'active' || s === 'approved';
         if (hasActive) {
           try {
             localStorage.removeItem('ttinc_deposit_status');
@@ -4718,14 +4718,10 @@
           var dep = localStorage.getItem('ttinc_deposit_status');
           var pay = localStorage.getItem('ttinc_payment_status');
           var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-          if (meta.status === 'active' || meta.status === 'approved') {
-            isDepPending = false;
-          } else {
-            isDepPending = dep === 'pending_approval' ||
-                           pay === 'pending_approval' ||
-                           meta.status === 'pending_approval' ||
-                           (location.search && location.search.indexOf('payment=pending') !== -1);
-          }
+          isDepPending = dep === 'pending_approval' ||
+                         pay === 'pending_approval' ||
+                         meta.status === 'pending_approval' ||
+                         (location.search && location.search.indexOf('payment=pending') !== -1);
         } catch (e) {}
 
         if (isDepPending && (s === 'none' || s === 'created' || !s)) {
@@ -4738,14 +4734,7 @@
         var auth = getAuth();
         if (!auth || !auth.email) return;
         if (!isInvestorDashboardRoute()) { removeOverlay(); stopPoll(); return; }
-        if (localStorage.getItem('ttinc_account_approved') === 'true') {
-          _lastStatus = 'active';
-          removeOverlay();
-          stopPoll();
-          return;
-        }
-
-        fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin' })
+        fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin', cache: 'no-store' })
           .then(function (r) {
             return r.json().then(function (d) {
               if (!r.ok) throw new Error((d && (d.error || d.message)) || 'Secure account status check failed.');
@@ -4756,7 +4745,7 @@
             var s = getEffectiveStatus(d);
             var isPendingState = (s === 'pending_approval' || s === 'pending');
 
-            if (s === 'active' || (d && d.hasActiveInvestment) || s === 'approved' || localStorage.getItem('ttinc_account_approved') === 'true') {
+            if (s === 'active' || (d && d.hasActiveInvestment) || s === 'approved') {
               _lastStatus = 'active';
               removeOverlay();
               stopPoll();
@@ -4790,12 +4779,7 @@
               var dep = localStorage.getItem('ttinc_deposit_status');
               var pay = localStorage.getItem('ttinc_payment_status');
               var m = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-              var isAct = dep === 'active' || pay === 'active' || m.status === 'active' || m.status === 'approved' ||
-                          (getAuth() && (getAuth().onboardingState === 'completed' || getAuth().onboarding_status === 'verified')) ||
-                          localStorage.getItem('ttinc_account_approved') === 'true';
-              if (!isAct) {
-                localPending = dep === 'pending_approval' || pay === 'pending_approval' || m.status === 'pending_approval';
-              }
+              localPending = dep === 'pending_approval' || pay === 'pending_approval' || m.status === 'pending_approval';
             } catch(e) {}
 
             if (isPendingState || localPending) {
@@ -4818,7 +4802,7 @@
             if (s === _lastStatus) return; // no change
             _lastStatus = s;
 
-            if (s === 'approved' || s === 'verified' || s === 'active') {
+            if (s === 'approved' || s === 'active') {
               _lastStatus = 'active';
               removeOverlay();
               stopPoll();
@@ -4839,13 +4823,8 @@
               var metaSt = '';
               try { metaSt = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}').status || ''; } catch (e) {}
               var authObj = getAuth() || {};
-              var isUserActive = depSt === 'active' || paySt === 'active' || depSt === 'approved' || paySt === 'approved' ||
-                                 metaSt === 'active' || metaSt === 'approved' ||
-                                 authObj.onboardingState === 'completed' || authObj.onboarding_status === 'verified';
-              if (!isUserActive) {
-                isDepPending = (depSt === 'pending_approval' || paySt === 'pending_approval' || metaSt === 'pending_approval' || metaSt === 'pending') ||
-                               (location.search && location.search.indexOf('payment=pending') !== -1);
-              }
+              isDepPending = (depSt === 'pending_approval' || paySt === 'pending_approval' || metaSt === 'pending_approval' || metaSt === 'pending') ||
+                         (location.search && location.search.indexOf('payment=pending') !== -1);
             } catch (e) {}
 
             if (isDepPending) {
@@ -4905,13 +4884,8 @@
           var metaSt = '';
           try { metaSt = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}').status || ''; } catch (e) {}
           var authObj = getAuth() || {};
-          var isUserActive = depSt === 'active' || paySt === 'active' || depSt === 'approved' || paySt === 'approved' ||
-                             metaSt === 'active' || metaSt === 'approved' ||
-                             authObj.onboardingState === 'completed' || authObj.onboarding_status === 'verified';
-          if (!isUserActive) {
-            isDepPending = (depSt === 'pending_approval' || paySt === 'pending_approval' || metaSt === 'pending_approval' || metaSt === 'pending') ||
-                           (location.search && location.search.indexOf('payment=pending') !== -1);
-          }
+          isDepPending = (depSt === 'pending_approval' || paySt === 'pending_approval' || metaSt === 'pending_approval' || metaSt === 'pending') ||
+                         (location.search && location.search.indexOf('payment=pending') !== -1);
         } catch (e) {}
 
         if (isDepPending) {
@@ -4923,7 +4897,7 @@
           removeOverlay();
         }
 
-        fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin' })
+        fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin', cache: 'no-store' })
           .then(function (r) {
             return r.json().then(function (d) {
               if (!r.ok) throw new Error((d && (d.error || d.message)) || 'Secure account status check failed.');
@@ -4933,7 +4907,7 @@
           .then(function (d) {
             var s = getEffectiveStatus(d);
             var isPendingState = (s === 'pending_approval' || s === 'pending');
-            var isUserApproved = s === 'active' || (d && d.hasActiveInvestment) || localStorage.getItem('ttinc_account_approved') === 'true';
+            var isUserApproved = s === 'active' || (d && d.hasActiveInvestment);
             _lastStatus = s;
 
             if (isUserApproved || s === 'active' || (d && d.hasActiveInvestment)) {
@@ -4943,7 +4917,7 @@
             }
 
             if (!d || (!d.account && !isPendingState)) {
-              if (localStorage.getItem('ttinc_account_approved') === 'true' || isUserApproved) {
+              if (isUserApproved) {
                 removeOverlay();
                 stopPoll();
                 return;
@@ -5012,13 +4986,8 @@
             var metaSt = '';
             try { metaSt = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}').status || ''; } catch (e) {}
             var authObj = getAuth() || {};
-            var isUserActive = depSt === 'active' || paySt === 'active' || depSt === 'approved' || paySt === 'approved' ||
-                               metaSt === 'active' || metaSt === 'approved' ||
-                               authObj.onboardingState === 'completed' || authObj.onboarding_status === 'verified';
-            if (!isUserActive) {
-              isDepPending = (depSt === 'pending_approval' || paySt === 'pending_approval' || metaSt === 'pending_approval' || metaSt === 'pending') ||
-                             (location.search && location.search.indexOf('payment=pending') !== -1);
-            }
+            isDepPending = (depSt === 'pending_approval' || paySt === 'pending_approval' || metaSt === 'pending_approval' || metaSt === 'pending') ||
+                         (location.search && location.search.indexOf('payment=pending') !== -1);
           } catch (e) {}
 
           // If a pending deposit is already on file, show the pending lock screen immediately
@@ -5047,7 +5016,7 @@
             .then(function (d) {
               var s = getEffectiveStatus(d);
               var isPendingState = (s === 'pending_approval' || s === 'pending');
-              var isUserApproved = s === 'active' || (d && d.hasActiveInvestment) || localStorage.getItem('ttinc_account_approved') === 'true';
+              var isUserApproved = s === 'active' || (d && d.hasActiveInvestment);
               _lastStatus = s;
 
               if (isUserApproved || s === 'active' || (d && d.hasActiveInvestment)) {
@@ -5061,7 +5030,7 @@
               }
 
               if (!d || (!d.account && !isPendingState)) {
-                if (localStorage.getItem('ttinc_account_approved') === 'true' || isUserApproved) {
+                if (isUserApproved) {
                   removeOverlay();
                   stopPoll();
                   return;

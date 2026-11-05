@@ -89,6 +89,11 @@ export default async function handler(req, res) {
       await conn.end();
     } catch (dbErr) {}
 
+    // Approval must be verified from MySQL. A stale disk or browser copy must never unlock an investor.
+    if (!dbRead) {
+      return res.status(503).json({ success: false, error: 'Investor approval status is temporarily unavailable. Please retry.' });
+    }
+
     // 2. Merge disk/memory copies ONLY when MySQL could not be read (they go stale across serverless instances)
     if (!dbRead) try {
       const { inMemoryDeposits, loadPersistentDeposits } = await import('./payment-submit.js');
@@ -169,7 +174,7 @@ export default async function handler(req, res) {
     const formattedInvestments = userInvestments.map(inv => {
       const depAmt = parseFloat(inv.total != null ? inv.total : (inv.amount != null ? inv.amount : 0));
       let val = parseFloat(inv.total_current_value != null ? inv.total_current_value : (inv.totalCurrentValue != null ? inv.totalCurrentValue : depAmt));
-      const isApproved = inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed';
+      const isApproved = inv.status === 'active' || inv.status === 'approved';
       return {
         ...inv,
         total: depAmt,
@@ -180,7 +185,7 @@ export default async function handler(req, res) {
     });
 
     // Check for active or approved investment first
-    const activeInv = formattedInvestments.find(inv => inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed');
+    const activeInv = formattedInvestments.find(inv => inv.status === 'active' || inv.status === 'approved');
     let status = 'none';
     let activeInvestmentId = null;
     let pendingDepositTotal = 0;
@@ -363,7 +368,7 @@ export default async function handler(req, res) {
       try {
         const conn = await getDbConnection();
         const [acc] = await conn.query('SELECT email, name, phone, age, onboarding_status, registered_at FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
-        const [inv] = await conn.query(`SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY CASE WHEN status IN ('active','approved','completed') THEN 0 WHEN status IN ('pending_approval','pending') THEN 1 ELSE 2 END, id DESC LIMIT 1`, [email]);
+        const [inv] = await conn.query(`SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY CASE WHEN status IN ('active','approved') THEN 0 WHEN status IN ('pending_approval','pending') THEN 1 ELSE 2 END, id DESC LIMIT 1`, [email]);
         await conn.end();
 
         return res.status(200).json({
@@ -372,7 +377,7 @@ export default async function handler(req, res) {
           phone: acc[0]?.phone || '',
           age: Number(acc[0]?.age || 0),
           registered_at: acc[0]?.registered_at || null,
-          onboarding_status: (inv[0] && ['active','approved','completed'].includes(String(inv[0].status || '').toLowerCase())) ? 'active' : (acc[0]?.onboarding_status || (inv[0] ? inv[0].status : 'pending_deposit')),
+          onboarding_status: (inv[0] && ['active','approved'].includes(String(inv[0].status || '').toLowerCase())) ? 'active' : (inv[0] ? inv[0].status : 'pending_deposit'),
           investment: inv[0] || null
         });
       } catch (e) {
@@ -400,8 +405,16 @@ export default async function handler(req, res) {
              updated_at=NOW()`,
           [email, name, phone, age]
         );
-        const [saved] = await conn.query('SELECT onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
-        persistedStatus = saved[0]?.onboarding_status || persistedStatus;
+        // A profile's onboarding flag is not proof of payment approval.
+        // Only an investment row explicitly approved by an admin can unlock access.
+        const [savedInvestments] = await conn.query(
+          "SELECT status FROM investments WHERE LOWER(user_email)=? ORDER BY CASE WHEN status IN ('active','approved') THEN 0 WHEN status IN ('pending_approval','pending') THEN 1 ELSE 2 END, id DESC LIMIT 1",
+          [email]
+        );
+        const savedInvestmentStatus = String(savedInvestments[0]?.status || '').toLowerCase();
+        persistedStatus = ['active', 'approved'].includes(savedInvestmentStatus)
+          ? 'active'
+          : (['pending', 'pending_approval'].includes(savedInvestmentStatus) ? 'pending_approval' : 'plan_selection');
         await conn.end();
       } catch (e) {
         console.error('[accounts] profile save failed:', e.message);

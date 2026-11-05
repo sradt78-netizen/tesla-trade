@@ -592,7 +592,7 @@ export default async function handler(req, res) {
               } else if (!dbInvestmentsAuthoritative) {
                 mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
               }
-            } else {
+            } else if (!dbInvestmentsAuthoritative) {
               mergedInvs.unshift(dep);
             }
           }
@@ -607,7 +607,7 @@ export default async function handler(req, res) {
           const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id));
           if (idx >= 0) {
             if (!dbInvestmentsAuthoritative) mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
-          } else {
+          } else if (!dbInvestmentsAuthoritative) {
             mergedInvs.unshift(dep);
           }
         }
@@ -617,7 +617,7 @@ export default async function handler(req, res) {
       // Merge disk persistent registered investors
       try {
         const diskInvestors = loadPersistentInvestors();
-        if (Array.isArray(diskInvestors)) {
+        if (!dbInvestmentsAuthoritative && Array.isArray(diskInvestors)) {
           for (const u of diskInvestors) {
             const em = (u.email || '').toLowerCase();
             const idx = investors.findIndex(x => (x.email || '').toLowerCase() === em);
