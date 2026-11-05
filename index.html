@@ -1879,6 +1879,9 @@
                     localStorage.setItem('ttinc_auth', JSON.stringify({
                       email: data.email || user.email,
                       name: data.name || supabaseUserLabel(user),
+                      phone: data.phone || '',
+                      age: Number(data.age || 0),
+                      onboardingState: data.onboardingStatus || data.investmentStatus || 'registered',
                       provider: 'social'
                     }));
                  if (getSocialRegistrationHandoff() || data.isNewAccount || data.investmentStatus === 'none') {
