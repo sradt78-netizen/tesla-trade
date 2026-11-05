@@ -1,4 +1,6 @@
 import { getDbConnection } from './dbcheck.js';
+import { sendWelcomeEmail } from '../mailer.js';
+import { notifySignup } from '../telegram.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -322,8 +324,11 @@ export default async function handler(req, res) {
       const age = parseInt(body.age || '0', 10);
 
       let persistedStatus = 'plan_selection';
+      let isNewAccount = false;
       try {
         const conn = await getDbConnection();
+        const [priorAccount] = await conn.query('SELECT email FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
+        isNewAccount = priorAccount.length === 0;
         await conn.query(
           `INSERT INTO investor_accounts (email, name, phone, age, onboarding_status, registered_at)
            VALUES (?, ?, ?, ?, 'plan_selection', NOW())
@@ -350,6 +355,11 @@ export default async function handler(req, res) {
         return res.status(503).json({ success: false, error: 'Your investor profile could not be saved. Please retry before choosing an investment plan.' });
       }
 
+      if (isNewAccount) {
+        const alert = { email, name, phone, ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '' };
+        const results = await Promise.allSettled([sendWelcomeEmail(email, name), notifySignup(alert)]);
+        results.forEach((result) => { if (result.status === 'rejected' || result.value?.ok === false) console.warn('[accounts] signup notification failed:', result.reason || result.value?.error); });
+      }
       return res.status(200).json({
         success: true,
         status: persistedStatus,
