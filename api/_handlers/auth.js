@@ -2,6 +2,7 @@ import bcryptjs from 'bcryptjs';
 import crypto from 'crypto';
 import { getDbConnection } from './dbcheck.js';
 import { resolveSupabaseCredentials } from './supabase-config.js';
+import { notifyAdminEvent } from '../telegram.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -111,6 +112,8 @@ export default async function handler(req, res) {
     if (!passwordValid) {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
+    try { await notifyAdminEvent('Investor sign-in', { email, name: investorName || email, status: 'success' }); }
+    catch (noticeError) { console.warn('[auth login] Telegram alert failed:', noticeError.message); }
 
     return res.status(200).json({
       success: true,
