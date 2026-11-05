@@ -164,7 +164,7 @@
       if (saved.stock) state.stock = saved.stock;
       if (saved.planId && findPlan(saved.planId)) state.planId = saved.planId;
       if (saved.amount) state.amount = String(saved.amount);
-      if (saved.method) state.method = saved.method;
+      if (saved.method && ['usdt', 'eth', 'btc', 'bank'].indexOf(String(saved.method).toLowerCase()) !== -1) state.method = String(saved.method).toLowerCase();
       if (saved.step >= 1 && saved.step <= 4) state.step = Number(saved.step);
     } catch (error) {}
   }
