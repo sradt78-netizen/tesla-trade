@@ -5,6 +5,8 @@
   var BANNER_ID = 'ttinc-pending-payment-banner';
   var pollTimer = null;
   var lastCheckedStatus = '';
+  // Only a fresh positive response from /api/account-status can approve this session.
+  var serverApproved = false;
 
   function onInvestorRoute() {
     var p = (window.location.pathname || '').toLowerCase();
@@ -66,13 +68,7 @@
     var origReplace = window.history.replaceState;
     function shouldBlock(targetUrl) {
       var str = String(targetUrl || '').toLowerCase();
-      var isApproved = (localStorage.getItem('ttinc_account_approved') === 'true');
-      var meta = {};
-      try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
-      var curAuth = auth() || {};
-      if (curAuth.onboardingState === 'completed' || curAuth.onboarding_status === 'verified' || curAuth.onboarding_status === 'active' || meta.status === 'active' || meta.status === 'approved') {
-        isApproved = true;
-      }
+      var isApproved = serverApproved;
 
       // If active, prevent kicking back to /invest, /waiting, or /payment
       if (isApproved) {
@@ -342,17 +338,7 @@
       return;
     }
 
-    var localApprovedEmail = localStorage.getItem('ttinc_account_approved_email') || '';
-    if (localStorage.getItem('ttinc_account_approved') === 'true' && localApprovedEmail === current.email && !isDepositPendingLocal()) {
-      removeLock();
-      removeBanner();
-      if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-      if (typeof callback === 'function') callback(true);
-      return;
-    }
+    serverApproved = false;
 
     // If local state says deposit pending, lock immediately to avoid flicker
     if (isDepositPendingLocal()) {
@@ -366,11 +352,13 @@
       .then(function (res) { return res.ok ? res.json() : null; })
       .then(function (data) {
         if (!data) {
+          serverApproved = false;
           if (typeof callback === 'function') callback(false);
           return;
         }
 
         var hasActive = data.hasActiveInvestment || data.status === 'active' || data.investmentStatus === 'active' || data.status === 'approved' || data.investmentStatus === 'approved';
+        serverApproved = !!hasActive;
         var isPending = data.status === 'pending_approval' || data.investmentStatus === 'pending_approval' ||
           (!hasActive && Array.isArray(data.pendingPayments) && data.pendingPayments.length > 0);
 
