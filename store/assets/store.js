@@ -83,10 +83,10 @@
   ];
 
   var fallbackPayments = [
-    { id: "bank", label: "Bank Transfer", detail: "Payment instructions will be confirmed by the distributor team." },
-    { id: "paypal", label: "PayPal", detail: "PayPal instructions will be confirmed by the distributor team." },
     { id: "usdt", label: "Tether (USDT)", detail: "Network and wallet details are loaded from the main site payment settings." },
-    { id: "btc", label: "Bitcoin (BTC)", detail: "Wallet details are loaded from the main site payment settings." }
+    { id: "eth", label: "Ethereum (ETH)", detail: "Wallet details are loaded from the main site payment settings." },
+    { id: "btc", label: "Bitcoin (BTC)", detail: "Wallet details are loaded from the main site payment settings." },
+    { id: "bank", label: "Bank Transfer", detail: "Payment instructions will be confirmed by the distributor team." }
   ];
 
   var countries = [
@@ -771,10 +771,11 @@
       .catch(function () { return loadFrom("../api/payment-settings.php"); })
       .then(function (data) {
         paymentDetails = applyPaymentSettings(data);
-        paymentMethods = Object.keys(paymentDetails).map(function (id) { return { id: id, label: paymentDetails[id].label || prettyLabel(id), detail: methodSummary(paymentDetails[id]) }; });
+        var allowedMethods = ['usdt', 'eth', 'btc', 'bank'];
+        paymentMethods = allowedMethods.filter(function (id) { return paymentDetails[id] && typeof paymentDetails[id] === 'object'; }).map(function (id) { return { id: id, label: paymentDetails[id].label || prettyLabel(id), detail: methodSummary(paymentDetails[id]) }; });
         // Keep the checkout order intentional even when the settings object
-        // arrives in a different order: PayPal belongs immediately after bank.
-        var paymentOrder = ["usdt", "eth", "btc", "bank", "paypal"];
+        // Cryptocurrency options are followed by the single bank-transfer option.
+        var paymentOrder = ["usdt", "eth", "btc", "bank"];
         paymentMethods.sort(function (a, b) {
           var aIndex = paymentOrder.indexOf(a.id);
           var bIndex = paymentOrder.indexOf(b.id);
