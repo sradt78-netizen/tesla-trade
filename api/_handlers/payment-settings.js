@@ -10,6 +10,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
@@ -65,24 +68,24 @@ export default async function handler(req, res) {
   return res.status(200).json({
     usdt: {
       network: 'TRC-20',
-      address: usdt || 'TVZpQ78y2s8N4x7a8n2b4k5L6m7j9w1Q2r',
+      address: usdt,
       label: 'Tether (USDT TRC-20)'
     },
     eth: {
       network: 'ERC-20',
-      address: eth || '0x71C8A9eD23B75aE033fDaC23e4d775F86d47Eb6C',
+      address: eth,
       label: 'Ethereum (ETH)'
     },
     btc: {
       network: 'Bitcoin',
-      address: btc || 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+      address: btc,
       label: 'Bitcoin (BTC)'
     },
     bank: {
-      name: bankName || 'JPMorgan Chase Bank, N.A.',
-      account: bankAccount || '8839201948',
-      routing: bankRouting || '021000021',
-      swift: bankSwift || 'CHASUS33',
+      name: bankName,
+      account: bankAccount,
+      routing: bankRouting,
+      swift: bankSwift,
       label: 'Bank Wire Transfer'
     }
   });
