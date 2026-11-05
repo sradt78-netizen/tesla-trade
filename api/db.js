@@ -204,21 +204,13 @@ export function resolveDatabaseConfig() {
  */
 export async function checkMySqlHealth(force = false) {
   const now = Date.now();
-  if (!force && mysqlStatus.tested && (now - mysqlStatus.lastTestedAt < 30000)) {
+  if (!force && mysqlStatus.tested && (mysqlStatus.available || now - mysqlStatus.lastTestedAt < 15000)) {
     return mysqlStatus;
   }
 
   const cfg = resolveDatabaseConfig();
   mysqlStatus.config = cfg;
   mysqlStatus.lastTestedAt = now;
-
-  // If host is remote Aiven cluster or outbound TCP is blocked in AI Studio container, don't stall
-  if (cfg.host.includes('aivencloud.com') || cfg.host.includes('remote') || !process.env.DB_LOCAL) {
-    mysqlStatus.tested = true;
-    mysqlStatus.available = false;
-    mysqlStatus.error = 'AI Studio container: Outbound direct TCP blocked. Operating with zero latency on persistent local database.';
-    return mysqlStatus;
-  }
 
   try {
     const conn = await mysql.createConnection({
@@ -228,7 +220,7 @@ export async function checkMySqlHealth(force = false) {
       password: cfg.password,
       database: cfg.database,
       ssl: cfg.ssl,
-      connectTimeout: 800
+      connectTimeout: 6000
     });
     const [tables] = await conn.query('SHOW TABLES');
     await conn.end();
@@ -236,6 +228,7 @@ export async function checkMySqlHealth(force = false) {
     mysqlStatus.available = true;
     mysqlStatus.error = null;
     mysqlStatus.tablesCount = Array.isArray(tables) ? tables.length : 0;
+    try { await ensureTradingColumns(cfg); } catch (e) {}
   } catch (err) {
     mysqlStatus.tested = true;
     mysqlStatus.available = false;
@@ -919,6 +912,32 @@ class PersistentDbConnection {
  * Otherwise returns a persistent local database connection that ensures
  * zero downtime, zero data loss, and seamless query compatibility.
  */
+export async function ensureTradingColumns(cfg) {
+  cfg = cfg || resolveDatabaseConfig();
+  const conn = await mysql.createConnection({ host: cfg.host, port: cfg.port, user: cfg.user, password: cfg.password, database: cfg.database, ssl: cfg.ssl, connectTimeout: 6000 });
+  const cols = [
+    "trading_status VARCHAR(20) NOT NULL DEFAULT 'idle'",
+    "trading_amount DECIMAL(15,2) NOT NULL DEFAULT 0",
+    "trading_current_value DECIMAL(15,2) NOT NULL DEFAULT 0",
+    "trading_started_at DATETIME DEFAULT NULL",
+    "trading_updated_at DATETIME DEFAULT NULL",
+    "activated_at DATETIME DEFAULT NULL",
+    "plan_name VARCHAR(100) DEFAULT NULL",
+    "plan_id VARCHAR(50) DEFAULT NULL",
+    "earnings DECIMAL(15,2) DEFAULT 0",
+    "updated_at DATETIME DEFAULT NULL",
+    "plan_label VARCHAR(100) DEFAULT NULL",
+    "deposit_purpose VARCHAR(50) NOT NULL DEFAULT 'investment'",
+    "deposit_parent_id VARCHAR(36) DEFAULT NULL",
+    "payment_confirmed TINYINT(1) NOT NULL DEFAULT 0",
+    "can_withdraw TINYINT(1) NOT NULL DEFAULT 0"
+  ];
+  for (const c of cols) {
+    try { await conn.query('ALTER TABLE investments ADD COLUMN ' + c); } catch (e) {}
+  }
+  await conn.end();
+}
+
 export async function getDbConnection() {
   const health = await checkMySqlHealth();
   if (health.available) {

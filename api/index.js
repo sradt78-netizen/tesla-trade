@@ -146,14 +146,15 @@ export default async function handler(req, res) {
     const invId = decodeURIComponent(tradingMatch[1]);
     const action = tradingMatch[2];
     if (action === 'trading-state') {
-      return handleTradingState(req, res, invId);
+      return await handleTradingState(req, res, invId);
     }
     if (action === 'trading/start') {
       const body = await parseJsonBody(req);
-      return handleTradingStart(req, res, invId, body);
+      return await handleTradingStart(req, res, invId, body);
     }
     if (action === 'trading/stop') {
-      return handleTradingStop(req, res, invId);
+      const stopBody = req.method === 'POST' ? await parseJsonBody(req) : {};
+      return await handleTradingStop(req, res, invId, stopBody);
     }
   }
 

@@ -10,7 +10,7 @@
   if (_origFetch) {
     window.fetch = function (resource, init) {
       var url = typeof resource === 'string' ? resource : (resource && resource.url ? resource.url : '');
-      if (url.indexOf('/api/investments') !== -1 && (!init || !init.method || String(init.method).toUpperCase() === 'GET')) {
+      if (url.indexOf('/api/investments') !== -1 && url.indexOf('/trading') === -1 && url.indexOf('chart-data') === -1 && (!init || !init.method || String(init.method).toUpperCase() === 'GET')) {
         return _origFetch.apply(this, arguments).then(function (res) {
           if (!res.ok) {
             var meta = {};
@@ -38,7 +38,7 @@
             });
           }
           return res.clone().json().then(function (data) {
-            if (data && typeof data === 'object') {
+            if (data && typeof data === 'object' && !Array.isArray(data)) {
               var modified = false;
               var isUserPending = (data.status === 'pending_approval' || data.status === 'pending' || localStorage.getItem('ttinc_deposit_status') === 'pending_approval');
               var isUserApproved = !isUserPending && (data.status === 'approved' || data.status === 'verified' || data.status === 'active');
@@ -290,9 +290,7 @@
         if (principal <= 0 && storedPrincipal > 0) {
           principal = storedPrincipal;
         }
-        if (Number.isFinite(storedCurrent) && storedCurrent > current) {
-          current = storedCurrent;
-        }
+        // Server value is authoritative (stale local values caused amounts to flip).
         oldMeta.id = investmentId || oldMeta.id || 'sim_inv_1';
         oldMeta.total = principal;
         oldMeta.totalCurrentValue = current;

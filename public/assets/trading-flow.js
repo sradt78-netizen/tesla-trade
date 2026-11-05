@@ -403,7 +403,7 @@
     var u = auth() || {};
 
     var available = Number(trade.availableBalance != null ? trade.availableBalance : 0);
-    if (available <= 0) {
+    if (available <= 0 && trade.availableBalance == null) {
       try {
         var metaObj = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
         if (metaObj.totalCurrentValue != null) available = Number(metaObj.totalCurrentValue);

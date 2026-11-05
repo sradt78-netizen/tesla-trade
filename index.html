@@ -4613,6 +4613,12 @@
       }
 
       function showOverlay(status) {
+        // The pending-payment lock screen is owned by /assets/pending-payment-dashboard.js.
+        // Two competing lock screens caused the flicker, so this one never draws it.
+        if (status === 'pending_approval' || status === 'pending') {
+          var dup = document.getElementById(OVERLAY_ID); if (dup) dup.remove();
+          return;
+        }
         var old = document.getElementById(OVERLAY_ID);
         if (old) {
           // Already showing same status — no-op to avoid flicker

@@ -83,8 +83,8 @@ export default async function handler(req, res) {
       await conn.end();
     } catch (dbErr) {}
 
-    // 2. Always check & merge persistent disk deposits, in-memory deposits & mockStore
-    try {
+    // 2. Merge disk/memory copies ONLY when MySQL could not be read (they go stale across serverless instances)
+    if (!dbRead) try {
       const { inMemoryDeposits, loadPersistentDeposits } = await import('./payment-submit.js');
       if (typeof loadPersistentDeposits === 'function') {
         const diskDeposits = loadPersistentDeposits();

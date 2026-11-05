@@ -570,7 +570,9 @@ export default async function handler(req, res) {
           for (const dep of diskDeposits) {
             const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id) || (dep.user_email && (x.user_email || '').toLowerCase() === dep.user_email.toLowerCase() && (dep.status === 'active' || dep.status === 'approved')));
             if (idx >= 0) {
-              if (dep.status === 'active' || dep.status === 'approved') {
+              if (dbInvestmentsAuthoritative) {
+                // MySQL row is the truth; never overwrite it with stale disk copies.
+              } else if (dep.status === 'active' || dep.status === 'approved') {
                 mergedInvs[idx] = { ...mergedInvs[idx], ...dep, status: 'active' };
               } else if (!dbInvestmentsAuthoritative) {
                 mergedInvs[idx] = { ...mergedInvs[idx], ...dep };
@@ -644,11 +646,11 @@ export default async function handler(req, res) {
         const totalDep = targetInvs.reduce((sum, i) => sum + parseFloat(i.total != null ? i.total : (i.amount || 0)), 0);
         const totalVal = targetInvs.reduce((sum, i) => {
           const dep = parseFloat(i.total != null ? i.total : (i.amount || 0));
-          const cur = parseFloat(i.total_current_value != null ? i.total_current_value : (i.totalCurrentValue != null ? i.totalCurrentValue : (dep * 2)));
-          return sum + (cur > 0 ? cur : (dep > 0 ? dep * 2 : 0));
+          const cur = parseFloat(i.total_current_value != null ? i.total_current_value : (i.totalCurrentValue != null ? i.totalCurrentValue : dep));
+          return sum + (cur > 0 ? cur : dep);
         }, 0);
         u.total_deposited = totalDep;
-        u.total_current_value = totalVal > 0 ? totalVal : (totalDep * 2);
+        u.total_current_value = totalVal > 0 ? totalVal : totalDep;
         u.available_balance = u.total_current_value;
         if (activeInvs.length > 0) {
           u.onboarding_status = 'active';

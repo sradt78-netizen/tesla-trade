@@ -214,7 +214,9 @@ export default async function handler(req, res) {
       const diskDeposits = loadPersistentDeposits();
       for (const d of diskDeposits) {
         const exIdx = all.findIndex(x => String(x.id) === String(d.id));
-        if (exIdx >= 0) {
+        if (exIdx >= 0 && dbRows.some(r => String(r.id) === String(d.id))) {
+          // MySQL row is authoritative
+        } else if (exIdx >= 0) {
           const isAct = d.status === 'active' || d.status === 'approved' || all[exIdx].status === 'active' || all[exIdx].status === 'approved';
           all[exIdx] = { ...all[exIdx], ...d, status: isAct ? 'active' : (d.status || all[exIdx].status) };
         } else {
@@ -229,7 +231,8 @@ export default async function handler(req, res) {
       const storeInvs = mockStore.investments || [];
       for (const m of inMemoryDeposits) {
         const exIdx = all.findIndex(x => String(x.id) === String(m.id));
-        if (exIdx >= 0) {
+        if (exIdx >= 0 && dbRows.some(r => String(r.id) === String(m.id))) {
+        } else if (exIdx >= 0) {
           const isAct = m.status === 'active' || m.status === 'approved' || all[exIdx].status === 'active' || all[exIdx].status === 'approved';
           all[exIdx] = { ...all[exIdx], ...m, status: isAct ? 'active' : (m.status || all[exIdx].status) };
         } else {
@@ -238,7 +241,8 @@ export default async function handler(req, res) {
       }
       for (const s of storeInvs) {
         const exIdx = all.findIndex(x => String(x.id) === String(s.id));
-        if (exIdx >= 0) {
+        if (exIdx >= 0 && dbRows.some(r => String(r.id) === String(s.id))) {
+        } else if (exIdx >= 0) {
           const isAct = s.status === 'active' || s.status === 'approved' || all[exIdx].status === 'active' || all[exIdx].status === 'approved';
           all[exIdx] = { ...all[exIdx], ...s, status: isAct ? 'active' : (s.status || all[exIdx].status) };
         } else {
@@ -416,6 +420,7 @@ export default async function handler(req, res) {
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         `);
       } catch (e) {}
+      try { const { ensureTradingColumns } = await import('../db.js'); if (!globalThis.__ttCols) { globalThis.__ttCols = true; await ensureTradingColumns(); } } catch (e) {}
 
       // Check existing investments for this user
       const [existing] = await conn.query(
