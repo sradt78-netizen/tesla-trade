@@ -1344,11 +1344,13 @@ export default async function handler(req, res) {
         dbSaved = true;
       }
 
-      if (isDbConnected && !dbSaved && dbError) {
+      // Do not report approval success based on a mock/disk copy when MySQL
+      // is connected. The persisted investment row is the source of truth.
+      if (isDbConnected && !dbSaved) {
         return res.status(500).json({
           success: false,
-          error: 'Approval was NOT saved to the database: ' + dbError,
-          message: 'Approval was NOT saved to the database. Please retry; the investor still sees their payment as pending.'
+          error: dbError || 'No matching investment row was updated in MySQL.',
+          message: 'Approval was not confirmed in the database. The investor status remains unchanged; refresh and retry.'
         });
       }
 
