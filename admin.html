@@ -1468,18 +1468,18 @@
           if (!curBest) {
             invMap[em] = inv;
           } else {
-            var curIsActive = (curBest.status === 'active' || curBest.status === 'approved');
-            var newIsActive = (inv.status === 'active' || inv.status === 'approved');
-            if (newIsActive && !curIsActive) {
+            var curIsActive = (curBest.status === 'active' || curBest.status === 'approved' || curBest.status === 'completed');
+            var newIsActive = (inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed');
+            var curHasProof = !!(curBest.payment_proof_path || curBest.payment_proof_name || curBest.payment_reference);
+            var newHasProof = !!(inv.payment_proof_path || inv.payment_proof_name || inv.payment_reference);
+            var curTime = Date.parse(curBest.created_at || curBest.registered_at || 0) || 0;
+            var newTime = Date.parse(inv.created_at || inv.registered_at || 0) || 0;
+            // Prefer the latest real deposit record with receipt/reference data.
+            // Within the same proof state, prefer an active record, then newest.
+            if ((newHasProof && !curHasProof) ||
+                (newHasProof === curHasProof && newIsActive && !curIsActive) ||
+                (newHasProof === curHasProof && newIsActive === curIsActive && newTime > curTime)) {
               invMap[em] = inv;
-            } else if (newIsActive === curIsActive) {
-              var curTotal = parseFloat(curBest.total || '0');
-              var newTotal = parseFloat(inv.total || '0');
-              if (newTotal > curTotal) {
-                invMap[em] = inv;
-              } else if (!curBest.payment_proof_path && inv.payment_proof_path) {
-                invMap[em] = inv;
-              }
             }
           }
         }
@@ -1512,9 +1512,10 @@
         investors.forEach(function(u) {
           var em = (u.email || '').toLowerCase();
           var inv = invMap[em] || {};
-          var bal = parseFloat(u.total_deposited != null ? u.total_deposited : (inv.total || '0'));
-          var cur = parseFloat(u.total_current_value != null ? u.total_current_value : (inv.total_current_value || inv.totalCurrentValue || (bal > 0 ? bal * 2 : 0)));
-          if (bal > 0 && cur <= bal) cur = bal * 2;
+          var bal = parseFloat(u.total_deposited != null ? u.total_deposited : (inv.total || inv.amount || '0'));
+          if (!Number.isFinite(bal)) bal = 0;
+          var cur = parseFloat(u.total_current_value != null ? u.total_current_value : (inv.total_current_value || inv.totalCurrentValue || bal));
+          if (!Number.isFinite(cur) || cur < 0) cur = bal;
           var isApproved = (inv.status === 'active' || inv.status === 'approved' || inv.status === 'completed' || u.onboarding_status === 'verified' || u.onboarding_status === 'active');
           var isPending = !isApproved && (inv.status === 'pending_approval' || u.onboarding_status === 'pending_deposit' || inv.payment_proof_path || inv.payment_reference || bal > 0);
 
