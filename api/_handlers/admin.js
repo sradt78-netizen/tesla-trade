@@ -1282,6 +1282,20 @@ export default async function handler(req, res) {
             );
           }
 
+          // Record the matched bonus once per approved investment so /api/my-status and wallet UI can read it.
+          if (status === 'active' && bonusMatch > 0 && effectiveEmail) {
+            const [bonusTxRows] = await conn.query(
+              'SELECT id FROM account_transactions WHERE LOWER(user_email)=? AND investment_id=? AND type="bonus" LIMIT 1',
+              [effectiveEmail, effectiveId]
+            );
+            if (!bonusTxRows.length) {
+              await conn.query(
+                'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "bonus", ?, "processed", "100% Deposit Match Bonus", NOW())',
+                ['tx_bonus_' + Math.random().toString(36).substring(2, 10), effectiveId, effectiveEmail, bonusMatch]
+              );
+            }
+          }
+
           // If still no row affected in DB, INSERT a new active investment row!
           if ((!result || !result.affectedRows) && effectiveEmail && status === 'active') {
             const insId = rawId || depId || effectiveId || ('inv_' + Math.random().toString(36).substring(2, 9));
