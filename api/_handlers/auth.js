@@ -45,6 +45,7 @@ export default async function handler(req, res) {
 
     let credential = null;
     let investorName = '';
+    let investmentStatus = 'none';
 
     try {
       const conn = await getDbConnection();
@@ -72,9 +73,20 @@ export default async function handler(req, res) {
         return res.status(404).json({ success: false, message: 'No investor account was found for this email.' });
       }
 
-      // Fetch name
-      const [acc] = await conn.query('SELECT name FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
+      // Resolve persisted onboarding and investment state at login. Never infer
+      // approval from client storage or a stale session response.
+      const [acc] = await conn.query('SELECT name, onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
       if (acc.length > 0 && acc[0].name) investorName = acc[0].name;
+      const [investments] = await conn.query(
+        "SELECT status FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC",
+        [email]
+      );
+      const states = investments.map(row => String(row.status || '').toLowerCase());
+      investmentStatus = states.some(s => ['active','approved','completed'].includes(s))
+        ? 'active'
+        : states.some(s => ['pending','pending_approval'].includes(s))
+          ? 'pending_approval'
+          : String(acc[0]?.onboarding_status || 'none').toLowerCase();
       await conn.end();
 
     } catch (e) {
@@ -111,7 +123,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       email,
-      name: investorName || email
+      name: investorName || email,
+      investmentStatus: typeof investmentStatus === 'string' ? investmentStatus : 'none'
     });
   }
 
@@ -214,17 +227,41 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!email) {
-      return res.status(400).json({ success: false, message: 'Social session token or email is required.' });
+    if (supabaseUrl && anonKey && accessToken && !email) {
+      return res.status(401).json({ success: false, message: 'The social access token could not be verified.' });
+    }
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ success: false, message: 'A valid social account email is required.' });
+    }
+    // In production, never trust an email supplied by the browser as proof of
+    // identity. Require the provider token to be verified by Supabase.
+    if (process.env.NODE_ENV === 'production' && !(supabaseUrl && anonKey && accessToken)) {
+      return res.status(401).json({ success: false, message: 'Social sign-in verification is not configured.' });
     }
 
-    // Upsert investor account in database
+    // Upsert account, then resolve its actual persisted investment state.
+    let investmentStatus = 'none';
     try {
       const conn = await getDbConnection();
       await conn.query(
         'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_approval", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name))',
         [email, name]
       );
+      const [accountRows] = await conn.query(
+        'SELECT onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1',
+        [email]
+      );
+      const [rows] = await conn.query(
+        "SELECT status FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC",
+        [email]
+      );
+      const states = rows.map(row => String(row.status || '').toLowerCase());
+      const persistedOnboarding = String(accountRows[0]?.onboarding_status || 'none').toLowerCase();
+      investmentStatus = states.some(s => ['active','approved','completed'].includes(s))
+        ? 'active'
+        : states.some(s => ['pending','pending_approval'].includes(s))
+          ? 'pending_approval'
+          : persistedOnboarding;
       await conn.end();
     } catch (e) {
       try {
@@ -252,7 +289,7 @@ export default async function handler(req, res) {
       name,
       provider,
       isNewAccount: false,
-      investmentStatus: 'none',
+      investmentStatus,
       message: 'Social session verified successfully.'
     });
   }

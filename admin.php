@@ -40,10 +40,15 @@ $is_auth = !empty($_SESSION['tt_admin_ok']);
 
 // ── Fetch helpers ──────────────────────────────────────────────
 function api_db_investments(): array {
+    global $admin_investments_error;
     try {
         $db = get_db();
         return $db->query('SELECT * FROM investments ORDER BY created_at DESC')->fetchAll();
-    } catch (Throwable $e) { return []; }
+    } catch (Throwable $e) {
+        $admin_investments_error = 'Investor records could not be loaded. Check the server error log and database schema.';
+        error_log('Tesla Trade admin investor query failed: ' . $e->getMessage());
+        return [];
+    }
 }
 function api_db_withdrawals(): array {
     try {
@@ -1067,6 +1072,9 @@ $revoked_invitation_codes = count(array_filter($invitation_codes, function ($c) 
         <h1>Investors</h1>
         <p>Manage all investor accounts, approve/decline, set ROI, and add funds.</p>
       </div>
+      <?php if (!empty($admin_investments_error)): ?>
+      <div class="action-msg error"><?= htmlspecialchars($admin_investments_error) ?></div>
+      <?php endif; ?>
 
       <div class="stats-grid">
         <div class="stat-card"><div class="s-label">Total Investors</div><div class="s-value"><?= $total_investors ?></div></div>

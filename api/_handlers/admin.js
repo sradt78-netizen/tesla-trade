@@ -992,7 +992,7 @@ export default async function handler(req, res) {
 
       if (isDbConnected && conn) {
         try {
-          const [invRows] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? LIMIT 1', [email]);
+          const [invRows] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC LIMIT 1', [email]);
           if (invRows.length > 0) {
             await conn.query('UPDATE investments SET total=?, total_current_value=?, earnings=?, status="active" WHERE id=?', [updatedTotal, updatedCurrentValue, updatedCurrentValue - updatedTotal, invRows[0].id]);
           } else {
@@ -1037,15 +1037,32 @@ export default async function handler(req, res) {
 
       let approvedDepositAmount = parseFloat(body.amount || '0');
       let foundDeposit = null;
+      let selectedDepositId = String(rawId || '').trim();
+      // If the admin action only supplies an email, select one pending deposit,
+      // then apply the action only to that deposit across the backing stores.
+      if (!selectedDepositId && targetEmail) {
+        const candidates = [
+          ...loadPersistentDeposits(),
+          ...inMemoryDeposits,
+          ...mockStore.investments
+        ];
+        const candidate = candidates.find(d =>
+          String(d.user_email || d.email || d.user_id || d.userId || '').toLowerCase().trim() === targetEmail &&
+          ['pending', 'pending_approval', 'awaiting_payment', ''].includes(String(d.status || '').toLowerCase())
+        );
+        if (candidate?.id) selectedDepositId = String(candidate.id).trim();
+      }
 
       const matchesDeposit = (d) => {
         if (!d) return false;
         const dId = String(d.id || '').trim();
         const dCleanId = dId.replace(/^dep_/, '').trim();
-        const dEmail = String(d.user_email || d.email || d.user_id || d.userId || '').toLowerCase().trim();
-        if (rawId && (dId === String(rawId) || dId === cleanId || dId === depId || dCleanId === cleanId)) return true;
-        if (targetEmail && dEmail === targetEmail) return true;
-        return false;
+        return !!selectedDepositId && (
+          dId === selectedDepositId ||
+          dId === selectedDepositId.replace(/^dep_/, '') ||
+          dId === ('dep_' + selectedDepositId.replace(/^dep_/, '')) ||
+          dCleanId === selectedDepositId.replace(/^dep_/, '')
+        );
       };
 
       // 1. Check disk persistent deposits
@@ -1103,12 +1120,46 @@ export default async function handler(req, res) {
         }
       }
 
-      if (!approvedDepositAmount && body.amount) approvedDepositAmount = parseFloat(body.amount);
+      if (!approvedDepositAmount && body.amount != null) approvedDepositAmount = parseFloat(body.amount);
       if (!approvedDepositAmount) approvedDepositAmount = (foundDeposit && parseFloat(foundDeposit.total)) || 0;
+      const effectiveEmail = String(targetEmail || (foundDeposit && (foundDeposit.user_email || foundDeposit.email || foundDeposit.user_id)) || '').toLowerCase().trim();
+      if (status === 'active' && !effectiveEmail) {
+        return res.status(400).json({ success: false, error: 'Investor email is required to approve a deposit.' });
+      }
+      if (status === 'active' && (!Number.isFinite(approvedDepositAmount) || approvedDepositAmount <= 0)) {
+        return res.status(400).json({ success: false, error: 'A valid positive deposit amount is required for approval.' });
+      }
       const totalBalanceReal = approvedDepositAmount;
-      // Apply the advertised 100% deposit-match bonus to approved deposits.
-      // Keep principal in `total`; the match is reflected in current wallet value.
-      const bonusMatch = status === 'active' && approvedDepositAmount > 0 ? Number(approvedDepositAmount.toFixed(2)) : 0;
+      // The offer is limited to the first two approved deposits per investor.
+      // Use the persistent ledger to determine prior approved deposits; the
+      // current investment is excluded so retries remain idempotent.
+      let priorApprovedDeposits = 0;
+      try {
+        const { loadDatabaseSync } = await import('../db.js');
+        const ledgerDb = loadDatabaseSync();
+        const txs = Array.isArray(ledgerDb?.account_transactions) ? ledgerDb.account_transactions : [];
+        const seen = new Set();
+        for (const tx of txs) {
+          const txEmail = String(tx.user_email || '').toLowerCase().trim();
+          const txInvestmentId = String(tx.investment_id || '');
+          const selectedBareId = String(selectedDepositId || '').replace(/^dep_/, '');
+          const currentDepositIds = new Set([
+            String(rawId || ''),
+            String(cleanId || ''),
+            String(depId || ''),
+            String(selectedDepositId || ''),
+            selectedBareId,
+            selectedBareId ? ('dep_' + selectedBareId) : ''
+          ].filter(Boolean));
+          if (txEmail === effectiveEmail && tx.type === 'deposit' && tx.status === 'processed' &&
+              txInvestmentId && !currentDepositIds.has(txInvestmentId)) {
+            seen.add(txInvestmentId);
+          }
+        }
+        priorApprovedDeposits = seen.size;
+      } catch (e) {}
+      const bonusMatch = status === 'active' && approvedDepositAmount > 0 && priorApprovedDeposits < 2
+        ? Number(approvedDepositAmount.toFixed(2)) : 0;
       const totalBalanceWithBonus = Number((totalBalanceReal + bonusMatch).toFixed(2));
 
       // Persist the matched value in the selected fallback record as well as
@@ -1123,7 +1174,7 @@ export default async function handler(req, res) {
       }
 
       // If no deposit was found on disk or memory yet, create an approved record now
-      const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || 'investor@teslawealths.org';
+      // Reuse the validated email; never synthesize a placeholder investor.
       const effectiveId = rawId || depId || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
 
       if (!foundDeposit && effectiveEmail && status === 'active') {
@@ -1148,18 +1199,6 @@ export default async function handler(req, res) {
         savePersistentDeposit(freshDep);
         inMemoryDeposits.unshift(freshDep);
         mockStore.investments.unshift(freshDep);
-      }
-
-      // Also ensure all deposits for this email in inMemoryDeposits and saved_deposits are marked active
-      if (effectiveEmail && status === 'active') {
-        for (const mem of inMemoryDeposits) {
-          const mEmail = String(mem.user_email || mem.email || mem.user_id || '').toLowerCase().trim();
-          if (mEmail === effectiveEmail) {
-            mem.status = 'active';
-            mem.total_current_value = totalBalanceWithBonus;
-            mem.totalCurrentValue = totalBalanceWithBonus;
-          }
-        }
       }
 
       // 4. Update investor account status in mockStore and persistent disk storage
@@ -1207,7 +1246,14 @@ export default async function handler(req, res) {
           for (const inv of db.investments) {
             const iEmail = String(inv.user_email || inv.email || '').toLowerCase().trim();
             const iId = String(inv.id || '').trim();
-            if (iId === String(rawId) || iId === cleanId || iId === depId || (effectiveEmail && iEmail === effectiveEmail)) {
+            const selectedId = String(selectedDepositId || effectiveId || '').trim();
+            const selectedBareId = selectedId.replace(/^dep_/, '');
+            if (
+              iId === String(rawId) ||
+              iId === cleanId ||
+              iId === depId ||
+              (selectedId && (iId === selectedId || iId === selectedBareId || iId === ('dep_' + selectedBareId)))
+            ) {
               inv.status = status;
               if (status === 'active') {
                 inv.total = approvedDepositAmount || inv.total || 0;
@@ -1280,16 +1326,16 @@ export default async function handler(req, res) {
           [result] = await conn.query(
             `UPDATE investments 
              SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
-             WHERE id=? OR id=? OR id=? OR (LOWER(user_email)=? AND (status="pending_approval" OR status="pending"))`,
-            [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, rawId, cleanId, depId, effectiveEmail]
+             WHERE id=? OR id=? OR id=? OR (? = "" AND LOWER(user_email)=? AND id=? AND (status="pending_approval" OR status="pending"))`,
+            [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, rawId, cleanId, depId, rawId, effectiveEmail, effectiveId]
           );
 
-          if ((!result || !result.affectedRows) && effectiveEmail) {
+          if ((!result || !result.affectedRows) && !rawId && effectiveEmail) {
             [result] = await conn.query(
               `UPDATE investments 
                SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
-               WHERE LOWER(user_email)=?`,
-              [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, effectiveEmail]
+               WHERE id=?`,
+              [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, effectiveId]
             );
           }
 
@@ -1553,8 +1599,9 @@ export default async function handler(req, res) {
   } catch (error) {
     if (conn) try { await conn.end(); } catch (e) {}
     console.error('API Admin Error:', error);
-    return res.status(200).json({
-      success: true,
+    return res.status(500).json({
+      success: false,
+      error: 'Admin API operation failed; success was not confirmed.',
       investors: mockStore.investors,
       investments: mockStore.investments,
       kyc: mockStore.kyc,
