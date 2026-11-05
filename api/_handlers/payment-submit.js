@@ -445,6 +445,13 @@ export default async function handler(req, res) {
       console.warn('DB payment submit notice (persisting to disk & memory):', dbErr.message);
     }
 
+    if (!dbSaved) {
+      return res.status(503).json({
+        success: false,
+        error: 'Payment receipt could not be saved to the investor database. Please retry; no pending or approved balance was created.'
+      });
+    }
+
     const depositRecord = {
       id: investmentId,
       tx_id: txId,
