@@ -145,6 +145,23 @@ export async function sendTelegramPhoto(photoDataUri, caption, fileName = 'depos
   }
 }
 
+
+/** Generic escaped event alert for operational events beyond deposits. */
+export async function notifyAdminEvent(eventName, details = {}) {
+  const allowed = ['email', 'name', 'phone', 'amount', 'reference', 'status', 'reason', 'recordId'];
+  const rows = allowed
+    .filter((key) => details[key] !== undefined && details[key] !== null && String(details[key]).trim() !== '')
+    .map((key) => `• <b>${escapeHtml(key)}:</b> ${escapeHtml(details[key])}`);
+  const message = [
+    `🔔 <b>${escapeHtml(String(eventName || 'SITE EVENT').toUpperCase())}</b>`,
+    '━━━━━━━━━━━━━━━━━━━━',
+    ...rows,
+    `⏰ <b>Time (UTC):</b> ${new Date().toISOString().replace('T', ' ').substring(0, 19)}`,
+    '<a href="https://teslawealths.org/admin">Open Admin Dashboard</a>'
+  ].join('\n');
+  return sendTelegramMessage(message);
+}
+
 /**
  * Alert 1: New Investor Signup
  */
@@ -334,5 +351,6 @@ export default {
   notifyPaymentStatusUpdate,
   notifyLinkClick,
   testTelegramConnection,
-  sendTelegramPhoto
+  sendTelegramPhoto,
+  notifyAdminEvent
 };
