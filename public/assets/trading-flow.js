@@ -75,7 +75,7 @@
               id: first.id,
               total: tot,
               totalCurrentValue: curVal,
-              bonus: 0,
+              bonus: Number(first.bonus != null ? first.bonus : (first.bonus_balance != null ? first.bonus_balance : 0)),
               status: first.status || 'active',
               planName: first.planName || first.portfolio || 'Explorer'
             }));
@@ -520,8 +520,8 @@
         return data;
       })
       .catch(function () {
-        var shell = document.getElementById(shellId);
-        if (shell) render(shell, { trade: {} });
+        // Keep the last valid render during transient polling failures; blank state causes balance flicker.
+        return null;
       });
   }
 
