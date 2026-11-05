@@ -425,6 +425,27 @@
       }
     }
   </style>
+<style id="tt-admin-visual-refresh">
+body { background-image:radial-gradient(ellipse at 15% 0%,rgba(227,25,55,.11),transparent 34%),radial-gradient(ellipse at 95% 15%,rgba(212,175,55,.07),transparent 30%); }
+.sidebar { background:linear-gradient(180deg,#151515 0%,#0d0d0f 100%); border-right-color:rgba(255,255,255,.09); }
+.sidebar-header { border-bottom-color:rgba(255,255,255,.09); }
+.sidebar-logo { box-shadow:0 6px 18px rgba(227,25,55,.25); }
+.nav-btn { border-radius:10px; padding:11px 13px; transition:background .18s ease,border-color .18s ease,transform .18s ease; }
+.nav-btn:hover { transform:translateX(2px); }
+.nav-btn.active { box-shadow:inset 3px 0 0 var(--red),0 6px 18px rgba(0,0,0,.16); }
+.card,.table-box { border-radius:15px; border-color:rgba(255,255,255,.09); box-shadow:0 10px 30px -18px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.025); }
+.card { background:linear-gradient(145deg,#171717,#111113); }
+.card-val { letter-spacing:-.035em; font-variant-numeric:tabular-nums; }
+th { background:#1b1b1e; letter-spacing:.045em; text-transform:uppercase; font-size:10px; }
+td { line-height:1.5; }
+button { transition:filter .18s ease,transform .15s ease,border-color .18s ease; }
+button:hover { filter:brightness(1.1); }
+button:active { transform:scale(.985); }
+input:focus,select:focus,textarea:focus { border-color:rgba(227,25,55,.8)!important; box-shadow:0 0 0 3px rgba(227,25,55,.12); outline:none; }
+.modal-content { box-shadow:0 24px 80px rgba(0,0,0,.6); }
+@media(max-width:900px) { .main { padding-top:18px!important; } .card { background:linear-gradient(145deg,#171717,#111113); } }
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important;transition:none!important; } }
+</style>
 </head>
 <body>
 
