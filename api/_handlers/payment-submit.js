@@ -214,65 +214,7 @@ export default async function handler(req, res) {
       return res.status(503).json({ success: false, error: 'Investment status is unavailable from the database. Please retry.' });
     }
 
-    // The JSON-backed database is also used by local/mock deployments; read its
-    // ledger when MySQL is unavailable so the bonus remains consistent there.
-    try {
-      const { loadDatabaseSync } = await import('../db.js');
-      const localDb = loadDatabaseSync();
-      const ledger = Array.isArray(localDb && localDb.account_transactions) ? localDb.account_transactions : [];
-      if (!Object.keys(bonusByInvestment).length) {
-        for (const tx of ledger) {
-          if (String(tx.user_email || '').toLowerCase() !== String(qEmail || (dbRows[0] && dbRows[0].user_email) || '').toLowerCase()) continue;
-          if (tx.type !== 'bonus' || tx.status !== 'processed') continue;
-          const key = String(tx.investment_id || '');
-          bonusByInvestment[key] = Number(bonusByInvestment[key] || 0) + Number(tx.amount || 0);
-        }
-      }
-    } catch (eLocalLedger) {}
-
     let all = Array.isArray(dbRows) ? [...dbRows] : [];
-
-    // Merge persistent file storage and promote approved status
-    try {
-      const diskDeposits = loadPersistentDeposits();
-      for (const d of diskDeposits) {
-        const exIdx = all.findIndex(x => String(x.id) === String(d.id));
-        if (exIdx >= 0 && dbRows.some(r => String(r.id) === String(d.id))) {
-          // MySQL row is authoritative
-        } else if (exIdx >= 0) {
-          const isAct = d.status === 'active' || d.status === 'approved' || all[exIdx].status === 'active' || all[exIdx].status === 'approved';
-          all[exIdx] = { ...all[exIdx], ...d, status: isAct ? 'active' : (d.status || all[exIdx].status) };
-        } else {
-          all.push(d);
-        }
-      }
-    } catch (e) {}
-
-    // Merge in-memory and mockStore
-    try {
-      const { mockStore } = await import('./admin.js');
-      const storeInvs = mockStore.investments || [];
-      for (const m of inMemoryDeposits) {
-        const exIdx = all.findIndex(x => String(x.id) === String(m.id));
-        if (exIdx >= 0 && dbRows.some(r => String(r.id) === String(m.id))) {
-        } else if (exIdx >= 0) {
-          const isAct = m.status === 'active' || m.status === 'approved' || all[exIdx].status === 'active' || all[exIdx].status === 'approved';
-          all[exIdx] = { ...all[exIdx], ...m, status: isAct ? 'active' : (m.status || all[exIdx].status) };
-        } else {
-          all.push(m);
-        }
-      }
-      for (const s of storeInvs) {
-        const exIdx = all.findIndex(x => String(x.id) === String(s.id));
-        if (exIdx >= 0 && dbRows.some(r => String(r.id) === String(s.id))) {
-        } else if (exIdx >= 0) {
-          const isAct = s.status === 'active' || s.status === 'approved' || all[exIdx].status === 'active' || all[exIdx].status === 'approved';
-          all[exIdx] = { ...all[exIdx], ...s, status: isAct ? 'active' : (s.status || all[exIdx].status) };
-        } else {
-          all.push(s);
-        }
-      }
-    } catch (e) {}
 
     if (qId) {
       let found = all.find(x => {
