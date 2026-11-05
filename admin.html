@@ -1159,6 +1159,15 @@
             </div>
           </div>
         </div>
+        <div style="border-top:1px solid var(--card-border);margin-top:18px;padding-top:18px;">
+          <h4 style="font-size:13px;color:#38bdf8;margin-bottom:10px;">Telegram Admin Alerts</h4>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Send real-time alerts for new registrations, sign-ins, deposits, receipt images and approval decisions. Keep the bot token private.</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
+            <div class="form-group"><label>Telegram Bot Token</label><input type="password" id="cfg-telegram-token" autocomplete="new-password" placeholder="123456:bot-token" /></div>
+            <div class="form-group"><label>Admin Chat ID</label><input type="text" id="cfg-telegram-chat" placeholder="Your Telegram chat ID" /></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:9px;color:var(--text);font-size:13px;"><input type="checkbox" id="cfg-telegram-enabled" checked style="width:16px;height:16px;"> Enable Telegram admin alerts</label>
+        </div>
         <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save API Credentials</button>
       </div>
     </section>
@@ -1787,11 +1796,11 @@
       
       var isResendLive = !!(mkStats.resendApiKeyConfigured);
       if (document.getElementById('stat-mk-apimode')) {
-        document.getElementById('stat-mk-apimode').textContent = isResendLive ? '● Live Resend SMTP' : '● Sandbox Simulator';
+        document.getElementById('stat-mk-apimode').textContent = isResendLive ? '● Live Resend API' : '● Email not configured';
         document.getElementById('stat-mk-apimode').style.color = isResendLive ? '#4ade80' : '#38bdf8';
       }
       if (document.getElementById('healthResendStatus')) {
-        document.getElementById('healthResendStatus').textContent = isResendLive ? 'Active (Live)' : 'Connected (Sandbox Mock)';
+        document.getElementById('healthResendStatus').textContent = isResendLive ? 'Configured' : 'Not configured';
         document.getElementById('healthResendStatus').style.color = isResendLive ? '#86efac' : '#93c5fd';
       }
       if (document.getElementById('healthAutopilotStatus')) {
@@ -1837,6 +1846,9 @@
       if (s.bank_swift && document.getElementById('cfg-bank-swift')) document.getElementById('cfg-bank-swift').value = s.bank_swift;
       if (s.resend_api_key && document.getElementById('cfg-resend-key')) document.getElementById('cfg-resend-key').value = s.resend_api_key;
       if (s.resend_from_email && document.getElementById('cfg-resend-from')) document.getElementById('cfg-resend-from').value = s.resend_from_email;
+      if (s.telegram_bot_token && document.getElementById('cfg-telegram-token')) document.getElementById('cfg-telegram-token').value = s.telegram_bot_token;
+      if (s.telegram_chat_id && document.getElementById('cfg-telegram-chat')) document.getElementById('cfg-telegram-chat').value = s.telegram_chat_id;
+      if (document.getElementById('cfg-telegram-enabled')) document.getElementById('cfg-telegram-enabled').checked = String(s.telegram_alerts_enabled || 'true') !== 'false';
       if (s.supabase_url && document.getElementById('cfg-supabase-url')) document.getElementById('cfg-supabase-url').value = s.supabase_url;
       if (s.supabase_anon_key && document.getElementById('cfg-supabase-anon')) document.getElementById('cfg-supabase-anon').value = s.supabase_anon_key;
     }
@@ -2277,6 +2289,9 @@
         bank_routing: (document.getElementById('cfg-bank-routing')?.value || '').trim(),
         bank_swift: (document.getElementById('cfg-bank-swift')?.value || '').trim(),
         resend_api_key: (document.getElementById('cfg-resend-key')?.value || '').trim(),
+        telegram_bot_token: (document.getElementById('cfg-telegram-token')?.value || '').trim(),
+        telegram_chat_id: (document.getElementById('cfg-telegram-chat')?.value || '').trim(),
+        telegram_alerts_enabled: document.getElementById('cfg-telegram-enabled')?.checked ? 'true' : 'false',
         resend_from_email: (document.getElementById('cfg-resend-from')?.value || '').trim(),
         supabase_url: (document.getElementById('cfg-supabase-url')?.value || '').trim(),
         supabase_anon_key: (document.getElementById('cfg-supabase-anon')?.value || '').trim()
