@@ -1021,15 +1021,18 @@ if ($seg0 === 'auth' && $seg1 === 'login' && $method === 'POST') {
     }
 
     $stName = $db->prepare(
-        'SELECT user_name FROM investments WHERE LOWER(user_email)=? ORDER BY created_at DESC LIMIT 1'
+        'SELECT user_name, status FROM investments WHERE LOWER(user_email)=? ORDER BY created_at DESC LIMIT 1'
     );
     $stName->execute([$email]);
     $investor = $stName->fetch();
-    if (!$investor) {
-        $stAccountName = $db->prepare('SELECT name FROM investor_accounts WHERE LOWER(email)=? LIMIT 1');
-        $stAccountName->execute([$email]);
-        $accountName = $stAccountName->fetch();
-        if ($accountName) $investor = ['user_name' => $accountName['name']];
+
+    $stProfile = $db->prepare(
+        'SELECT name, phone, age, onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1'
+    );
+    $stProfile->execute([$email]);
+    $profile = $stProfile->fetch() ?: [];
+    if (!$investor && !empty($profile['name'])) {
+        $investor = ['user_name' => $profile['name']];
     }
     // A browser session may expire while the password remains valid. Rotate
     // the session on every successful login and establish a fresh investor
@@ -1040,6 +1043,13 @@ if ($seg0 === 'auth' && $seg1 === 'login' && $method === 'POST') {
         'success' => true,
         'email'   => $email,
         'name'    => $investor['user_name'] ?? $email,
+        'phone'   => $profile['phone'] ?? '',
+        'age'     => (int)($profile['age'] ?? 0),
+        'onboardingStatus' => $profile['onboarding_status'] ?? 'registered',
+        'investmentStatus' => in_array(strtolower((string)($investor['status'] ?? '')), ['active','approved','completed'], true)
+            ? 'active'
+            : (in_array(strtolower((string)($investor['status'] ?? '')), ['pending','pending_approval'], true)
+                ? 'pending_approval' : 'none'),
     ]);
 }
 
@@ -3014,13 +3024,17 @@ if ($uri === '/profile' && $method === 'GET') {
     $stP = $db->prepare('SELECT phone, country, address FROM user_profiles WHERE email=?');
     $stP->execute([$email]);
     $prof = $stP->fetch() ?: ['phone'=>'','country'=>'','address'=>''];
+    $stAccountProfile = $db->prepare('SELECT phone, age FROM investor_accounts WHERE LOWER(email)=? LIMIT 1');
+    $stAccountProfile->execute([$email]);
+    $accountProfile = $stAccountProfile->fetch() ?: [];
 
     json_out([
         'user_name'  => $inv['user_name'],
         'user_email' => $inv['user_email'],
         'portfolio'  => $inv['portfolio'],
         'created_at' => $inv['created_at'],
-        'phone'      => $prof['phone'],
+        'phone'      => ($accountProfile['phone'] ?? '') ?: $prof['phone'],
+        'age'        => (int)($accountProfile['age'] ?? 0),
         'country'    => $prof['country'],
         'address'    => $prof['address'],
     ]);
