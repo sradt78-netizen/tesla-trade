@@ -1545,18 +1545,33 @@ export default async function handler(req, res) {
 
     // ── 10. SETTINGS SAVE ──────────────────────────────────────────
     if (action === 'save_settings') {
-      const s = body.settings || {};
-      if (isDbConnected && conn) {
-        try {
-          for (const [k, v] of Object.entries(s)) {
-            await conn.query('INSERT INTO app_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=?', [k, String(v), String(v)]);
-          }
-          await conn.end();
-        } catch (e) {}
-      } else {
-        Object.assign(mockStore.settings, s);
+      if (!isDbConnected || !conn) {
+        return res.status(503).json({ success: false, error: 'Settings cannot be saved because the database is unavailable.' });
       }
-      return res.status(200).json({ success: true, message: 'Settings saved successfully.' });
+      const supplied = body.settings || {};
+      const allowedKeys = new Set([
+        'wallet_usdt', 'wallet_btc', 'wallet_eth',
+        'bank_name', 'bank_account', 'bank_routing', 'bank_swift',
+        'resend_api_key', 'resend_from_email',
+        'supabase_url', 'supabase_anon_key',
+        'telegram_bot_token', 'telegram_chat_id', 'telegram_alerts_enabled'
+      ]);
+      try {
+        for (const [key, value] of Object.entries(supplied)) {
+          if (!allowedKeys.has(key)) continue;
+          await conn.query(
+            'INSERT INTO app_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=?',
+            [key, String(value == null ? '' : value), String(value == null ? '' : value)]
+          );
+        }
+        await conn.end();
+        conn = null;
+        return res.status(200).json({ success: true, message: 'Settings saved successfully.' });
+      } catch (error) {
+        console.error('[admin save_settings] database write failed:', error.message);
+        if (conn) { try { await conn.end(); } catch (closeError) {} conn = null; }
+        return res.status(500).json({ success: false, error: 'Settings could not be saved to the database. No success was recorded.' });
+      }
     }
 
     // ── 11. DELETE INVESTOR ─────────────────────────────────────────
