@@ -3,6 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import { getDbConnection } from './dbcheck.js';
 import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
+import { sendPaymentApprovedEmail, sendPaymentDeclinedEmail } from '../mailer.js';
+import { notifyPaymentStatusUpdate } from '../telegram.js';
 
 const INVESTORS_FILE = path.join(process.cwd(), 'data', 'saved_investors.json');
 
@@ -353,12 +355,7 @@ async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subjec
   const sender = fromEmail || 'no-reply@teslawealths.org';
 
   if (!apiKey) {
-    return {
-      ok: true,
-      simulated: true,
-      id: 'sim_' + Math.random().toString(36).substring(2, 10),
-      note: 'Simulated dispatch (Set RESEND_API_KEY in environment or admin settings for live SMTP delivery)'
-    };
+    return { ok: false, simulated: false, error: 'RESEND_API_KEY is not configured; no email was sent.' };
   }
 
   try {
@@ -380,14 +377,9 @@ async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subjec
     if (res.ok && data.id) {
       return { ok: true, simulated: false, id: data.id };
     }
-    return { ok: true, simulated: true, id: 'sim_resend_' + Date.now(), error: data.message };
+    return { ok: false, simulated: false, error: data.message || `Resend rejected the request (HTTP ${res.status})` };
   } catch (err) {
-    return {
-      ok: true,
-      simulated: true,
-      id: 'sim_fallback_' + Date.now(),
-      error: err.message
-    };
+    return { ok: false, simulated: false, error: err.message };
   }
 }
 
@@ -767,7 +759,11 @@ export default async function handler(req, res) {
       }
 
       if (targetList.length === 0) {
-        targetList.push({ email: 'investor@teslawealths.org', name: 'Verified Investor', code: defaultCode });
+        if (isDbConnected && conn) { try { await conn.end(); } catch (e) {} }
+        return res.status(422).json({
+          success: false,
+          error: 'No real investor recipients matched this campaign. No email was sent.'
+        });
       }
 
       let sentCount = 0;
@@ -797,8 +793,9 @@ export default async function handler(req, res) {
           user_email: target.email,
           campaign_type: campaignType,
           subject,
-          status: resendRes.simulated ? 'sent (sandbox)' : 'delivered',
-          resend_id: resendRes.id || 'sim',
+          status: resendRes.ok ? 'sent' : 'failed',
+          resend_id: resendRes.ok ? resendRes.id : null,
+          error: resendRes.ok ? null : resendRes.error,
           created_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
         };
 
@@ -813,7 +810,7 @@ export default async function handler(req, res) {
           mockStore.marketingLogs.unshift(newLog);
         }
 
-        sentCount++;
+        if (resendRes.ok) sentCount++;
       }
 
       if (isDbConnected && conn) {
@@ -826,13 +823,16 @@ export default async function handler(req, res) {
       }
 
       return res.status(200).json({
-        success: true,
+        success: sentCount > 0,
         campaign: campaignType,
         sent: sentCount,
+        failed: targetList.length - sentCount,
         targetCount: targetList.length,
-        isSimulated: !resendApiKey,
+        isSimulated: false,
         logs: mockStore.marketingLogs,
-        message: `Successfully dispatched "${template.name}" to ${sentCount} investor(s)!`
+        message: sentCount === targetList.length
+          ? `Email provider accepted ${sentCount} message(s) for delivery.`
+          : `Email provider accepted ${sentCount} of ${targetList.length} message(s). Check failed delivery logs and Resend configuration.`
       });
     }
 
@@ -1448,10 +1448,31 @@ export default async function handler(req, res) {
         });
       }
 
+      const notificationName = (authoritativeDeposit && authoritativeDeposit.user_name) || (foundDeposit && foundDeposit.user_name) || 'Investor';
+      const notificationPlan = (authoritativeDeposit && authoritativeDeposit.plan_name) || (foundDeposit && foundDeposit.plan_name) || 'Investment Portfolio';
+      const notificationData = { amount: approvedDepositAmount, planName: notificationPlan };
+      const noticeResults = await Promise.allSettled([
+        status === 'active'
+          ? sendPaymentApprovedEmail(effectiveEmail, notificationName, notificationData)
+          : sendPaymentDeclinedEmail(effectiveEmail, notificationName, notificationData),
+        notifyPaymentStatusUpdate({
+          user_email: effectiveEmail,
+          user_name: notificationName,
+          amount: approvedDepositAmount,
+          plan_name: notificationPlan,
+          status
+        })
+      ]);
+      noticeResults.forEach((result) => {
+        if (result.status === 'rejected' || result.value?.ok === false) {
+          console.warn('[admin deposit status] notification failed:', result.reason || result.value?.error);
+        }
+      });
+
       return res.status(200).json({
         success: true,
         message: status === 'active'
-          ? `Deposit of $${approvedDepositAmount.toFixed(2)} approved! Investor dashboard unlocked with verified active balance.`
+          ? `Deposit of ${approvedDepositAmount.toFixed(2)} approved! Investor dashboard unlocked with verified active balance.`
           : `Deposit receipt updated to ${status}.`,
         status: status,
         total: approvedDepositAmount,
