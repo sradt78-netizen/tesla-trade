@@ -208,6 +208,13 @@ export default async function handler(req, res) {
       });
     }
 
+    try {
+      res.setHeader('Set-Cookie', createInvestorSessionCookie(email));
+    } catch (sessionError) {
+      console.error('[auth set-password] secure investor session could not be issued:', sessionError.message);
+      return res.status(503).json({ success: false, message: 'Your password was saved, but secure sign-in could not be started. Please sign in again after session security is configured.' });
+    }
+
     return res.status(200).json({
       success: true,
       email,
