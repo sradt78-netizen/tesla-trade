@@ -1488,48 +1488,69 @@ export default async function handler(req, res) {
     if (action === 'approve_kyc' || action === 'reject_kyc') {
       const id = body.id;
       const status = action === 'approve_kyc' ? 'approved' : 'rejected';
-      if (isDbConnected && conn) {
-        try {
-          await conn.query('UPDATE kyc_submissions SET status=? WHERE id=?', [status, id]);
-          await conn.end();
-        } catch (e) {}
-      } else {
-        const k = mockStore.kyc.find(i => String(i.id) === String(id));
-        if (k) k.status = status;
+      if (!isDbConnected || !conn || !id) return res.status(400).json({ success: false, error: 'A database connection and KYC record ID are required.' });
+      try {
+        const [existingRows] = await conn.query('SELECT user_email FROM kyc_submissions WHERE id=? LIMIT 1', [id]);
+        if (!existingRows.length) {
+          await conn.end(); conn = null;
+          return res.status(404).json({ success: false, error: 'KYC submission was not found; no status was changed.' });
+        }
+        await conn.query('UPDATE kyc_submissions SET status=? WHERE id=?', [status, id]);
+        await conn.end(); conn = null;
+        const notice = await notifyAdminEvent('KYC review completed', { email: existingRows[0].user_email || '', status, recordId: id });
+        if (!notice.ok) console.warn('[admin KYC] Telegram alert failed:', notice.error);
+        return res.status(200).json({ success: true, message: `KYC updated to ${status}.` });
+      } catch (error) {
+        console.error('[admin KYC] update failed:', error.message);
+        if (conn) { try { await conn.end(); } catch (e) {} conn = null; }
+        return res.status(500).json({ success: false, error: 'KYC status could not be saved. No success was recorded.' });
       }
-      return res.status(200).json({ success: true, message: `KYC updated to ${status}.` });
     }
 
-    // ── 8. SHOP RECEIPT APPROVE / REJECT ───────────────────────────
     if (action === 'approve_receipt' || action === 'reject_receipt') {
       const id = body.id;
       const status = action === 'approve_receipt' ? 'approved' : 'rejected';
-      if (isDbConnected && conn) {
-        try {
-          await conn.query('UPDATE ev_orders SET status=? WHERE id=?', [status, id]);
-          await conn.end();
-        } catch (e) {}
-      } else {
-        const ord = mockStore.orders.find(o => String(o.id) === String(id));
-        if (ord) ord.status = status;
+      if (!isDbConnected || !conn || !id) return res.status(400).json({ success: false, error: 'A database connection and order ID are required.' });
+      try {
+        const [existingRows] = await conn.query('SELECT customer_email, customer_name FROM ev_orders WHERE id=? LIMIT 1', [id]);
+        if (!existingRows.length) {
+          await conn.end(); conn = null;
+          return res.status(404).json({ success: false, error: 'Order receipt was not found; no status was changed.' });
+        }
+        await conn.query('UPDATE ev_orders SET status=? WHERE id=?', [status, id]);
+        await conn.end(); conn = null;
+        const notice = await notifyAdminEvent('Store order receipt reviewed', {
+          email: existingRows[0].customer_email || '',
+          name: existingRows[0].customer_name || '',
+          status,
+          recordId: id
+        });
+        if (!notice.ok) console.warn('[admin receipt] Telegram alert failed:', notice.error);
+        return res.status(200).json({ success: true, message: `Order updated to ${status}.` });
+      } catch (error) {
+        console.error('[admin receipt] update failed:', error.message);
+        if (conn) { try { await conn.end(); } catch (e) {} conn = null; }
+        return res.status(500).json({ success: false, error: 'Order receipt status could not be saved.' });
       }
-      return res.status(200).json({ success: true, message: `Order updated to ${status}.` });
     }
 
-    // ── 9. INVITATION CODE GENERATE ─────────────────────────────────
     if (action === 'generate_code') {
-      const randomCode = 'TT-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      if (!isDbConnected || !conn) return res.status(503).json({ success: false, error: 'Invitation code could not be saved because the database is unavailable.' });
+      const randomCode = 'TT-' + crypto.randomBytes(5).toString('hex').toUpperCase();
       const customCode = cleanString(body.code || randomCode).toUpperCase();
-      if (isDbConnected && conn) {
-        try {
-          await conn.query('INSERT INTO invitation_codes (code, status, source) VALUES (?, "active", "admin")', [customCode]);
-          const [codes] = await conn.query('SELECT * FROM invitation_codes ORDER BY created_at DESC');
-          await conn.end();
-          return res.status(200).json({ success: true, created: customCode, codes });
-        } catch (e) {}
+      if (!/^[A-Z0-9-]{4,48}$/.test(customCode)) return res.status(400).json({ success: false, error: 'Invitation code may contain only letters, numbers and hyphens (4–48 characters).' });
+      try {
+        await conn.query('INSERT INTO invitation_codes (code, status, source) VALUES (?, "active", "admin")', [customCode]);
+        const [codes] = await conn.query('SELECT * FROM invitation_codes ORDER BY created_at DESC');
+        await conn.end(); conn = null;
+        const notice = await notifyAdminEvent('Invitation code created', { status: 'active', recordId: customCode });
+        if (!notice.ok) console.warn('[admin invite] Telegram alert failed:', notice.error);
+        return res.status(200).json({ success: true, created: customCode, codes });
+      } catch (error) {
+        console.error('[admin invite] code save failed:', error.message);
+        if (conn) { try { await conn.end(); } catch (e) {} conn = null; }
+        return res.status(500).json({ success: false, error: 'Invitation code could not be saved.' });
       }
-      mockStore.codes.unshift({ id: Date.now(), code: customCode, status: 'active', source: 'admin', created_at: new Date().toISOString() });
-      return res.status(200).json({ success: true, created: customCode, codes: mockStore.codes });
     }
 
     if (action === 'test_email') {
