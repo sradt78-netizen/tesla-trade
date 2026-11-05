@@ -57,8 +57,6 @@ export default async function handler(req, res) {
     let dbRead = false; // true once the database answered; its rows are authoritative
     let bonusBalance = 0;
 
-    let userAdminApproved = false;
-
     // 1. Try MySQL Database
     try {
       const conn = await getDbConnection();
@@ -94,76 +92,7 @@ export default async function handler(req, res) {
       return res.status(503).json({ success: false, error: 'Investor approval status is temporarily unavailable. No cached approval was used.' });
     }
 
-    // 2. MySQL is the sole source of truth; fallback records cannot grant approval.
-    if (!dbRead) try {
-      const { inMemoryDeposits, loadPersistentDeposits } = await import('./payment-submit.js');
-      if (typeof loadPersistentDeposits === 'function') {
-        const diskDeposits = loadPersistentDeposits();
-        const userDisk = diskDeposits.filter(d => (d.user_email || d.email || d.user_id || '').toLowerCase().trim() === email);
-        for (const dd of userDisk) {
-          hasAccount = true;
-          const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(dd.id));
-          if (exIdx >= 0) {
-            const isApproved = dd.status === 'active' || dd.status === 'approved' || userInvestments[exIdx].status === 'active' || userInvestments[exIdx].status === 'approved';
-            userInvestments[exIdx] = {
-              ...userInvestments[exIdx],
-              ...dd,
-              status: isApproved ? 'active' : (dd.status || userInvestments[exIdx].status || 'pending_approval')
-            };
-          } else {
-            userInvestments.unshift(dd);
-          }
-        }
-      }
-
-      if (Array.isArray(inMemoryDeposits)) {
-        const memDeposits = inMemoryDeposits.filter(d => (d.user_email || d.email || d.user_id || '').toLowerCase().trim() === email);
-        for (const md of memDeposits) {
-          hasAccount = true;
-          const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(md.id));
-          if (exIdx >= 0) {
-            const isApproved = md.status === 'active' || md.status === 'approved' || userInvestments[exIdx].status === 'active' || userInvestments[exIdx].status === 'approved';
-            userInvestments[exIdx] = {
-              ...userInvestments[exIdx],
-              ...md,
-              status: isApproved ? 'active' : (md.status || userInvestments[exIdx].status || 'pending_approval')
-            };
-          } else {
-            userInvestments.unshift(md);
-          }
-        }
-      }
-
-      const { mockStore, loadPersistentInvestors } = await import('./admin.js');
-      if (typeof loadPersistentInvestors === 'function') {
-        const savedInvs = loadPersistentInvestors();
-        const savedU = savedInvs.find(u => (u.email || '').toLowerCase().trim() === email);
-        if (savedU) {
-          hasAccount = true;
-          if (savedU.name) investorName = savedU.name;
-        }
-      }
-      const mockUser = mockStore.investors.find(u => (u.email || '').toLowerCase().trim() === email);
-      if (mockUser) {
-        hasAccount = true;
-        if (mockUser.name) investorName = mockUser.name;
-      }
-      const mockInvs = mockStore.investments.filter(i => (i.user_email || i.email || i.user_id || '').toLowerCase().trim() === email);
-      for (const mi of mockInvs) {
-        hasAccount = true;
-        const exIdx = userInvestments.findIndex(inv => String(inv.id) === String(mi.id));
-        if (exIdx >= 0) {
-          const isApproved = mi.status === 'active' || mi.status === 'approved' || userInvestments[exIdx].status === 'active' || userInvestments[exIdx].status === 'approved';
-          userInvestments[exIdx] = {
-            ...userInvestments[exIdx],
-            ...mi,
-            status: isApproved ? 'active' : (mi.status || userInvestments[exIdx].status || 'pending_approval')
-          };
-        } else {
-          userInvestments.unshift(mi);
-        }
-      }
-    } catch (eMem) {}
+    // MySQL is the sole source of truth for investor activation.
 
     // If an email was provided, treat as existing account session
     if (!hasAccount && email.includes('@')) {
