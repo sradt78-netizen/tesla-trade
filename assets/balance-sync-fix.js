@@ -228,7 +228,7 @@
       return response.json();
     }).then(function (resData) {
       var investment = Array.isArray(resData) ? (resData[0] || {}) : resData;
-      var invId = investment.id || investment.activeInvestmentId || investmentId || 'sim_inv_1';
+      var invId = investment.id || investment.activeInvestmentId || investmentId || '';
       if (invId && (!investmentId || investmentId !== invId)) {
         localStorage.setItem('ttinc_investment_id', String(invId));
         investmentId = String(invId);
@@ -261,7 +261,7 @@
         oldMeta.total = principal;
         oldMeta.totalCurrentValue = current;
         oldMeta.bonus = Number.isFinite(bonus) ? bonus : 0;
-        if (investment.status === 'active' || investment.status === 'approved' || localStorage.getItem('ttinc_account_approved') === 'true') {
+        if (investment.status === 'active' || investment.status === 'approved') {
           oldMeta.status = 'active';
         }
         localStorage.setItem('ttinc_inv_meta', JSON.stringify(oldMeta));
@@ -287,21 +287,21 @@
   var isPatching = false;
   function safeTriggerPatch() {
     if (isPatching || !isBalancePage()) return;
+    // Only repaint from the latest successful server response. Browser cache
+    // is not proof of approval or a reliable source of a funded balance.
+    if (!previous) {
+      readBalance();
+      return;
+    }
+    isPatching = true;
     try {
-      var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-      if (meta && meta.total) {
-        var p = Number(meta.total);
-        var c = Number(meta.totalCurrentValue != null ? meta.totalCurrentValue : p);
-        var b = Number(meta.bonus != null ? meta.bonus : (meta.welcomeBonus != null ? meta.welcomeBonus : 0));
-        isPatching = true;
-        patchVisibleWalletDom(p, c, b);
-      }
-    } catch (e) {} finally {
+      patchVisibleWalletDom(previous.principal, previous.current, previous.bonus);
+    } finally {
       isPatching = false;
     }
   }
 
-  window.addEventListener('ttinc_account_activated', safeTriggerPatch);
+  window.addEventListener('ttinc_account_activated', function () { previous = null; readBalance(); });
   window.addEventListener('popstate', safeTriggerPatch);
   window.addEventListener('storage', safeTriggerPatch);
 
