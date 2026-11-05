@@ -38,6 +38,7 @@ export default async function handler(req, res) {
 
   const device = body.device_type || (/Mobi|Android|iPhone/i.test(req.headers['user-agent'] || '') ? 'mobile' : 'desktop');
 
+  let tracked = false;
   try {
     const conn = await getDbConnection();
     await conn.query(
@@ -45,7 +46,11 @@ export default async function handler(req, res) {
       [ip.substring(0, 45), ref.substring(0, 500), landing.substring(0, 255), source.substring(0, 100), device.substring(0, 20), (req.headers['user-agent'] || '').substring(0, 500)]
     );
     await conn.end();
-  } catch (e) {}
+    tracked = true;
+  } catch (e) {
+    console.error('[track] database insert failed:', e.message);
+    return res.status(503).json({ success: false, error: 'Traffic event could not be recorded.' });
+  }
 
   try {
     const notice = await notifyLinkClick({ campaign_source: source, landing_page: landing, device_type: device, referrer: ref });
