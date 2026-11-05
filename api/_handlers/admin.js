@@ -524,6 +524,12 @@ export default async function handler(req, res) {
 
     // ── 1. GET ALL DASHBOARD DATA ───────────────────────────────────
     if (action === 'all_data' || req.method === 'GET') {
+      if (!isDbConnected || !conn) {
+        return res.status(503).json({
+          success: false,
+          error: 'The investor database is unavailable. Admin data was not replaced with mock or cached records.'
+        });
+      }
       let investors = mockStore.investors;
       let investments = mockStore.investments;
       let dbInvestmentsAuthoritative = false; // true when investments came from MySQL
@@ -545,11 +551,20 @@ export default async function handler(req, res) {
           try { const [rows] = await conn.query(sql); return rows; }
           catch (e) { console.error('[admin all_data] query failed:', sql.slice(0, 60), e.message); return fallback; }
         };
-        investors = await safeQuery('SELECT * FROM investor_accounts ORDER BY registered_at DESC', investors);
-        let investmentsFromDb = false;
-        try { const [rows] = await conn.query('SELECT * FROM investments ORDER BY id DESC'); investments = rows; investmentsFromDb = true; }
-        catch (e) { console.error('[admin all_data] investments query failed:', e.message); }
-        dbInvestmentsAuthoritative = investmentsFromDb;
+        try {
+          const [investorRows] = await conn.query('SELECT * FROM investor_accounts ORDER BY registered_at DESC');
+          const [investmentRows] = await conn.query('SELECT * FROM investments ORDER BY id DESC');
+          investors = investorRows;
+          investments = investmentRows;
+          dbInvestmentsAuthoritative = true;
+        } catch (e) {
+          console.error('[admin all_data] authoritative investor query failed:', e.message);
+          await conn.end();
+          return res.status(503).json({
+            success: false,
+            error: 'Investor records could not be loaded from MySQL. Cached or mock investor data was not substituted.'
+          });
+        }
         kyc = await safeQuery('SELECT * FROM kyc_submissions ORDER BY created_at DESC', kyc);
         orders = await safeQuery('SELECT * FROM ev_orders ORDER BY created_at DESC LIMIT 100', orders);
         withdrawals = await safeQuery('SELECT * FROM withdrawals ORDER BY created_at DESC', withdrawals);
@@ -1029,6 +1044,12 @@ export default async function handler(req, res) {
 
     // ── 6. APPROVE / REJECT INVESTMENT DEPOSIT RECEIPT ──────────────
     if (action === 'approve_deposit' || action === 'reject_deposit' || action === 'approve_investor') {
+      if (!isDbConnected || !conn) {
+        return res.status(503).json({
+          success: false,
+          error: 'Approval requires a live database connection. No fallback or mock approval was applied.'
+        });
+      }
       const rawId = body.id || '';
       const cleanId = String(rawId).replace(/^dep_/, '').trim();
       const depId = cleanId ? ('dep_' + cleanId) : '';
@@ -1121,43 +1142,67 @@ export default async function handler(req, res) {
       }
 
       if (!approvedDepositAmount && body.amount != null) approvedDepositAmount = parseFloat(body.amount);
-      if (!approvedDepositAmount) approvedDepositAmount = (foundDeposit && parseFloat(foundDeposit.total)) || 0;
-      const effectiveEmail = String(targetEmail || (foundDeposit && (foundDeposit.user_email || foundDeposit.email || foundDeposit.user_id)) || '').toLowerCase().trim();
+      let effectiveEmail = String(targetEmail || (foundDeposit && (foundDeposit.user_email || foundDeposit.email || foundDeposit.user_id)) || '').toLowerCase().trim();
+
+      // MySQL is the source of truth for approval. Read the exact pending row
+      // before changing any fallback copy or balance, and recover a zeroed
+      // principal only from that row's own deposit ledger entries.
+      let authoritativeDeposit = null;
+      if (selectedDepositId) {
+        const ids = [...new Set([
+          selectedDepositId,
+          selectedDepositId.replace(/^dep_/, ''),
+          'dep_' + selectedDepositId.replace(/^dep_/, '')
+        ].filter(Boolean))];
+        const marks = ids.map(() => '?').join(',');
+        const [dbRows] = await conn.query(
+          'SELECT * FROM investments WHERE id IN (' + marks + ') LIMIT 1',
+          ids
+        );
+        authoritativeDeposit = dbRows[0] || null;
+      } else if (effectiveEmail) {
+        const [dbRows] = await conn.query(
+          "SELECT * FROM investments WHERE LOWER(user_email)=? AND status IN ('pending','pending_approval') ORDER BY created_at DESC LIMIT 1",
+          [effectiveEmail]
+        );
+        authoritativeDeposit = dbRows[0] || null;
+      }
+      if (!authoritativeDeposit) {
+        return res.status(404).json({
+          success: false,
+          error: 'The selected payment was not found in the investor database. No approval was applied.'
+        });
+      }
+      selectedDepositId = String(authoritativeDeposit.id);
+      effectiveEmail = String(authoritativeDeposit.user_email || effectiveEmail).toLowerCase().trim();
+      const databasePrincipal = Number(authoritativeDeposit.total || 0);
+      if (databasePrincipal > 0) {
+        approvedDepositAmount = databasePrincipal;
+      } else {
+        const [ledgerRows] = await conn.query(
+          "SELECT COALESCE(SUM(amount),0) AS amount FROM account_transactions WHERE investment_id=? AND type='deposit' AND amount>0",
+          [selectedDepositId]
+        );
+        const ledgerPrincipal = Number(ledgerRows[0]?.amount || 0);
+        if (ledgerPrincipal > 0) approvedDepositAmount = ledgerPrincipal;
+      }
+
       if (status === 'active' && !effectiveEmail) {
         return res.status(400).json({ success: false, error: 'Investor email is required to approve a deposit.' });
       }
       if (status === 'active' && (!Number.isFinite(approvedDepositAmount) || approvedDepositAmount <= 0)) {
-        return res.status(400).json({ success: false, error: 'A valid positive deposit amount is required for approval.' });
+        return res.status(400).json({ success: false, error: 'A valid positive deposit amount could not be confirmed from the database.' });
       }
       const totalBalanceReal = approvedDepositAmount;
       // The offer is limited to the first two approved deposits per investor.
       // Use the persistent ledger to determine prior approved deposits; the
       // current investment is excluded so retries remain idempotent.
       let priorApprovedDeposits = 0;
-      try {
-        const { loadDatabaseSync } = await import('../db.js');
-        const ledgerDb = loadDatabaseSync();
-        const txs = Array.isArray(ledgerDb?.account_transactions) ? ledgerDb.account_transactions : [];
-        const seen = new Set();
-        for (const tx of txs) {
-          const txEmail = String(tx.user_email || '').toLowerCase().trim();
-          const txInvestmentId = String(tx.investment_id || '');
-          const selectedBareId = String(selectedDepositId || '').replace(/^dep_/, '');
-          const currentDepositIds = new Set([
-            String(rawId || ''),
-            String(cleanId || ''),
-            String(depId || ''),
-            String(selectedDepositId || ''),
-            selectedBareId,
-            selectedBareId ? ('dep_' + selectedBareId) : ''
-          ].filter(Boolean));
-          if (txEmail === effectiveEmail && tx.type === 'deposit' && tx.status === 'processed' &&
-              txInvestmentId && !currentDepositIds.has(txInvestmentId)) {
-            seen.add(txInvestmentId);
-          }
-        }
-        priorApprovedDeposits = seen.size;
-      } catch (e) {}
+      const [priorDepositRows] = await conn.query(
+        "SELECT COUNT(DISTINCT investment_id) AS approved_count FROM account_transactions WHERE LOWER(user_email)=? AND type='deposit' AND status='processed' AND investment_id<>?",
+        [effectiveEmail, selectedDepositId]
+      );
+      priorApprovedDeposits = Number(priorDepositRows[0]?.approved_count || 0);
       const bonusMatch = status === 'active' && approvedDepositAmount > 0 && priorApprovedDeposits < 2
         ? Number(approvedDepositAmount.toFixed(2)) : 0;
       const totalBalanceWithBonus = Number((totalBalanceReal + bonusMatch).toFixed(2));
@@ -1175,7 +1220,7 @@ export default async function handler(req, res) {
 
       // If no deposit was found on disk or memory yet, create an approved record now
       // Reuse the validated email; never synthesize a placeholder investor.
-      const effectiveId = rawId || depId || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
+      const effectiveId = selectedDepositId || rawId || depId || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
 
       if (!foundDeposit && effectiveEmail && status === 'active') {
         const freshDep = {
@@ -1353,30 +1398,8 @@ export default async function handler(req, res) {
             }
           }
 
-          // If still no row affected in DB, INSERT a new active investment row!
-          if ((!result || !result.affectedRows) && effectiveEmail && status === 'active') {
-            const insId = rawId || depId || effectiveId || ('inv_' + Math.random().toString(36).substring(2, 9));
-            const txId = 'tx_' + Math.random().toString(36).substring(2, 9);
-            try {
-              await conn.query(
-                `INSERT INTO investments (
-                  id, tx_id, user_id, user_name, user_email, portfolio,
-                  plan_id, plan_label, plan_name, total, total_current_value, earnings,
-                  method, status, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "active", NOW())`,
-                [
-                  insId, txId, effectiveEmail, (foundDeposit && foundDeposit.user_name) || 'Investor', effectiveEmail,
-                  'Tesla · Explorer', 'starter_ai', 'Explorer', 'Explorer',
-                  approvedDepositAmount, totalBalanceWithBonus, 0,
-                  'Crypto'
-                ]
-              );
-              result = { affectedRows: 1 };
-            } catch (eIns) {
-              console.error('[admin approve] fallback insert failed:', eIns.message);
-            }
-          }
-
+          // Approval may update an existing payment only. Never fabricate a
+          // new active investment when the selected database row was not updated.
           dbSaved = !!(result && result.affectedRows);
 
           if (effectiveEmail && status === 'active') {
@@ -1384,17 +1407,22 @@ export default async function handler(req, res) {
             // Idempotent deposit ledger write: retries must not create duplicate credits.
             try {
               const [depositTxRows] = await conn.query(
-                'SELECT id FROM account_transactions WHERE LOWER(user_email)=? AND investment_id=? AND type="deposit" LIMIT 1',
+                'SELECT id FROM account_transactions WHERE LOWER(user_email)=? AND investment_id=? AND type="deposit" ORDER BY created_at DESC LIMIT 1',
                 [effectiveEmail, effectiveId]
               );
-              if (!depositTxRows.length) {
+              if (depositTxRows.length) {
+                await conn.query(
+                  "UPDATE account_transactions SET amount=?, status='processed', reference_id=COALESCE(reference_id, ?), note=COALESCE(note, 'Investment deposit approved') WHERE id=?",
+                  [approvedDepositAmount, authoritativeDeposit.tx_id || null, depositTxRows[0].id]
+                );
+              } else {
                 const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
                 await conn.query(
-                  'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "processed", "Investment deposit approved", NOW())',
-                  [txDepId, effectiveId, effectiveEmail, approvedDepositAmount]
+                  'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, reference_id, note, created_at) VALUES (?, ?, ?, "deposit", ?, "processed", ?, "Investment deposit approved", NOW())',
+                  [txDepId, effectiveId, effectiveEmail, approvedDepositAmount, authoritativeDeposit.tx_id || null]
                 );
               }
-            } catch (eTx) { console.error('[admin approve] ledger insert failed:', eTx.message); }
+            } catch (eTx) { console.error('[admin approve] ledger upsert failed:', eTx.message); }
           }
           await conn.end();
         } catch (e) {

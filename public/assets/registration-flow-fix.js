@@ -76,6 +76,8 @@
     var account = {
       email: payload.email,
       name: payload.name,
+      phone: payload.phone || '',
+      age: Number(payload.age || 0),
       createdAt: new Date().toISOString()
     };
     try {
@@ -99,6 +101,8 @@
       localStorage.setItem('ttinc_auth', JSON.stringify({
         email: email,
         name: name,
+        phone: String(account.phone || ''),
+        age: Number(account.age || 0),
         onboardingState: 'plan_selection'
       }));
       sessionStorage.removeItem('ttinc_social_onboarding');
@@ -135,7 +139,7 @@
       pending.phone || '';
     var dob = firstValue(['input[type="date"]'], root) || pending.dob || '';
     var ageField = firstField(['#ttinc-register-age', 'input[type="number"]'], root);
-    var age = ageField ? Number(ageField.value) : 0;
+    var age = ageField ? Number(ageField.value) : Number(pending.age || 0);
     if (!age && dob) age = ageFromDate(dob);
     var password = firstValue(['#ttinc-register-password'], root) || pending.password || '';
     var invitationField = root.querySelector('#ttinc-register-invitation');
@@ -148,6 +152,12 @@
     var otp = firstValue(['#ttinc-register-otp', 'input[maxlength="6"]'], root);
     var submit = root.querySelector('#ttinc-register-submit') ||
       root.querySelector('button[type="submit"]');
+
+    if (!phone || !Number.isInteger(age) || age < 18 || age > 120) {
+      completing = false;
+      showError(form, 'Enter your phone number and a valid age (18 or older) before creating the account.');
+      return;
+    }
 
     if (submit) {
       submit.disabled = true;
@@ -185,12 +195,16 @@
       .then(function () {
         saveBrowserAuth({
           email: email,
-          name: name || email.split('@')[0]
+          name: name || email.split('@')[0],
+          phone: phone,
+          age: age || ageFromDate(dob)
         });
         try { sessionStorage.removeItem('ttinc_registration_pending'); } catch (error) {}
         handoffToInvestment({
           email: email,
-          name: name || email.split('@')[0]
+          name: name || email.split('@')[0],
+          phone: phone,
+          age: age || ageFromDate(dob)
         });
       })
       .catch(function (error) {
@@ -218,6 +232,7 @@
           email: value('input[type="email"]', form).toLowerCase(),
           name: value('input[placeholder="John Smith"]', form),
           phone: value('input[type="tel"]', form),
+          age: Number(value('#ttinc-register-age', form) || value('input[type="number"]', form) || 0),
           dob: value('input[type="date"]', form),
           invitationCode: registrationInvitation
             ? registrationInvitation.value.trim()

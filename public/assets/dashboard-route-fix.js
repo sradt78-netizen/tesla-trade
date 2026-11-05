@@ -34,10 +34,9 @@
       );
       var existingMeta = {};
       try { existingMeta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch(e) {}
-      var status = row.status || 'active';
-      if (existingMeta.status === 'active' || existingMeta.status === 'approved' || localStorage.getItem('ttinc_account_approved') === 'true') {
-        status = 'active';
-      }
+      // The server's investment status is authoritative; do not preserve
+      // an old browser approval flag across a sign-out or new login.
+      var status = row.status || 'pending_approval';
       localStorage.setItem('ttinc_inv_meta', JSON.stringify({
         id: row.id,
         total: tot,

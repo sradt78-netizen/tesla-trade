@@ -13,28 +13,9 @@
       if (url.indexOf('/api/investments') !== -1 && url.indexOf('/trading') === -1 && url.indexOf('chart-data') === -1 && (!init || !init.method || String(init.method).toUpperCase() === 'GET')) {
         return _origFetch.apply(this, arguments).then(function (res) {
           if (!res.ok) {
-            var meta = {};
-            try { meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
-            var p = Number(meta.total != null ? meta.total : (meta.amount != null ? meta.amount : 0));
-            var c = Number(meta.totalCurrentValue != null ? meta.totalCurrentValue : p);
-            var synthData = {
-              id: localStorage.getItem('ttinc_investment_id') || 'inv_active_1',
-              status: (localStorage.getItem('ttinc_account_approved') === 'true' || meta.status === 'active' || meta.status === 'approved') ? 'active' : (meta.status || 'pending_approval'),
-              total: p,
-              totalCurrentValue: c,
-              total_current_value: c,
-              planName: meta.planName || 'Explorer',
-              portfolio: [
-                { id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: Math.round(p * 0.5) },
-                { id: 'nvda', name: 'NVIDIA Corp.', ticker: 'NVDA', investedAmount: Math.round(p * 0.3) },
-                { id: 'aapl', name: 'Apple Inc.', ticker: 'AAPL', investedAmount: Math.round(p * 0.2) }
-              ],
-              earnings: { tsla: Math.round(p * 0.5), nvda: Math.round(p * 0.3), aapl: Math.round(p * 0.2) }
-            };
-            return new Response(JSON.stringify(synthData), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' }
-            });
+            // Never replace an unavailable database response with a locally
+            // cached or synthetic investment. Keep the real HTTP error visible.
+            return res;
           }
           return res.clone().json().then(function (data) {
             if (data && typeof data === 'object' && !Array.isArray(data)) {
@@ -52,16 +33,7 @@
                 modified = true;
               }
               var p = Number(data.total != null ? data.total : (data.amount != null ? data.amount : 0));
-              if (p <= 0 && isUserApproved) {
-                var localMeta = {};
-                try { localMeta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}'); } catch (e) {}
-                var localTotal = Number(localMeta.total != null ? localMeta.total : (localMeta.amount != null ? localMeta.amount : (localStorage.getItem('ttinc_deposit_amount') || 0)));
-                if (localTotal > 0) {
-                  p = localTotal;
-                  data.total = p;
-                  modified = true;
-                }
-              }
+
               var c = Number(data.totalCurrentValue != null ? data.totalCurrentValue : (data.total_current_value != null ? data.total_current_value : p));
               data.totalCurrentValue = c;
               data.total_current_value = c;
@@ -69,18 +41,7 @@
               if (data.bonus == null && data.welcomeBonus != null) data.bonus = Number(data.welcomeBonus);
               modified = true;
 
-              if (!Array.isArray(data.portfolio) || data.portfolio.length === 0) {
-                data.portfolio = [
-                  { id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: Math.round(p * 0.5) },
-                  { id: 'nvda', name: 'NVIDIA Corp.', ticker: 'NVDA', investedAmount: Math.round(p * 0.3) },
-                  { id: 'aapl', name: 'Apple Inc.', ticker: 'AAPL', investedAmount: Math.round(p * 0.2) }
-                ];
-                modified = true;
-              }
-              if (!data.earnings || typeof data.earnings !== 'object') {
-                data.earnings = { tsla: Math.round(p * 0.5), nvda: Math.round(p * 0.3), aapl: Math.round(p * 0.2) };
-                modified = true;
-              }
+
               if (modified) {
                 try {
                   localStorage.setItem('ttinc_inv_meta', JSON.stringify(data));
@@ -267,7 +228,7 @@
       return response.json();
     }).then(function (resData) {
       var investment = Array.isArray(resData) ? (resData[0] || {}) : resData;
-      var invId = investment.id || investment.activeInvestmentId || investmentId || 'sim_inv_1';
+      var invId = investment.id || investment.activeInvestmentId || investmentId || '';
       if (invId && (!investmentId || investmentId !== invId)) {
         localStorage.setItem('ttinc_investment_id', String(invId));
         investmentId = String(invId);
@@ -300,7 +261,7 @@
         oldMeta.total = principal;
         oldMeta.totalCurrentValue = current;
         oldMeta.bonus = Number.isFinite(bonus) ? bonus : 0;
-        if (investment.status === 'active' || investment.status === 'approved' || localStorage.getItem('ttinc_account_approved') === 'true') {
+        if (investment.status === 'active' || investment.status === 'approved') {
           oldMeta.status = 'active';
         }
         localStorage.setItem('ttinc_inv_meta', JSON.stringify(oldMeta));
@@ -326,21 +287,21 @@
   var isPatching = false;
   function safeTriggerPatch() {
     if (isPatching || !isBalancePage()) return;
+    // Only repaint from the latest successful server response. Browser cache
+    // is not proof of approval or a reliable source of a funded balance.
+    if (!previous) {
+      readBalance();
+      return;
+    }
+    isPatching = true;
     try {
-      var meta = JSON.parse(localStorage.getItem('ttinc_inv_meta') || '{}');
-      if (meta && meta.total) {
-        var p = Number(meta.total);
-        var c = Number(meta.totalCurrentValue != null ? meta.totalCurrentValue : p);
-        var b = Number(meta.bonus != null ? meta.bonus : (meta.welcomeBonus != null ? meta.welcomeBonus : 0));
-        isPatching = true;
-        patchVisibleWalletDom(p, c, b);
-      }
-    } catch (e) {} finally {
+      patchVisibleWalletDom(previous.principal, previous.current, previous.bonus);
+    } finally {
       isPatching = false;
     }
   }
 
-  window.addEventListener('ttinc_account_activated', safeTriggerPatch);
+  window.addEventListener('ttinc_account_activated', function () { previous = null; readBalance(); });
   window.addEventListener('popstate', safeTriggerPatch);
   window.addEventListener('storage', safeTriggerPatch);
 

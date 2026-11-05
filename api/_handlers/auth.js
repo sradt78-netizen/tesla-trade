@@ -75,8 +75,11 @@ export default async function handler(req, res) {
 
       // Resolve persisted onboarding and investment state at login. Never infer
       // approval from client storage or a stale session response.
-      const [acc] = await conn.query('SELECT name, onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
+      const [acc] = await conn.query('SELECT name, phone, age, onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
       if (acc.length > 0 && acc[0].name) investorName = acc[0].name;
+      var investorPhone = acc[0]?.phone || '';
+      var investorAge = Number(acc[0]?.age || 0);
+      var onboardingStatus = String(acc[0]?.onboarding_status || 'registered');
       const [investments] = await conn.query(
         "SELECT status FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC",
         [email]
@@ -124,6 +127,9 @@ export default async function handler(req, res) {
       success: true,
       email,
       name: investorName || email,
+      phone: investorPhone || '',
+      age: Number(investorAge || 0),
+      onboardingStatus: onboardingStatus || 'registered',
       investmentStatus: typeof investmentStatus === 'string' ? investmentStatus : 'none'
     });
   }
@@ -241,6 +247,9 @@ export default async function handler(req, res) {
 
     // Upsert account, then resolve its actual persisted investment state.
     let investmentStatus = 'none';
+    let profilePhone = '';
+    let profileAge = 0;
+    let onboardingStatus = 'registered';
     try {
       const conn = await getDbConnection();
       await conn.query(
@@ -248,9 +257,12 @@ export default async function handler(req, res) {
         [email, name]
       );
       const [accountRows] = await conn.query(
-        'SELECT onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1',
+        'SELECT phone, age, onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1',
         [email]
       );
+      profilePhone = accountRows[0]?.phone || '';
+      profileAge = Number(accountRows[0]?.age || 0);
+      onboardingStatus = String(accountRows[0]?.onboarding_status || 'registered');
       const [rows] = await conn.query(
         "SELECT status FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC",
         [email]
@@ -288,6 +300,9 @@ export default async function handler(req, res) {
       email,
       name,
       provider,
+      phone: profilePhone,
+      age: profileAge,
+      onboardingStatus,
       isNewAccount: false,
       investmentStatus,
       message: 'Social session verified successfully.'

@@ -518,26 +518,44 @@ if ($uri === '/transactions' && $method === 'GET') {
         "SELECT i.id, i.tx_id, i.total, i.method, i.status, i.created_at,
                 i.payment_submitted_at
          FROM investments i
-         WHERE LOWER(i.user_email)=? AND i.total > 0
-           AND NOT EXISTS (
-             SELECT 1 FROM account_transactions t
-             WHERE t.type='deposit'
-               AND (t.reference_id=i.tx_id OR t.investment_id=i.id)
-           )"
+         WHERE LOWER(i.user_email)=? AND i.total > 0"
     );
     $stInvestments->execute([$email]);
     foreach ($stInvestments->fetchAll() as $row) {
-        $rows[] = cast_transaction([
-            'id'            => 'legacy-deposit-' . $row['id'],
-            'investment_id' => $row['id'],
-            'type'          => 'deposit',
-            'amount'        => $row['total'],
-            'method'        => $row['method'],
-            'status'        => $row['status'] === 'active' ? 'processed' : $row['status'],
-            'reference_id'  => $row['tx_id'],
-            'note'          => 'Initial investor deposit',
-            'created_at'    => $row['payment_submitted_at'] ?: $row['created_at'],
-        ]);
+        $investmentStatus = strtolower((string)$row['status']);
+        $ledgerStatus = in_array($investmentStatus, ['active','approved','completed'], true)
+            ? 'processed'
+            : (in_array($investmentStatus, ['declined','rejected','cancelled'], true) ? 'declined' : 'pending');
+        $existingIndex = null;
+        foreach ($rows as $index => $transaction) {
+            if (($transaction['type'] ?? '') === 'deposit' &&
+                ((string)($transaction['investmentId'] ?? $transaction['investment_id'] ?? '') === (string)$row['id'] ||
+                 (!empty($row['tx_id']) && (string)($transaction['referenceId'] ?? $transaction['reference_id'] ?? '') === (string)$row['tx_id']))) {
+                $existingIndex = $index;
+                break;
+            }
+        }
+        if ($existingIndex !== null) {
+            $rows[$existingIndex]['status'] = $ledgerStatus;
+            if ((float)($rows[$existingIndex]['amount'] ?? 0) <= 0) {
+                $rows[$existingIndex]['amount'] = (float)$row['total'];
+            }
+            if (empty($rows[$existingIndex]['method'])) {
+                $rows[$existingIndex]['method'] = $row['method'];
+            }
+        } else {
+            $rows[] = cast_transaction([
+                'id'            => 'legacy-deposit-' . $row['id'],
+                'investment_id' => $row['id'],
+                'type'          => 'deposit',
+                'amount'        => $row['total'],
+                'method'        => $row['method'],
+                'status'        => $ledgerStatus,
+                'reference_id'  => $row['tx_id'],
+                'note'          => 'Investment deposit',
+                'created_at'    => $row['payment_submitted_at'] ?: $row['created_at'],
+            ]);
+        }
     }
 
     $stWithdrawals = $db->prepare(
@@ -580,7 +598,7 @@ if ($uri === '/account-status' && $method === 'GET') {
     require_investor_session($email);
 
     $db = get_db();
-    $stAccount = $db->prepare('SELECT email, name, created_at FROM investor_accounts WHERE email=? LIMIT 1');
+    $stAccount = $db->prepare('SELECT email, name, phone, age, created_at FROM investor_accounts WHERE LOWER(email)=? LIMIT 1');
     $stAccount->execute([$email]);
     $account = $stAccount->fetch();
 
@@ -599,6 +617,8 @@ if ($uri === '/account-status' && $method === 'GET') {
         $account = [
             'email' => $email,
             'name' => $investments[0]['user_name'] ?? $email,
+            'phone' => '',
+            'age' => 0,
             'created_at' => $investments[0]['created_at'] ?? null,
         ];
     }
@@ -654,6 +674,8 @@ if ($uri === '/account-status' && $method === 'GET') {
     json_out([
         'account' => (bool)$account,
         'name' => $account['name'] ?? $email,
+        'phone' => $account['phone'] ?? '',
+        'age' => (int)($account['age'] ?? 0),
         'walletBalance' => $walletBalance,
         'welcomeBonus' => $walletBalance >= 100 ? 100.00 : 0.00,
         'investmentStatus' => $status,
@@ -1021,15 +1043,18 @@ if ($seg0 === 'auth' && $seg1 === 'login' && $method === 'POST') {
     }
 
     $stName = $db->prepare(
-        'SELECT user_name FROM investments WHERE LOWER(user_email)=? ORDER BY created_at DESC LIMIT 1'
+        'SELECT user_name, status FROM investments WHERE LOWER(user_email)=? ORDER BY created_at DESC LIMIT 1'
     );
     $stName->execute([$email]);
     $investor = $stName->fetch();
-    if (!$investor) {
-        $stAccountName = $db->prepare('SELECT name FROM investor_accounts WHERE LOWER(email)=? LIMIT 1');
-        $stAccountName->execute([$email]);
-        $accountName = $stAccountName->fetch();
-        if ($accountName) $investor = ['user_name' => $accountName['name']];
+
+    $stProfile = $db->prepare(
+        'SELECT name, phone, age, onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1'
+    );
+    $stProfile->execute([$email]);
+    $profile = $stProfile->fetch() ?: [];
+    if (!$investor && !empty($profile['name'])) {
+        $investor = ['user_name' => $profile['name']];
     }
     // A browser session may expire while the password remains valid. Rotate
     // the session on every successful login and establish a fresh investor
@@ -1040,6 +1065,13 @@ if ($seg0 === 'auth' && $seg1 === 'login' && $method === 'POST') {
         'success' => true,
         'email'   => $email,
         'name'    => $investor['user_name'] ?? $email,
+        'phone'   => $profile['phone'] ?? '',
+        'age'     => (int)($profile['age'] ?? 0),
+        'onboardingStatus' => $profile['onboarding_status'] ?? 'registered',
+        'investmentStatus' => in_array(strtolower((string)($investor['status'] ?? '')), ['active','approved','completed'], true)
+            ? 'active'
+            : (in_array(strtolower((string)($investor['status'] ?? '')), ['pending','pending_approval'], true)
+                ? 'pending_approval' : 'none'),
     ]);
 }
 
@@ -3014,13 +3046,17 @@ if ($uri === '/profile' && $method === 'GET') {
     $stP = $db->prepare('SELECT phone, country, address FROM user_profiles WHERE email=?');
     $stP->execute([$email]);
     $prof = $stP->fetch() ?: ['phone'=>'','country'=>'','address'=>''];
+    $stAccountProfile = $db->prepare('SELECT phone, age FROM investor_accounts WHERE LOWER(email)=? LIMIT 1');
+    $stAccountProfile->execute([$email]);
+    $accountProfile = $stAccountProfile->fetch() ?: [];
 
     json_out([
         'user_name'  => $inv['user_name'],
         'user_email' => $inv['user_email'],
         'portfolio'  => $inv['portfolio'],
         'created_at' => $inv['created_at'],
-        'phone'      => $prof['phone'],
+        'phone'      => ($accountProfile['phone'] ?? '') ?: $prof['phone'],
+        'age'        => (int)($accountProfile['age'] ?? 0),
         'country'    => $prof['country'],
         'address'    => $prof['address'],
     ]);

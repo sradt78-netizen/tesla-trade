@@ -252,53 +252,91 @@ export default async function handler(req, res) {
     let results = [];
     try {
       const conn = await getDbConnection();
-      const [txs] = await conn.query(
-        'SELECT * FROM account_transactions WHERE LOWER(user_email)=? ORDER BY id DESC LIMIT 100',
-        [email]
-      );
-      await conn.end();
-      if (Array.isArray(txs) && txs.length > 0) results = txs;
-    } catch (e) {}
+      let txs = [];
+      try {
+        const [rows] = await conn.query(
+          'SELECT * FROM account_transactions WHERE LOWER(user_email)=? ORDER BY created_at DESC, id DESC LIMIT 250',
+          [email]
+        );
+        txs = rows;
+      } catch (ledgerReadError) {
+        console.error('[transactions] ledger lookup failed; checking persisted investment records:', ledgerReadError.message);
+      }
+      results = Array.isArray(txs) ? txs : [];
 
-    // Merge persistent transactions as a fallback source even when MySQL returned
-    // some rows. Previously, one MySQL row suppressed all JSON-backed history.
-    try {
-      const { loadDatabaseSync } = await import('../db.js');
-      const db = loadDatabaseSync();
-      if (db && Array.isArray(db.account_transactions)) {
-        const fallbackRows = db.account_transactions.filter(t => (t.user_email || '').toLowerCase().trim() === email);
-        const seen = new Set(results.map(t => String(t.id || t.reference_id || '')));
-        for (const tx of fallbackRows) {
-          const key = String(tx.id || tx.reference_id || '');
-          if (!key || !seen.has(key)) {
-            results.push(tx);
-            if (key) seen.add(key);
+      // Older accounts may have funded investment/withdrawal rows created
+      // before the durable ledger write was available. Include those records
+      // when the corresponding ledger entry is absent; never invent amounts.
+      try {
+        const [legacyInvestments] = await conn.query(
+          'SELECT id, tx_id, user_email, total, method, status, created_at, payment_submitted_at FROM investments WHERE LOWER(user_email)=? AND total>0 ORDER BY created_at DESC',
+          [email]
+        );
+        for (const inv of legacyInvestments || []) {
+          const investmentStatus = String(inv.status || '').toLowerCase();
+          const ledgerStatus = ['active','approved','completed'].includes(investmentStatus) ? 'processed' :
+            (['declined','rejected','cancelled'].includes(investmentStatus) ? 'declined' : 'pending');
+          const existingDeposit = results.find(tx =>
+            tx.type === 'deposit' && String(tx.investment_id || '') === String(inv.id)
+          );
+          if (existingDeposit) {
+            // The investment approval state is authoritative if an older
+            // payment endpoint left its ledger row marked pending.
+            existingDeposit.status = ledgerStatus;
+            if (Number(existingDeposit.amount || 0) <= 0) existingDeposit.amount = Number(inv.total || 0);
+            if (!existingDeposit.method) existingDeposit.method = inv.method || '';
+          } else {
+            results.push({
+              id: inv.tx_id || ('legacy-deposit-' + inv.id),
+              investment_id: inv.id,
+              user_email: email,
+              type: 'deposit',
+              amount: Number(inv.total || 0),
+              method: inv.method || '',
+              status: ledgerStatus,
+              reference_id: inv.tx_id || null,
+              note: 'Investment deposit',
+              created_at: inv.payment_submitted_at || inv.created_at
+            });
           }
         }
+      } catch (legacyDepositError) {
+        console.error('[transactions] legacy deposit lookup failed:', legacyDepositError.message);
       }
-    } catch (e2) {}
 
-    try {
-      const { loadPersistentDeposits } = await import('./payment-submit.js');
-      const diskDeps = loadPersistentDeposits();
-      const userDeps = diskDeps.filter(d => (d.user_email || d.email || '').toLowerCase().trim() === email && (d.status === 'active' || d.status === 'approved'));
-      for (const dep of userDeps) {
-        const depAmt = parseFloat(dep.total || dep.amount || 0);
-        const hasDepTx = results.some(t => t.type === 'deposit' && (String(t.investment_id) === String(dep.id) || Math.abs(parseFloat(t.amount || 0) - depAmt) < 0.01));
-        if (depAmt > 0 && !hasDepTx) {
-          results.push({
-            id: dep.tx_id || ('tx_' + (dep.id || 'dep').replace(/^dep_/, '')),
-            investment_id: dep.id,
+      try {
+        const [legacyWithdrawals] = await conn.query(
+          'SELECT w.id, w.investment_id, w.amount, w.method, w.status, w.created_at FROM withdrawals w LEFT JOIN investments i ON i.id=w.investment_id WHERE LOWER(i.user_email)=? ORDER BY w.created_at DESC',
+          [email]
+        );
+        for (const wd of legacyWithdrawals || []) {
+          const exists = results.some(tx => tx.type === 'withdrawal' && String(tx.id || '') === String(wd.id));
+          if (!exists) results.push({
+            id: wd.id,
+            investment_id: wd.investment_id,
             user_email: email,
-            type: 'deposit',
-            amount: depAmt,
-            status: 'processed',
-            note: 'Investment deposit approved',
-            created_at: dep.activated_at || dep.created_at || new Date().toISOString()
+            type: 'withdrawal',
+            amount: Number(wd.amount || 0),
+            method: wd.method || '',
+            status: wd.status || 'pending',
+            note: 'Withdrawal request',
+            created_at: wd.created_at
           });
         }
+      } catch (legacyWithdrawalError) {
+        console.error('[transactions] legacy withdrawal lookup failed:', legacyWithdrawalError.message);
       }
-    } catch (e3) {}
+      await conn.end();
+    } catch (e) {
+      console.error('[transactions] database connection failed:', e.message);
+      return res.status(503).json({ error: 'Transaction history is temporarily unavailable. Your records have not been marked as empty.' });
+    }
+
+    results.sort((a, b) => {
+      const aTime = new Date(a.created_at || a.createdAt || 0).getTime() || 0;
+      const bTime = new Date(b.created_at || b.createdAt || 0).getTime() || 0;
+      return bTime - aTime;
+    });
 
     // Format fields consistently for frontend
     const formatted = results.map(t => ({
@@ -307,6 +345,9 @@ export default async function handler(req, res) {
       amount: parseFloat(t.amount || '0'),
       status: t.status || 'processed',
       note: t.note || '',
+      method: t.method || '',
+      investment_id: t.investment_id || '',
+      reference_id: t.reference_id || '',
       created_at: t.created_at || new Date().toISOString(),
       createdAt: t.created_at || new Date().toISOString()
     }));
@@ -321,7 +362,7 @@ export default async function handler(req, res) {
       if (!email) return res.status(400).json({ error: 'Email parameter required' });
       try {
         const conn = await getDbConnection();
-        const [acc] = await conn.query('SELECT * FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
+        const [acc] = await conn.query('SELECT email, name, phone, age, onboarding_status, registered_at FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
         const [inv] = await conn.query(`SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY CASE WHEN status IN ('active','approved','completed') THEN 0 WHEN status IN ('pending_approval','pending') THEN 1 ELSE 2 END, id DESC LIMIT 1`, [email]);
         await conn.end();
 
@@ -329,26 +370,14 @@ export default async function handler(req, res) {
           email,
           name: acc[0]?.name || inv[0]?.user_name || 'Investor',
           phone: acc[0]?.phone || '',
+          age: Number(acc[0]?.age || 0),
+          registered_at: acc[0]?.registered_at || null,
           onboarding_status: (inv[0] && ['active','approved','completed'].includes(String(inv[0].status || '').toLowerCase())) ? 'active' : (acc[0]?.onboarding_status || (inv[0] ? inv[0].status : 'pending_deposit')),
           investment: inv[0] || null
         });
       } catch (e) {
-        try {
-          const { mockStore } = await import('./admin.js');
-          const acc = mockStore.investors.find(u => u.email.toLowerCase() === email);
-          const { inMemoryDeposits } = await import('./payment-submit.js');
-          const candidates = [...(inMemoryDeposits || []), ...(mockStore.investments || [])].filter(i => i.user_email && i.user_email.toLowerCase() === email);
-          const inv = candidates.find(i => ['active','approved','completed'].includes(String(i.status || '').toLowerCase())) || candidates.sort((a,b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
-          return res.status(200).json({
-            email,
-            name: acc?.name || inv?.user_name || 'Investor',
-            phone: acc?.phone || '',
-            onboarding_status: (inv && ['active','approved','completed'].includes(String(inv.status || '').toLowerCase())) ? 'active' : (acc?.onboarding_status || (inv ? inv.status : 'pending_deposit')),
-            investment: inv || null
-          });
-        } catch (err2) {
-          return res.status(200).json({ email, name: 'Investor', onboarding_status: 'pending_deposit' });
-        }
+        console.error('[accounts] profile lookup failed:', e.message);
+        return res.status(503).json({ error: 'Your saved investor profile is temporarily unavailable. Please retry; do not create another account.' });
       }
     }
 
@@ -375,45 +404,17 @@ export default async function handler(req, res) {
         persistedStatus = saved[0]?.onboarding_status || persistedStatus;
         await conn.end();
       } catch (e) {
-        // Preserve the last known state in fallback stores; do not downgrade it.
-        try {
-          const { mockStore } = await import('./admin.js');
-          const existing = mockStore.investors.find(u => (u.email || '').toLowerCase() === email);
-          persistedStatus = existing?.onboarding_status || persistedStatus;
-        } catch (e2) {}
+        console.error('[accounts] profile save failed:', e.message);
+        return res.status(503).json({ success: false, error: 'Your investor profile could not be saved. Please retry before choosing an investment plan.' });
       }
-
-      try {
-        const { mockStore, savePersistentInvestor } = await import('./admin.js');
-        if (typeof savePersistentInvestor === 'function') {
-          savePersistentInvestor({
-            name,
-            email,
-            phone,
-            onboarding_status: persistedStatus
-          });
-        }
-        const existing = mockStore.investors.find(u => u.email.toLowerCase() === email);
-        if (existing) {
-          existing.name = name;
-          if (phone) existing.phone = phone;
-        } else {
-          mockStore.investors.unshift({
-            id: Date.now(),
-            name,
-            email,
-            phone,
-            onboarding_status: persistedStatus,
-            registered_at: new Date().toISOString()
-          });
-        }
-      } catch (e2) {}
 
       return res.status(200).json({
         success: true,
         status: persistedStatus,
         email,
-        name
+        name,
+        phone,
+        age: Number.isFinite(age) ? age : 0
       });
     }
   }

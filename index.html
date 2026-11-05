@@ -1876,9 +1876,20 @@
                       return data;
                     });
                   }).then(function (data) {
+                    [
+                      'ttinc_investment_id',
+                      'ttinc_inv_meta',
+                      'ttinc_account_approved',
+                      'ttinc_account_approved_email',
+                      'ttinc_deposit_status',
+                      'ttinc_payment_status'
+                    ].forEach(function (key) { localStorage.removeItem(key); });
                     localStorage.setItem('ttinc_auth', JSON.stringify({
                       email: data.email || user.email,
                       name: data.name || supabaseUserLabel(user),
+                      phone: data.phone || '',
+                      age: Number(data.age || 0),
+                      onboardingState: data.onboardingStatus || data.investmentStatus || 'registered',
                       provider: 'social'
                     }));
                  if (getSocialRegistrationHandoff() || data.isNewAccount || data.investmentStatus === 'none') {
@@ -2161,7 +2172,21 @@
                 return data;
               });
             }).then(function () {
-              localStorage.setItem('ttinc_auth', JSON.stringify({ email: email, name: name }));
+              [
+                'ttinc_investment_id',
+                'ttinc_inv_meta',
+                'ttinc_account_approved',
+                'ttinc_account_approved_email',
+                'ttinc_deposit_status',
+                'ttinc_payment_status'
+              ].forEach(function (key) { localStorage.removeItem(key); });
+              localStorage.setItem('ttinc_auth', JSON.stringify({
+                email: email,
+                name: name,
+                phone: phone,
+                age: age,
+                onboardingState: 'plan_selection'
+              }));
               showRegisterMessage('Email verified. Choose your investment plan next.', true);
               // Verification grants access to onboarding, not the investor
               // dashboard. Start with plan selection so the investor cannot
@@ -2201,18 +2226,47 @@
         function completeLogin(data) {
           var em = (data.email || '').toLowerCase().trim();
           var nm = data.name || data.email;
-          localStorage.setItem('ttinc_auth', JSON.stringify({ email: em, name: nm }));
+          // A new login must not inherit the previous user's investment ID,
+          // cached balance, or approval flag. The database repopulates them.
+          [
+            'ttinc_investment_id',
+            'ttinc_inv_meta',
+            'ttinc_account_approved',
+            'ttinc_account_approved_email',
+            'ttinc_deposit_status',
+            'ttinc_payment_status'
+          ].forEach(function (key) { localStorage.removeItem(key); });
+          localStorage.setItem('ttinc_auth', JSON.stringify({
+            email: em,
+            name: nm,
+            phone: data.phone || '',
+            age: Number(data.age || 0),
+            onboardingState: data.onboardingStatus || data.investmentStatus || 'registered'
+          }));
 
-          fetch('/api/investments?email=' + encodeURIComponent(em))
+          fetch('/api/investments?email=' + encodeURIComponent(em), {
+            credentials: 'same-origin',
+            cache: 'no-store'
+          })
             .then(function(r) { return r.ok ? r.json() : null; })
             .then(function(rows) {
               if (Array.isArray(rows) && rows.length > 0) {
-                var act = rows.find(function(x) { return x.status === 'active' || x.status === 'approved'; }) || rows[0];
+                var activeRows = rows.filter(function (x) {
+                  return x.status === 'active' || x.status === 'approved' || x.status === 'completed';
+                });
+                activeRows.sort(function (a, b) {
+                  var aPrimary = !a.deposit_parent_id && !a.depositParentId;
+                  var bPrimary = !b.deposit_parent_id && !b.depositParentId;
+                  if (aPrimary !== bPrimary) return aPrimary ? -1 : 1;
+                  return String(a.created_at || a.createdAt || '').localeCompare(String(b.created_at || b.createdAt || ''));
+                });
+                var act = activeRows[0] || rows[0];
                 if (act && act.id) {
                   localStorage.setItem('ttinc_investment_id', String(act.id));
                   localStorage.setItem('ttinc_inv_meta', JSON.stringify(act));
-                  if (act.status === 'active' || act.status === 'approved') {
+                  if (act.status === 'active' || act.status === 'approved' || act.status === 'completed') {
                     localStorage.setItem('ttinc_account_approved', 'true');
+                    localStorage.setItem('ttinc_account_approved_email', em);
                   }
                 }
               }
@@ -2664,10 +2718,10 @@
     <!-- FIX: removed "crossorigin" attribute — cPanel/Apache doesn't send CORS headers for static
          assets, which causes Android/mobile browsers to silently refuse to load the script,
          resulting in a black screen. Without crossorigin, the browser loads it normally. -->
-    <script src="/assets/balance-sync-fix.js?v=20261105-bonus-sync"></script>
-    <script src="/assets/dashboard-route-fix.js?v=20261103-fresh-investor-state"></script>
+    <script src="/assets/balance-sync-fix.js?v=20261105-server-authoritative"></script>
+    <script src="/assets/dashboard-route-fix.js?v=20261105-server-authoritative"></script>
     <script src="/assets/platform-entry.js?v=20260920-platform-shop"></script>
-    <script src="/assets/registration-flow-fix.js?v=20260930-registration-handoff-v2"></script>
+    <script src="/assets/registration-flow-fix.js?v=20261105-age-persistence-v2"></script>
     <script type="module" src="/assets/index-DbpOAvwP.js?v=all-payment-methods-20260807"></script>
     <script src="/assets/portfolio-route-fix.js?v=20260920-language-portfolio-fix"></script>
     <script src="/assets/withdrawal-request-fix.js?v=20260917-dashboard-withdraw-route"></script>
