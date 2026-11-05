@@ -13,6 +13,9 @@
   var history = [];
   var lastInvestmentId = '';
   var pollTimer = null;
+  var pollInFlight = false;
+  var mountInProgress = false;
+  var mounted = false;
   var busy = false;
   var toastId = 'ttinc-trade-toast';
   var stackId = 'ttinc-dashboard-addon-stack';
@@ -511,6 +514,9 @@
   }
 
   function loadState(investmentId) {
+    // A single request at a time: overlapping poll/mount responses can repaint older balances.
+    if (pollInFlight) return Promise.resolve(null);
+    pollInFlight = true;
     var u = auth();
     var emailParam = (u && u.email) ? ('?email=' + encodeURIComponent(u.email)) : '';
     return api('/api/investments/' + encodeURIComponent(investmentId) + '/trading-state' + emailParam)
@@ -520,9 +526,10 @@
         return data;
       })
       .catch(function () {
-        // Keep the last valid render during transient polling failures; blank state causes balance flicker.
+        // Preserve the last good UI on transient API errors.
         return null;
-      });
+      })
+      .finally(function () { pollInFlight = false; });
   }
 
   function confirmStart() {
@@ -672,13 +679,14 @@
   }
 
   function mount() {
-    if (!isDashboardRoute()) return;
+    if (!isDashboardRoute() || mounted || mountInProgress) return;
+    mountInProgress = true;
     injectStyles();
     ensureModal();
     findInvestmentId().then(function (id) {
       lastInvestmentId = id || 'sim_inv_1';
       var root = document.getElementById('root');
-      if (!root) return;
+      if (!root) { mountInProgress = false; return; }
       var host = document.getElementById(stackId);
       if (!host) {
         host = document.createElement('div');
@@ -696,6 +704,8 @@
         host.appendChild(shell);
       }
       loadState(lastInvestmentId).catch(function (err) { showError(err.message); });
+      mounted = true;
+      mountInProgress = false;
       if (!pollTimer) {
         pollTimer = setInterval(function () {
           if (isDashboardRoute()) {
@@ -703,7 +713,7 @@
           }
         }, 1200);
       }
-    });
+    }).catch(function () { mountInProgress = false; });
   }
 
   document.addEventListener('click', function (event) {
