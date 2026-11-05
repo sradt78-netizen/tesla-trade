@@ -2,7 +2,8 @@ import bcryptjs from 'bcryptjs';
 import crypto from 'crypto';
 import { getDbConnection } from './dbcheck.js';
 import { resolveSupabaseCredentials } from './supabase-config.js';
-import { notifyAdminEvent } from '../telegram.js';
+import { notifyAdminEvent, notifySignup } from '../telegram.js';
+import { sendWelcomeEmail } from '../mailer.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -251,8 +252,11 @@ export default async function handler(req, res) {
     let profilePhone = '';
     let profileAge = 0;
     let onboardingStatus = 'registered';
+    let isNewAccount = false;
     try {
       const conn = await getDbConnection();
+      const [priorRows] = await conn.query('SELECT email FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
+      isNewAccount = priorRows.length === 0;
       await conn.query(
         'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_approval", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name))',
         [email, name]
@@ -285,6 +289,18 @@ export default async function handler(req, res) {
       });
     }
 
+    if (isNewAccount) {
+      const results = await Promise.allSettled([
+        sendWelcomeEmail(email, name),
+        notifySignup({ email, name, phone: profilePhone })
+      ]);
+      results.forEach((result) => {
+        if (result.status === 'rejected' || result.value?.ok === false) {
+          console.warn('[auth social-session] signup notification failed:', result.reason || result.value?.error);
+        }
+      });
+    }
+
     return res.status(200).json({
       success: true,
       email,
@@ -293,7 +309,7 @@ export default async function handler(req, res) {
       phone: profilePhone,
       age: profileAge,
       onboardingStatus,
-      isNewAccount: false,
+      isNewAccount,
       investmentStatus,
       message: 'Social session verified successfully.'
     });
