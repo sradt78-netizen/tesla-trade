@@ -443,14 +443,12 @@
       '</div>';
 
     if (!active) {
-      html += available > 0
-        ? '<div class="ttinc-trade-action">' +
-            '<button class="ttinc-start-btn" type="button" data-start-trading>Trade Now ✦</button>' +
-            '<button class="ttinc-stop-btn" type="button" data-stop-trading disabled>Stop Trading</button>' +
-            '<span style="color:#64748b;font-size:12px;margin-left:4px;">10%, 50%, 100%, or custom allocation of your balance</span>' +
-          '</div>'
-        : '<div class="ttinc-no-funds">You currently have no available balance to allocate. Top up your account to activate trading.</div>' +
-          '<div class="ttinc-trade-action" style="margin-top:12px"><a class="ttinc-topup-link" href="/invest">Top up account →</a></div>';
+      html += '<div class="ttinc-trade-action">' +
+          '<button class="ttinc-start-btn" type="button" data-start-trading' + (available > 0 ? '' : ' disabled') + '>Start Trade</button>' +
+          '<button class="ttinc-stop-btn" type="button" data-stop-trading disabled>Stop Trade</button>' +
+          '<span style="color:#64748b;font-size:12px;margin-left:4px;">Choose 10%, 50%, 100%, or a custom amount.</span>' +
+        '</div>' +
+        (available > 0 ? '' : '<div class="ttinc-no-funds">No available balance to allocate. Fund the account before starting a trade.</div><div class="ttinc-trade-action" style="margin-top:12px"><a class="ttinc-topup-link" href="/invest">Deposit funds →</a></div>');
     } else {
       // CLEAN, CONVINCING TRADING DISPLAY WITHOUT DISTRACTING COUNTDOWN TIMERS
       html +=
@@ -479,14 +477,15 @@
               '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;"></span>' +
               'Execution Active · Instant Capital Preservation Lock' +
             '</div>' +
-            '<button class="ttinc-stop-btn" type="button" data-stop-trading>Stop Trade &amp; Lock Profit</button>' +
+            '<button class="ttinc-start-btn" type="button" data-start-trading disabled>Start Trade (already active)</button>' +
+            '<button class="ttinc-stop-btn" type="button" data-stop-trading>Stop Trade</button>' +
           '</div>' +
         '</div>';
     }
 
     container.innerHTML = html + '<div class="ttinc-trade-error" data-trade-error></div>';
     var start = container.querySelector('[data-start-trading]');
-    if (start) start.addEventListener('click', function () { openModal(available); });
+    if (start && !start.disabled) start.addEventListener('click', function () { openModal(available); });
     if (active) {
       window.requestAnimationFrame(function () {
         var canvas = container.querySelector('#ttinc-trade-canvas');
