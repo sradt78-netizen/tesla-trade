@@ -1198,30 +1198,11 @@ export default async function handler(req, res) {
       // Use the persistent ledger to determine prior approved deposits; the
       // current investment is excluded so retries remain idempotent.
       let priorApprovedDeposits = 0;
-      try {
-        const { loadDatabaseSync } = await import('../db.js');
-        const ledgerDb = loadDatabaseSync();
-        const txs = Array.isArray(ledgerDb?.account_transactions) ? ledgerDb.account_transactions : [];
-        const seen = new Set();
-        for (const tx of txs) {
-          const txEmail = String(tx.user_email || '').toLowerCase().trim();
-          const txInvestmentId = String(tx.investment_id || '');
-          const selectedBareId = String(selectedDepositId || '').replace(/^dep_/, '');
-          const currentDepositIds = new Set([
-            String(rawId || ''),
-            String(cleanId || ''),
-            String(depId || ''),
-            String(selectedDepositId || ''),
-            selectedBareId,
-            selectedBareId ? ('dep_' + selectedBareId) : ''
-          ].filter(Boolean));
-          if (txEmail === effectiveEmail && tx.type === 'deposit' && tx.status === 'processed' &&
-              txInvestmentId && !currentDepositIds.has(txInvestmentId)) {
-            seen.add(txInvestmentId);
-          }
-        }
-        priorApprovedDeposits = seen.size;
-      } catch (e) {}
+      const [priorDepositRows] = await conn.query(
+        "SELECT COUNT(DISTINCT investment_id) AS approved_count FROM account_transactions WHERE LOWER(user_email)=? AND type='deposit' AND status='processed' AND investment_id<>?",
+        [effectiveEmail, selectedDepositId]
+      );
+      priorApprovedDeposits = Number(priorDepositRows[0]?.approved_count || 0);
       const bonusMatch = status === 'active' && approvedDepositAmount > 0 && priorApprovedDeposits < 2
         ? Number(approvedDepositAmount.toFixed(2)) : 0;
       const totalBalanceWithBonus = Number((totalBalanceReal + bonusMatch).toFixed(2));
