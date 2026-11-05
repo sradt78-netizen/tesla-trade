@@ -9,6 +9,20 @@ function cleanString(val) {
   return String(val).trim().replace(/^["']|["']$/g, '');
 }
 
+function normalizePaymentMethod(value) {
+  const normalized = cleanString(value).toLowerCase().replace(/[()]/g, '').replace(/[_-]+/g, ' ').replace(/\\s+/g, ' ').trim();
+  const aliases = {
+    usdt: ['usdt', 'tether', 'tether usdt', 'usdt trc 20', 'tether trc 20', 'usdt trc20'],
+    eth: ['eth', 'ethereum', 'ethereum erc 20', 'ethereum erc20'],
+    btc: ['btc', 'bitcoin'],
+    bank: ['bank', 'bank transfer', 'bank wire', 'bank wire transfer', 'wire transfer']
+  };
+  for (const [key, names] of Object.entries(aliases)) {
+    if (names.includes(normalized)) return key;
+  }
+  return '';
+}
+
 function getSavedDepositsFilePath() {
   const p = path.resolve(process.cwd(), 'data', 'saved_deposits.json');
   try {
@@ -315,7 +329,8 @@ export default async function handler(req, res) {
 
     const email = cleanString(fields.email || fields.userEmail || fields.userId || fields.user_email).toLowerCase();
     const amount = parseFloat(fields.amount || fields.total || '0');
-    const method = fields.method || fields.paymentMethod || fields.payment_method || 'crypto';
+    const suppliedMethod = fields.method || fields.paymentMethod || fields.payment_method || '';
+    const method = normalizePaymentMethod(suppliedMethod);
     const ref = fields.paymentReference || fields.reference || fields.tx_id || '';
     const planId = fields.planId || fields.plan_id || 'standard';
     const planName = fields.planName || fields.plan_name || fields.portfolio || 'Explorer';
@@ -337,6 +352,12 @@ export default async function handler(req, res) {
 
     if (!email) {
       return res.status(400).json({ success: false, error: 'User email is required' });
+    }
+    if (!method) {
+      return res.status(400).json({ success: false, error: 'Choose a supported payment method: cryptocurrency (USDT, ETH or BTC) or bank transfer.' });
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ success: false, error: 'Enter a valid deposit amount greater than zero.' });
     }
 
     let investmentId = 'dep_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7);
