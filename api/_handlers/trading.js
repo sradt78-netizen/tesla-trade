@@ -170,6 +170,44 @@ async function saveInv(inv, fields) {
   } finally { try { await conn.end(); } catch (e) {} }
 }
 
+async function recordTradeSettlement(inv, email, pnl) {
+  if (!email) return;
+  const amount = Number(Math.abs(Number(pnl || 0)).toFixed(2));
+  const type = Number(pnl || 0) < 0 ? 'loss' : 'profit';
+  const txId = 'tx_trade_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+  const note = 'Simulated trade settled';
+  const conn = await realConn();
+  if (conn) {
+    try {
+      await conn.query(
+        'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, ?, ?, "processed", ?, NOW())',
+        [txId, inv.id, email, type, amount, note]
+      );
+      await conn.end();
+      return;
+    } catch (error) {
+      try { await conn.end(); } catch (ignored) {}
+    }
+  }
+  // Keep local/mock history in step with the wallet when MySQL is offline.
+  try {
+    const { loadDatabaseSync, saveDatabaseSync } = await import('../db.js');
+    const db = loadDatabaseSync();
+    if (!Array.isArray(db.account_transactions)) db.account_transactions = [];
+    db.account_transactions.unshift({
+      id: txId,
+      investment_id: inv.id,
+      user_email: email,
+      type,
+      amount,
+      status: 'processed',
+      note,
+      created_at: new Date().toISOString()
+    });
+    saveDatabaseSync();
+  } catch (error) {}
+}
+
 function withWallet(inv, trade) {
   // Single wallet number: idle = full balance, trading = untraded cash + live trade value.
   const base = Number(inv.totalCurrentValue || 0);
@@ -223,7 +261,8 @@ export async function handleTradingStart(req, res, id, body) {
 export async function handleTradingStop(req, res, id, body) {
   res.setHeader('Cache-Control', 'no-store');
   const now = Math.floor(Date.now() / 1000);
-  const inv = await getOrCreateInvestment(id, qEmail(req, body));
+  const email = qEmail(req, body);
+  const inv = await getOrCreateInvestment(id, email);
 
   if (!inv || inv.tradingStatus !== 'active') {
     // Already stopped (e.g. double click): report the saved balance instead of an error.
@@ -243,6 +282,7 @@ export async function handleTradingStop(req, res, id, body) {
   inv.tradingAmount = 0;
   inv.tradingStartedAt = null;
   await saveInv(inv, {});
+  await recordTradeSettlement(inv, email, active.pnl);
 
   return res.status(200).json({
     success: true,
