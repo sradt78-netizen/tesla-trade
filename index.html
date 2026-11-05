@@ -7649,7 +7649,7 @@
 
           addMethod('🪙', (usdt.label || 'USDT') + ' · ' + (usdt.network || 'TRC-20'),
                     usdt.address, usdt.address,
-                    'Sample details — update in Admin');
+                    'Not configured — contact support');
           addMethod('⬡', (eth.label || 'Ethereum (ETH)') + ' · ' + (eth.network || 'ERC-20'),
                     eth.address, eth.address,
                     'Sample details — update in Admin');
@@ -9988,7 +9988,8 @@
             projectedRoi: Number(plan.roi)
           }]);
         }
-        var method = sessionStorage.getItem('ttinc_payment_method') || 'USDT (TRC-20)';
+        var storedMethod = String(sessionStorage.getItem('ttinc_payment_method') || 'usdt').toLowerCase();
+         var method = ['usdt', 'eth', 'btc', 'bank'].indexOf(storedMethod) !== -1 ? storedMethod : 'usdt';
         var error = document.getElementById('ttinc-deposit-confirm-error');
         var button = document.getElementById('ttinc-deposit-confirm-button');
         var referenceInput = document.getElementById('ttinc-deposit-reference');
@@ -10127,15 +10128,15 @@
         methods.id = 'ttinc-investment-payment-methods';
          methods.style.cssText = 'position:fixed!important;inset:0!important;z-index:2147483647!important;overflow-y:auto;box-sizing:border-box;background:#0a0a0a;padding:22px 16px 190px;';
         var fallbackSettings = {
-          usdt: { address: 'SAMPLE-USDT-ADDRESS-UPDATE-IN-ADMIN' },
-          eth: { address: 'SAMPLE-ETH-ADDRESS-UPDATE-IN-ADMIN' },
-          btc: { address: 'SAMPLE-BTC-ADDRESS-UPDATE-IN-ADMIN' },
-          bank: { name: 'Sample Bank (Replace in Admin)', account: '0000000000', routing: '000000000', swift: 'SAMPLEXXX' },
+          usdt: { address: '' },
+          eth: { address: '' },
+          btc: { address: '' },
+          bank: { name: '', account: '', routing: '', swift: '' },
         };
         methods.innerHTML =
           '<div style="background:#111;border:1px solid #252525;border-radius:16px;padding:18px;">' +
           '<div style="color:#d4af37;font-size:10px;letter-spacing:1.5px;font-weight:900;text-transform:uppercase;margin-bottom:7px;">Payment details</div>' +
-          '<h2 style="color:#fff;font-size:20px;margin:0 0 6px;">Choose any available payment method</h2>' +
+          '<h2 style="color:#fff;font-size:20px;margin:0 0 6px;">Choose a payment method</h2>' +
           '<p style="color:#888;font-size:12px;line-height:1.55;margin:0 0 14px;">Send the exact investment amount, then confirm below. The payment methods configured by the administrator are listed here.</p>' +
           '<div id="ttinc-investment-payment-method-list" style="display:grid;gap:9px;">' +
             '<div style="color:#888;font-size:12px;padding:12px 0;">Loading payment details…</div>' +
