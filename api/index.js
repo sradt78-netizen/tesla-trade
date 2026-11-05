@@ -9,6 +9,7 @@ import authHandler from './_handlers/auth.js';
 import supabaseConfigHandler from './_handlers/supabase-config.js';
 import accountsHandler from './_handlers/accounts.js';
 import stocksHandler from './_handlers/stocks.js';
+import withdrawalsHandler from './_handlers/withdrawals.js';
 import {
   handleTradingState,
   handleTradingStart,
@@ -100,6 +101,13 @@ export default async function handler(req, res) {
     /^\/investments\/[^/]+$/.test(normalizedPath)
   ) {
     return await paymentSubmitHandler(req, res);
+  }
+
+  if (normalizedPath === '/withdrawals') {
+    return await withdrawalsHandler(req, res);
+  }
+  if (normalizedPath === '/withdrawal-deposits') {
+    return res.status(410).json({ success: false, error: 'Upfront deposits are not required or accepted for withdrawal requests. Submit the withdrawal directly.' });
   }
 
   // 9. Analytics & tracking
