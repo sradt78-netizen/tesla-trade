@@ -650,6 +650,35 @@ function record_account_transaction(
  * the configured value otherwise.
  */
 function sync_approved_investment_balance(PDO $db, string $investmentId): void {
+    // Recover a missing principal from the recorded deposit ledger before
+    // syncing current value. Approval must never turn a funded row into $0.
+    $lookup = $db->prepare('SELECT total, total_current_value, roi_percent, tx_id FROM investments WHERE id=? LIMIT 1');
+    $lookup->execute([$investmentId]);
+    $investment = $lookup->fetch();
+    if (!$investment) return;
+
+    $principal = (float)($investment['total'] ?? 0);
+    if ($principal <= 0) {
+        $ledger = $db->prepare(
+            "SELECT COALESCE(SUM(amount),0) FROM account_transactions
+             WHERE investment_id=? AND type='deposit' AND amount>0"
+        );
+        $ledger->execute([$investmentId]);
+        $principal = (float)$ledger->fetchColumn();
+        if ($principal <= 0 && !empty($investment['tx_id'])) {
+            $byReference = $db->prepare(
+                "SELECT COALESCE(SUM(amount),0) FROM account_transactions
+                 WHERE reference_id=? AND type='deposit' AND amount>0"
+            );
+            $byReference->execute([$investment['tx_id']]);
+            $principal = (float)$byReference->fetchColumn();
+        }
+        if ($principal > 0) {
+            $db->prepare('UPDATE investments SET total=? WHERE id=? AND (total IS NULL OR total<=0)')
+               ->execute([round($principal, 2), $investmentId]);
+        }
+    }
+
     $db->prepare(
         'UPDATE investments
          SET earnings = CASE
