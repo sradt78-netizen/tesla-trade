@@ -717,6 +717,7 @@ input:focus,select:focus,textarea:focus { border-color:rgba(227,25,55,.8)!import
 
     <!-- TAB 5: WITHDRAWALS -->
     <section id="tab-withdrawals" style="display: none;">
+      <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Review the destination and amount carefully. Use Approve only after the payout has actually been sent; approval deducts the amount from the investor balance.</p>
       <div class="table-box">
         <table>
           <thead>
@@ -1725,17 +1726,17 @@ input:focus,select:focus,textarea:focus { border-color:rgba(227,25,55,.8)!import
       } else {
         var wRows = '';
         wds.forEach(function(w) {
-          var statusBadge = w.status === 'approved' ? '<span class="badge green">Approved</span>' : '<span class="badge red">' + (w.status || 'pending') + '</span>';
+          var statusBadge = w.status === 'approved' ? '<span class="badge green">Paid</span>' : (w.status === 'rejected' ? '<span class="badge red">Rejected</span>' : '<span class="badge amber">' + (w.status || 'pending') + '</span>');
           wRows += '<tr>' +
             '<td style="font-size: 12px; color: var(--muted);">' + (w.created_at || '').substring(0, 10) + '</td>' +
-            '<td style="font-family: monospace;">' + (w.user_email || '—') + '</td>' +
+            '<td style="font-family: monospace;">' + escapeHtml(w.user_email || '—') + '</td>' +
             '<td style="font-weight: 600; color: #f87171;">$' + Number(w.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</td>' +
             '<td>' + (w.method || 'Crypto') + '</td>' +
-            '<td style="font-family: monospace; font-size: 12px;">' + (w.destination || '—') + '</td>' +
+            '<td style="font-family: monospace; font-size: 12px; word-break:break-all;">' + escapeHtml(w.wallet_address || w.destination || '—') + '</td>' +
             '<td>' + statusBadge + '</td>' +
             '<td>' +
-              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="wdAction(' + w.id + ', \'approve_withdrawal\')">Approve</button>' +
-              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="wdAction(' + w.id + ', \'reject_withdrawal\')">Reject</button>' +
+              '<button type="button" class="success" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="wdAction(' + JSON.stringify(String(w.id || '')) + ', \'approve_withdrawal\')">Approve</button>' +
+              '<button type="button" style="padding: 4px 8px; font-size: 11px; color: #fca5a5;" onclick="wdAction(' + JSON.stringify(String(w.id || '')) + ', \'reject_withdrawal\')">Reject</button>' +
             '</td>' +
             '</tr>';
         });
@@ -2245,18 +2246,27 @@ input:focus,select:focus,textarea:focus { border-color:rgba(227,25,55,.8)!import
     }
 
     function wdAction(id, act) {
+      if (act === 'approve_withdrawal' && !confirm('Confirm the payout has already been sent to the investor\'s wallet or bank account? Approving will deduct this amount from the investor\'s available balance.')) return;
+      if (act === 'reject_withdrawal' && !confirm('Reject this withdrawal request? The investor\'s balance will remain unchanged.')) return;
       adminFetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: act, id: id })
       })
-      .then(function(r) { return r.json(); })
+      .then(function(r) {
+        return r.json().then(function(d) {
+          if (!r.ok || !d.success) throw new Error(d.error || d.message || 'Withdrawal review failed.');
+          return d;
+        });
+      })
       .then(function(d) {
         showToast(d.message || 'Withdrawal updated');
         loadDashboardData();
+      })
+      .catch(function(error) {
+        showToast(error.message || 'Withdrawal review failed.');
       });
     }
-
     function finAction(id, act) {
       adminFetch('/api/admin', {
         method: 'POST',
