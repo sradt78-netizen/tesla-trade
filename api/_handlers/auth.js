@@ -247,16 +247,21 @@ export default async function handler(req, res) {
         'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_approval", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name))',
         [email, name]
       );
+      const [accountRows] = await conn.query(
+        'SELECT onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1',
+        [email]
+      );
       const [rows] = await conn.query(
         "SELECT status FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC",
         [email]
       );
       const states = rows.map(row => String(row.status || '').toLowerCase());
+      const persistedOnboarding = String(accountRows[0]?.onboarding_status || 'none').toLowerCase();
       investmentStatus = states.some(s => ['active','approved','completed'].includes(s))
         ? 'active'
         : states.some(s => ['pending','pending_approval'].includes(s))
           ? 'pending_approval'
-          : 'none';
+          : persistedOnboarding;
       await conn.end();
     } catch (e) {
       try {
