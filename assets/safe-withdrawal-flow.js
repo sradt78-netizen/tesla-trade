@@ -36,15 +36,18 @@
     box.style.borderColor = tone === 'success' ? '#166534' : '#7f1d1d';
   }
 
+  function renderUnavailable(root, message) {
+    root.innerHTML = '<div style="min-height:100vh;background:#0a0a0a;color:#fff;font-family:Arial,sans-serif;padding:28px 16px;"><div style="max-width:520px;margin:0 auto;background:#111;border:1px solid #292929;border-radius:14px;padding:22px;"><a href="/overview" style="color:#94a3b8;text-decoration:none;font-size:12px;">← Back to overview</a><h1 style="font-size:22px;margin:22px 0 10px;">Withdrawal unavailable</h1><p role="alert" style="color:#fca5a5;font-size:13px;line-height:1.6;">' + escapeHtml(message || 'Your verified account balance could not be loaded. Please retry later.') + '</p><button type="button" onclick="location.reload()" style="background:#e31937;color:#fff;border:0;border-radius:8px;padding:11px 16px;font-weight:700;">Retry</button></div></div>';
+  }
+
   function renderWithdrawal(root, investment, auth) {
     var principal = Number(investment.total || 0);
-    var balance = Number(
-      investment.totalCurrentValue != null
-        ? investment.totalCurrentValue
-        : (investment.total_current_value != null ? investment.total_current_value : (principal > 0 ? principal * 2 : 2000))
-    );
-    if (balance <= principal && principal > 0) balance = principal * 2;
-    var bonus = Number(investment.bonus || principal);
+    var balance = Number(investment.totalCurrentValue != null ? investment.totalCurrentValue : (investment.total_current_value != null ? investment.total_current_value : principal));
+    var bonus = Number(investment.bonus != null ? investment.bonus : Math.max(0, balance - principal));
+    if (!investment || !investment.id || !Number.isFinite(balance) || balance <= 0) {
+      renderUnavailable(root, 'No verified active balance is available for withdrawal. Please check your investor dashboard or contact support.');
+      return;
+    }
 
     root.innerHTML =
       '<div id="' + MARKER + '" style="min-height:100vh;background:#0a0a0a;color:#fff;font-family:Arial,sans-serif;padding:28px 16px;">' +
@@ -53,7 +56,7 @@
           '<h1 style="font-size:26px;margin:0 0 7px;text-transform:uppercase;">Request <span style="color:#e31937;">Withdrawal</span></h1>' +
           '<p style="color:#94a3b8;font-size:13px;line-height:1.6;margin:0 0 18px;">No upfront payment or withdrawal deposit is required. Complete identity verification if requested, then your withdrawal is sent for admin review.</p>' +
           '<div style="display:flex;justify-content:space-between;align-items:center;background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:14px;margin-bottom:18px;">' +
-            '<div><span style="color:#94a3b8;font-size:12px;display:block;">Available Wallet Balance</span><span style="color:#22c55e;font-size:11px;font-weight:700;">✦ Includes 100% Deposit Match Bonus ($' + Number(bonus).toFixed(2) + ')</span></div>' +
+            '<div><span style="color:#94a3b8;font-size:12px;display:block;">Available Wallet Balance</span><span style="color:#22c55e;font-size:11px;font-weight:700;">Verified balance · Bonus: ' + money(bonus) + '</span></div>' +
             '<strong style="font-size:20px;color:#fff;">' + money(balance) + '</strong>' +
           '</div>' +
           '<div data-withdraw-message role="alert" style="display:none;border:1px solid;border-radius:9px;padding:11px 12px;font-size:12px;line-height:1.5;margin-bottom:14px;"></div>' +
@@ -147,15 +150,14 @@
       return response.json();
     }).then(function (resData) {
       var investment = Array.isArray(resData) ? (resData[0] || {}) : resData;
-      if (investment && investment.id) {
-        localStorage.setItem('ttinc_investment_id', investment.id);
-      }
+      if (investment && investment.id) localStorage.setItem('ttinc_investment_id', investment.id);
       if (window.location.pathname === '/withdraw' && !root.querySelector('#' + MARKER)) {
-        renderWithdrawal(root, investment || { total: 1000, totalCurrentValue: 2000, bonus: 1000, id: 'inv_active' }, auth);
+        if (investment && ['active', 'approved'].includes(String(investment.status || '').toLowerCase())) renderWithdrawal(root, investment, auth);
+        else renderUnavailable(root, 'Your account does not have a verified active investment balance yet.');
       }
     }).catch(function () {
       if (window.location.pathname === '/withdraw' && !root.querySelector('#' + MARKER)) {
-        renderWithdrawal(root, { total: 1000, totalCurrentValue: 2000, bonus: 1000, id: 'inv_active' }, auth);
+        renderUnavailable(root, 'The investor database could not be reached. No balance has been assumed or displayed. Please retry later.');
       }
     });
   }
