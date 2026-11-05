@@ -1335,12 +1335,19 @@ export default async function handler(req, res) {
 
           if (effectiveEmail && status === 'active') {
             await conn.query('UPDATE investor_accounts SET onboarding_status="active", deposit_match_eligible=1, activated_at=NOW() WHERE LOWER(email)=?', [effectiveEmail]);
-            const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
+            // Idempotent deposit ledger write: retries must not create duplicate credits.
             try {
-              await conn.query(
-                'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "processed", "Investment deposit approved", NOW())',
-                [txDepId, effectiveId, effectiveEmail, approvedDepositAmount]
+              const [depositTxRows] = await conn.query(
+                'SELECT id FROM account_transactions WHERE LOWER(user_email)=? AND investment_id=? AND type="deposit" LIMIT 1',
+                [effectiveEmail, effectiveId]
               );
+              if (!depositTxRows.length) {
+                const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
+                await conn.query(
+                  'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "processed", "Investment deposit approved", NOW())',
+                  [txDepId, effectiveId, effectiveEmail, approvedDepositAmount]
+                );
+              }
             } catch (eTx) { console.error('[admin approve] ledger insert failed:', eTx.message); }
           }
           await conn.end();
