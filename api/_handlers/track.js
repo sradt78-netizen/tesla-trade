@@ -1,4 +1,5 @@
 import { getDbConnection } from './dbcheck.js';
+import { notifyLinkClick } from '../telegram.js';
 
 function parseJsonBody(req) {
   return new Promise((resolve) => {
@@ -45,6 +46,11 @@ export default async function handler(req, res) {
     );
     await conn.end();
   } catch (e) {}
+
+  try {
+    const notice = await notifyLinkClick({ campaign_source: source, landing_page: landing, device_type: device, referrer: ref });
+    if (notice.ok === false && !notice.skipped) console.warn('[track] Telegram alert failed:', notice.error);
+  } catch (noticeError) { console.warn('[track] Telegram alert failed:', noticeError.message); }
 
   return res.status(200).json({ success: true });
 }
