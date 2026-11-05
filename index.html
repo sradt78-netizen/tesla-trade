@@ -4698,7 +4698,7 @@
       // ── poll /api/my-status ────────────────────────────────────
       function getEffectiveStatus(d) {
         var s = (d && (d.investmentStatus || d.status)) ? (d.investmentStatus || d.status) : 'none';
-        var hasActive = (d && d.hasActiveInvestment) || s === 'active' || s === 'approved';
+        var hasActive = !!(d && d.hasActiveInvestment === true && d.status === 'active' && d.investmentStatus === 'active');
         if (hasActive) {
           try {
             localStorage.removeItem('ttinc_deposit_status');
@@ -4745,7 +4745,7 @@
             var s = getEffectiveStatus(d);
             var isPendingState = (s === 'pending_approval' || s === 'pending');
 
-            if (s === 'active' || (d && d.hasActiveInvestment) || s === 'approved') {
+            if (d && d.hasActiveInvestment === true && d.status === 'active' && d.investmentStatus === 'active') {
               _lastStatus = 'active';
               removeOverlay();
               stopPoll();
@@ -4855,7 +4855,7 @@
             if (s === 'active') {
               removeOverlay();
               stopPoll();
-            } else if (s === 'approved' || s === 'verified') {
+            } else if (s === 'pending_approval' || s === 'pending') {
               showOverlay('approved');
               stopPoll();
             } else if (s === 'declined' || s === 'rejected') {
@@ -4907,10 +4907,10 @@
           .then(function (d) {
             var s = getEffectiveStatus(d);
             var isPendingState = (s === 'pending_approval' || s === 'pending');
-            var isUserApproved = s === 'active' || (d && d.hasActiveInvestment);
+            var isUserApproved = !!(d && d.hasActiveInvestment === true && d.status === 'active' && d.investmentStatus === 'active');
             _lastStatus = s;
 
-            if (isUserApproved || s === 'active' || (d && d.hasActiveInvestment)) {
+            if (isUserApproved) {
               removeOverlay();
               stopPoll();
               return;
@@ -5016,10 +5016,10 @@
             .then(function (d) {
               var s = getEffectiveStatus(d);
               var isPendingState = (s === 'pending_approval' || s === 'pending');
-              var isUserApproved = s === 'active' || (d && d.hasActiveInvestment);
+              var isUserApproved = !!(d && d.hasActiveInvestment === true && d.status === 'active' && d.investmentStatus === 'active');
               _lastStatus = s;
 
-              if (isUserApproved || s === 'active' || (d && d.hasActiveInvestment)) {
+              if (isUserApproved) {
                 try {
                   localStorage.removeItem('ttinc_deposit_status');
                   localStorage.removeItem('ttinc_payment_status');
