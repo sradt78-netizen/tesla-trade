@@ -167,7 +167,16 @@
         return response.json();
       })
       .then(renderTransactions)
-      .catch(function () { renderTransactions([]); })
+      .catch(function () {
+        if (!root || window.location.pathname !== '/transactions') return;
+        root.innerHTML = '<div id="' + HISTORY_ID + '" style="min-height:100vh;background:#0a0a0a;color:#fff;font-family:Arial,sans-serif;padding:48px 16px;text-align:center;"><div style="max-width:520px;margin:0 auto;"><h2 style="font-size:20px;margin:0 0 10px;">History could not be loaded</h2><p style="color:#94a3b8;font-size:13px;line-height:1.6;">Your transaction records have not been marked as empty. The account ledger could not be reached. Please retry.</p><button type="button" id="ttinc-retry-history" style="margin-top:12px;padding:11px 18px;border:0;border-radius:8px;background:#e31937;color:#fff;font-weight:700;">Retry</button><p style="margin-top:20px;"><a href="/overview" style="color:#94a3b8;font-size:12px;">Back to overview</a></p></div></div>';
+        var retry = document.getElementById('ttinc-retry-history');
+        if (retry) retry.addEventListener('click', function () {
+          root.removeAttribute('data-ttinc-transactions');
+          root.removeAttribute('data-ttinc-transactions-loading');
+          loadTransactions();
+        });
+      })
       .then(function () {
         root.removeAttribute('data-ttinc-transactions-loading');
       });
