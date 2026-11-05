@@ -1237,7 +1237,14 @@ export default async function handler(req, res) {
           for (const inv of db.investments) {
             const iEmail = String(inv.user_email || inv.email || '').toLowerCase().trim();
             const iId = String(inv.id || '').trim();
-            if (iId === String(rawId) || iId === cleanId || iId === depId || (!rawId && effectiveEmail && iEmail === effectiveEmail)) {
+            const selectedId = String(selectedDepositId || effectiveId || '').trim();
+            const selectedBareId = selectedId.replace(/^dep_/, '');
+            if (
+              iId === String(rawId) ||
+              iId === cleanId ||
+              iId === depId ||
+              (selectedId && (iId === selectedId || iId === selectedBareId || iId === ('dep_' + selectedBareId)))
+            ) {
               inv.status = status;
               if (status === 'active') {
                 inv.total = approvedDepositAmount || inv.total || 0;
