@@ -425,6 +425,27 @@
       }
     }
   </style>
+<style id="tt-admin-visual-refresh">
+body { background-image:radial-gradient(ellipse at 15% 0%,rgba(227,25,55,.11),transparent 34%),radial-gradient(ellipse at 95% 15%,rgba(212,175,55,.07),transparent 30%); }
+.sidebar { background:linear-gradient(180deg,#151515 0%,#0d0d0f 100%); border-right-color:rgba(255,255,255,.09); }
+.sidebar-header { border-bottom-color:rgba(255,255,255,.09); }
+.sidebar-logo { box-shadow:0 6px 18px rgba(227,25,55,.25); }
+.nav-btn { border-radius:10px; padding:11px 13px; transition:background .18s ease,border-color .18s ease,transform .18s ease; }
+.nav-btn:hover { transform:translateX(2px); }
+.nav-btn.active { box-shadow:inset 3px 0 0 var(--red),0 6px 18px rgba(0,0,0,.16); }
+.card,.table-box { border-radius:15px; border-color:rgba(255,255,255,.09); box-shadow:0 10px 30px -18px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.025); }
+.card { background:linear-gradient(145deg,#171717,#111113); }
+.card-val { letter-spacing:-.035em; font-variant-numeric:tabular-nums; }
+th { background:#1b1b1e; letter-spacing:.045em; text-transform:uppercase; font-size:10px; }
+td { line-height:1.5; }
+button { transition:filter .18s ease,transform .15s ease,border-color .18s ease; }
+button:hover { filter:brightness(1.1); }
+button:active { transform:scale(.985); }
+input:focus,select:focus,textarea:focus { border-color:rgba(227,25,55,.8)!important; box-shadow:0 0 0 3px rgba(227,25,55,.12); outline:none; }
+.modal-content { box-shadow:0 24px 80px rgba(0,0,0,.6); }
+@media(max-width:900px) { .main { padding-top:18px!important; } .card { background:linear-gradient(145deg,#171717,#111113); } }
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important;transition:none!important; } }
+</style>
 </head>
 <body>
 
@@ -1159,7 +1180,20 @@
             </div>
           </div>
         </div>
-        <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save API Credentials</button>
+        <div style="border-top:1px solid var(--card-border);margin-top:18px;padding-top:18px;">
+          <h4 style="font-size:13px;color:#38bdf8;margin-bottom:10px;">Telegram Admin Alerts</h4>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Send real-time alerts for new registrations, sign-ins, deposits, receipt images and approval decisions. Keep the bot token private.</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
+            <div class="form-group"><label>Telegram Bot Token</label><input type="password" id="cfg-telegram-token" autocomplete="new-password" placeholder="123456:bot-token" /></div>
+            <div class="form-group"><label>Admin Chat ID</label><input type="text" id="cfg-telegram-chat" placeholder="Your Telegram chat ID" /></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:9px;color:var(--text);font-size:13px;"><input type="checkbox" id="cfg-telegram-enabled" checked style="width:16px;height:16px;"> Enable Telegram admin alerts</label>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+          <button type="button" class="primary" onclick="saveSettings()">Save API Credentials</button>
+          <button type="button" onclick="testTelegramAlerts()">📨 Send Telegram Test Alert</button>
+          <button type="button" onclick="testEmailDelivery()">✉️ Send Test Email</button>
+        </div>
       </div>
     </section>
   </main>
@@ -1787,11 +1821,11 @@
       
       var isResendLive = !!(mkStats.resendApiKeyConfigured);
       if (document.getElementById('stat-mk-apimode')) {
-        document.getElementById('stat-mk-apimode').textContent = isResendLive ? '● Live Resend SMTP' : '● Sandbox Simulator';
+        document.getElementById('stat-mk-apimode').textContent = isResendLive ? '● Live Resend API' : '● Email not configured';
         document.getElementById('stat-mk-apimode').style.color = isResendLive ? '#4ade80' : '#38bdf8';
       }
       if (document.getElementById('healthResendStatus')) {
-        document.getElementById('healthResendStatus').textContent = isResendLive ? 'Active (Live)' : 'Connected (Sandbox Mock)';
+        document.getElementById('healthResendStatus').textContent = isResendLive ? 'Configured' : 'Not configured';
         document.getElementById('healthResendStatus').style.color = isResendLive ? '#86efac' : '#93c5fd';
       }
       if (document.getElementById('healthAutopilotStatus')) {
@@ -1837,6 +1871,9 @@
       if (s.bank_swift && document.getElementById('cfg-bank-swift')) document.getElementById('cfg-bank-swift').value = s.bank_swift;
       if (s.resend_api_key && document.getElementById('cfg-resend-key')) document.getElementById('cfg-resend-key').value = s.resend_api_key;
       if (s.resend_from_email && document.getElementById('cfg-resend-from')) document.getElementById('cfg-resend-from').value = s.resend_from_email;
+      if (s.telegram_bot_token && document.getElementById('cfg-telegram-token')) document.getElementById('cfg-telegram-token').value = s.telegram_bot_token;
+      if (s.telegram_chat_id && document.getElementById('cfg-telegram-chat')) document.getElementById('cfg-telegram-chat').value = s.telegram_chat_id;
+      if (document.getElementById('cfg-telegram-enabled')) document.getElementById('cfg-telegram-enabled').checked = String(s.telegram_alerts_enabled || 'true') !== 'false';
       if (s.supabase_url && document.getElementById('cfg-supabase-url')) document.getElementById('cfg-supabase-url').value = s.supabase_url;
       if (s.supabase_anon_key && document.getElementById('cfg-supabase-anon')) document.getElementById('cfg-supabase-anon').value = s.supabase_anon_key;
     }
@@ -2267,6 +2304,29 @@
       });
     }
 
+    function testEmailDelivery() {
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_email' })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        showToast(d.success ? 'Email provider accepted the test message.' : (d.error || 'Test email was not sent.'));
+      }).catch(function() { showToast('Email test could not reach the server.'); });
+    }
+
+    function testTelegramAlerts() {
+      var token = (document.getElementById('cfg-telegram-token')?.value || '').trim();
+      var chatId = (document.getElementById('cfg-telegram-chat')?.value || '').trim();
+      if (!token || !chatId) { showToast('Enter the Telegram bot token and admin chat ID first.'); return; }
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_telegram', bot_token: token, chat_id: chatId })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        showToast(d.success ? 'Telegram test alert delivered.' : (d.error || 'Telegram test failed.'));
+      }).catch(function() { showToast('Telegram test could not reach the server.'); });
+    }
+
     function saveSettings() {
       var s = {
         wallet_usdt: (document.getElementById('cfg-usdt')?.value || '').trim(),
@@ -2277,6 +2337,9 @@
         bank_routing: (document.getElementById('cfg-bank-routing')?.value || '').trim(),
         bank_swift: (document.getElementById('cfg-bank-swift')?.value || '').trim(),
         resend_api_key: (document.getElementById('cfg-resend-key')?.value || '').trim(),
+        telegram_bot_token: (document.getElementById('cfg-telegram-token')?.value || '').trim(),
+        telegram_chat_id: (document.getElementById('cfg-telegram-chat')?.value || '').trim(),
+        telegram_alerts_enabled: document.getElementById('cfg-telegram-enabled')?.checked ? 'true' : 'false',
         resend_from_email: (document.getElementById('cfg-resend-from')?.value || '').trim(),
         supabase_url: (document.getElementById('cfg-supabase-url')?.value || '').trim(),
         supabase_anon_key: (document.getElementById('cfg-supabase-anon')?.value || '').trim()
