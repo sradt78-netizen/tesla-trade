@@ -521,7 +521,8 @@ if ($uri === '/transactions' && $method === 'GET') {
          WHERE LOWER(i.user_email)=? AND i.total > 0
            AND NOT EXISTS (
              SELECT 1 FROM account_transactions t
-             WHERE t.reference_id=i.tx_id AND t.type='deposit'
+             WHERE t.type='deposit'
+               AND (t.reference_id=i.tx_id OR t.investment_id=i.id)
            )"
     );
     $stInvestments->execute([$email]);
