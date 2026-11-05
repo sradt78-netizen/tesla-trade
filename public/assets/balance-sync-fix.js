@@ -210,6 +210,11 @@
               '<div style="color:#94a3b8;font-size:11px;margin-top:4px;">Verified Principal</div>' +
             '</div>' +
             '<div style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;">' +
+              '<div style="color:#94a3b8;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Confirmed Deposit Match Bonus</div>' +
+              '<div data-wallet-bonus style="font-family:monospace;font-size:22px;font-weight:700;color:#4ade80;">' + formatMoney(bonus) + '</div>' +
+              '<div style="color:#94a3b8;font-size:11px;margin-top:4px;">Recorded bonus credit</div>' +
+            '</div>' +
+            '<div style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;">' +
               '<div style="color:#94a3b8;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Available for Trade / Withdraw</div>' +
               '<div data-wallet-available style="font-family:monospace;font-size:22px;font-weight:700;color:#fff;">' + formatMoney(current) + '</div>' +
               '<div style="color:#e31937;font-size:11px;margin-top:4px;">Liquid Funds</div>' +
@@ -230,6 +235,8 @@
         if (totNode) totNode.textContent = formatMoney(current);
         var princNode = existingCard.querySelector('[data-wallet-principal]');
         if (princNode) princNode.textContent = formatMoney(principal);
+        var bonusNode = existingCard.querySelector('[data-wallet-bonus]');
+        if (bonusNode) bonusNode.textContent = formatMoney(bonus);
         var availNode = existingCard.querySelector('[data-wallet-available]');
         if (availNode) availNode.textContent = formatMoney(current);
       }
@@ -272,7 +279,7 @@
           ? investment.totalCurrentValue
           : (investment.total_current_value != null ? investment.total_current_value : principal)
       );
-      var bonus = 0;
+      var bonus = Number(investment.bonus != null ? investment.bonus : (investment.welcomeBonus != null ? investment.welcomeBonus : (investment.bonus_balance != null ? investment.bonus_balance : 0)));
 
       if (!Number.isFinite(principal) || !Number.isFinite(current)) return;
 
@@ -288,15 +295,11 @@
         );
         if (Number.isFinite(storedPrincipal)) oldPrincipal = storedPrincipal;
         if (Number.isFinite(storedCurrent)) oldCurrent = storedCurrent;
-        if (principal <= 0 && storedPrincipal > 0) {
-          principal = storedPrincipal;
-        }
-        // Server value is authoritative (stale local values caused amounts to flip).
-        oldMeta.id = investmentId || oldMeta.id || 'sim_inv_1';
+        // Server values are authoritative; never replace a valid server zero with stale browser data.
+        oldMeta.id = investmentId || oldMeta.id || '';
         oldMeta.total = principal;
         oldMeta.totalCurrentValue = current;
-        if (investment.bonus != null) oldMeta.bonus = Number(investment.bonus);
-        else if (investment.welcomeBonus != null) oldMeta.bonus = Number(investment.welcomeBonus);
+        oldMeta.bonus = Number.isFinite(bonus) ? bonus : 0;
         if (investment.status === 'active' || investment.status === 'approved' || localStorage.getItem('ttinc_account_approved') === 'true') {
           oldMeta.status = 'active';
         }
@@ -307,11 +310,12 @@
       // Rewriting the DOM on every poll caused visible flicker against React renders.
       var balanceChanged = !previous ||
         Math.abs(previous.principal - principal) > 0.005 ||
-        Math.abs(previous.current - current) > 0.005;
+        Math.abs(previous.current - current) > 0.005 ||
+        Math.abs(previous.bonus - bonus) > 0.005;
       if (balanceChanged) {
         patchVisibleWalletDom(principal, current, bonus);
       }
-      previous = { principal: principal, current: current };
+      previous = { principal: principal, current: current, bonus: bonus };
     }).catch(function () {});
   }
 
@@ -327,8 +331,9 @@
       if (meta && meta.total) {
         var p = Number(meta.total);
         var c = Number(meta.totalCurrentValue != null ? meta.totalCurrentValue : p);
+        var b = Number(meta.bonus != null ? meta.bonus : (meta.welcomeBonus != null ? meta.welcomeBonus : 0));
         isPatching = true;
-        patchVisibleWalletDom(p, c, 0);
+        patchVisibleWalletDom(p, c, b);
       }
     } catch (e) {} finally {
       isPatching = false;
