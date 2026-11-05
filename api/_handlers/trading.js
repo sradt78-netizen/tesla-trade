@@ -116,7 +116,9 @@ export async function getOrCreateInvestment(id, email) {
     try {
       let rows = [];
       if (id && !String(id).startsWith('sim_')) {
-        [rows] = await conn.query('SELECT ' + COLS + ' FROM investments WHERE id=? LIMIT 1', [id]);
+        [rows] = email
+          ? await conn.query('SELECT ' + COLS + ' FROM investments WHERE id=? AND LOWER(user_email)=? LIMIT 1', [id, String(email).toLowerCase()])
+          : await conn.query('SELECT ' + COLS + ' FROM investments WHERE id=? LIMIT 1', [id]);
       }
       if (!rows.length && email) {
         [rows] = await conn.query(
@@ -135,7 +137,7 @@ export async function getOrCreateInvestment(id, email) {
   let depositTotal = 0, curVal = 0, invStatus = 'active';
   const lcEmail = String(email || '').toLowerCase();
   const pick = (list) => (list || []).find(d =>
-    String(d.id) === String(id) ||
+    ((String(d.id) === String(id)) && (!lcEmail || String(d.user_email || d.email || '').toLowerCase() === lcEmail)) ||
     (lcEmail && String(d.user_email || d.email || '').toLowerCase() === lcEmail &&
       ['active', 'approved'].includes(d.status)));
   let match = null;
