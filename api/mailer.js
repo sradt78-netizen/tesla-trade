@@ -355,6 +355,71 @@ export async function sendTestEmail(toEmail) {
   });
 }
 
+
+/**
+ * Withdrawal request and decision notices.
+ * "Approved" means the administrator has confirmed the payout was sent.
+ */
+export async function sendWithdrawalStatusEmail(toEmail, toName, {
+  amount,
+  method,
+  status,
+  reference
+} = {}) {
+  const safeName = escapeHtml(toName || 'Investor');
+  const safeMethod = escapeHtml(method || 'selected payout method');
+  const safeStatus = String(status || 'pending').toLowerCase();
+  const formatted = '
+  getMailerConfig,
+  sendEmail,
+  sendWelcomeEmail,
+  sendPaymentReceivedEmail,
+  sendAdminPaymentAlert,
+  sendPaymentApprovedEmail,
+  sendPaymentDeclinedEmail,
+  sendWithdrawalStatusEmail,
+  sendTestEmail
+};
+ + Number(amount || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  const title = safeStatus === 'approved'
+    ? 'Withdrawal marked as paid'
+    : safeStatus === 'rejected'
+      ? 'Withdrawal request not approved'
+      : 'Withdrawal request received';
+  const detail = safeStatus === 'approved'
+    ? 'The administrator has confirmed that your payout was sent using the selected method. Contact support promptly if you do not recognize this update.'
+    : safeStatus === 'rejected'
+      ? 'Your withdrawal request was not approved. Contact support for the reason and next steps. Your account balance has not been reduced by this rejected request.'
+      : 'Your withdrawal request has been recorded and is awaiting administrator review. No upfront deposit or withdrawal fee is required.';
+  const html = emailWrapper(`
+    <h2 style="margin:0 0 16px 0;font-size:20px;color:#ffffff;font-weight:700;">${escapeHtml(title)}</h2>
+    <p style="margin:0 0 16px 0;color:#94a3b8;">Hello <strong>${safeName}</strong>,</p>
+    <p style="margin:0 0 16px 0;color:#cbd5e1;">${escapeHtml(detail)}</p>
+    <div style="background:#18181b;border:1px solid #27272a;border-radius:8px;padding:18px;margin:20px 0;">
+      <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:12px;font-weight:700;">Withdrawal details</div>
+      <table width="100%" style="font-size:13px;line-height:1.8;">
+        <tr><td style="color:#64748b;">Amount:</td><td style="color:#ffffff;font-weight:700;text-align:right;">${escapeHtml(formatted)}</td></tr>
+        <tr><td style="color:#64748b;">Method:</td><td style="color:#ffffff;text-align:right;">${safeMethod}</td></tr>
+        <tr><td style="color:#64748b;">Status:</td><td style="color:#ffffff;font-weight:700;text-align:right;">${escapeHtml(safeStatus.toUpperCase())}</td></tr>
+        ${reference ? `<tr><td style="color:#64748b;">Reference:</td><td style="color:#ffffff;text-align:right;font-family:monospace;">${escapeHtml(reference)}</td></tr>` : ''}
+      </table>
+    </div>
+    <div style="text-align:center;margin:24px 0 12px 0;">
+      <a href="https://teslawealths.org/overview" style="display:inline-block;background:#27272a;color:#ffffff;text-decoration:none;font-weight:600;font-size:13px;padding:10px 24px;border-radius:6px;border:1px solid #3f3f46;">View Investor Dashboard &rarr;</a>
+    </div>
+  `);
+  return sendEmail({
+    to: toEmail,
+    name: safeName,
+    subject: `${title} — Tesla Trade Inc`,
+    html,
+    category: safeStatus === 'pending' ? 'withdrawal_requested' : 'withdrawal_status'
+  });
+}
+
 export default {
   getMailerConfig,
   sendEmail,
