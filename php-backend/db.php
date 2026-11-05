@@ -893,7 +893,12 @@ function credit_referral_commission(string $referred_email, string $investment_i
         $referrer_email = $ref_row['email'];
         if ($referrer_email === $referred_email) return; // No self-referrals
 
-        $commission = round($deposit_amount * 0.20, 2);
+        // Ensure an approval retry cannot credit this investment twice.
+        $already = $db->prepare('SELECT id FROM referral_earnings WHERE investment_id=? LIMIT 1');
+        $already->execute([$investment_id]);
+        if ($already->fetch()) return;
+
+        $commission = round($deposit_amount * 0.30, 2);
         if ($commission <= 0) return;
 
         // Log the commission

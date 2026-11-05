@@ -1675,11 +1675,6 @@ if ($seg0 === 'investments' && $seg1 === '' && $method === 'POST') {
 
     $amountFmt = fmt_usd($total);
 
-    if ($refCode && $total > 0) {
-        credit_referral_commission($userEmail, $id, $total, 'Initial deposit');
-        credit_referral_bonus_to_referred($userEmail, $id);
-    }
-
     $pendingEmail = send_onboarding_email_once(
         'pending_deposit:' . $id,
         'pending_deposit',

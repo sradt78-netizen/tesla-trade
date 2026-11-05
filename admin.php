@@ -214,6 +214,9 @@ if ($is_auth && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 'deposit',
             ]);
             if ($action === 'active') {
+                // Pay referral rewards only after the deposit is approved.
+                credit_referral_commission((string)$inv['user_email'], (string)$id, (float)$inv['total'], 'Approved deposit');
+                credit_referral_bonus_to_referred((string)$inv['user_email'], (string)$id);
                 $matchedBonus = credit_deposit_match_bonus($db, $inv);
                 $db->prepare('UPDATE investments SET activated_at=NOW() WHERE id=?')->execute([$id]);
                 $db->prepare("UPDATE investor_accounts SET onboarding_status='active', activated_at=NOW() WHERE email=?")

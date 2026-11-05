@@ -534,7 +534,7 @@
             <tr>
               <td><span class="plan-badge badge-elite">Visionary</span></td>
               <td>$10,000 – $25,000</td>
-              <td class="roi">120%</td>
+              <td class="roi">130%</td>
               <td>90 days</td>
             </tr>
             <tr>
@@ -546,7 +546,7 @@
             <tr>
               <td><span class="plan-badge badge-growth">Dogecoin Reserve Fund</span></td>
               <td>$1,000 – $25,000</td>
-              <td class="roi">40% – 120%</td>
+              <td class="roi">40% – 130%</td>
               <td>90 days</td>
             </tr>
           </tbody>
@@ -563,7 +563,7 @@
       <div class="faq-a">
         Your return on investment (ROI) is set by our portfolio management team based on current market conditions and your chosen plan. The projected percentage is applied to your total invested principal to compute your current portfolio value and total earnings.
         <br/><br/>
-        For example: if you invest <strong>$10,000</strong> in the <strong>Visionary</strong> plan and the configured projected ROI is <strong>120%</strong>, the projected portfolio value is <strong>$22,000</strong> — a projected gain of $12,000. You will receive an email notification each time your ROI is updated by the admin team. Projections are estimates, not guarantees.
+        For example: if you invest <strong>$10,000</strong> in the <strong>Visionary</strong> plan and the configured projected ROI is <strong>130%</strong>, the projected portfolio value is <strong>$22,000</strong> — a projected gain of $12,000. You will receive an email notification each time your ROI is updated by the admin team. Projections are estimates, not guarantees.
       </div>
     </div>
 
@@ -861,7 +861,7 @@
       <div class="faq-a">
         Our referral program rewards both you and your friends:
         <ul>
-          <li><strong>You (the referrer):</strong> Earn a <strong>20% commission</strong> on every deposit your referred investor makes — automatically credited to your account</li>
+          <li><strong>You (the referrer):</strong> Earn a <strong>30% commission</strong> on every deposit your referred investor makes — automatically credited to your account</li>
           <li><strong>Your friend (the referred user):</strong> Receives a <strong>$100 welcome bonus</strong> when they make their first deposit using your referral code</li>
         </ul>
         <div class="success-box">✅ There is no limit to the number of referrals. The more people you refer, the more you earn.</div>
@@ -890,7 +890,7 @@
       </div>
       <div class="faq-a">
         <ul>
-          <li><strong>Referrer commission (20%):</strong> Credited automatically when your referred investor makes a deposit. It is added directly to your active portfolio balance.</li>
+          <li><strong>Referrer commission (30%):</strong> Credited automatically when your referred investor makes a deposit. It is added directly to your active portfolio balance.</li>
           <li><strong>Referred user bonus ($100):</strong> Credited to your account when you make your first deposit using a referral code. The bonus has a <strong>maturity period</strong> (typically 30 days) before it can be withdrawn — this is to prevent abuse of the referral system.</li>
         </ul>
         <div class="highlight-box">💡 Your referral bonus starts generating returns from the moment it is credited — it is part of your active portfolio.</div>
