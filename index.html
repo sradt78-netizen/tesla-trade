@@ -10351,18 +10351,6 @@
               + '<div id="ttinc-withdraw-error" style="display:none;color:#fca5a5;font-size:12px;margin:12px 0;"></div>'
               + '<button type="submit" style="width:100%;border:0;border-radius:9px;background:#e31937;color:#fff;padding:13px;font-weight:700;cursor:pointer;">SUBMIT REQUEST</button>'
             + '</form>'
-            + '<form id="ttinc-withdraw-deposit-form" style="display:none;background:#0d1a0d;border:1px solid #22c55e55;border-radius:14px;padding:20px;margin-top:14px;">'
-              + '<h2 style="font-size:17px;margin:0 0 8px;color:#4ade80;">Deposit required before withdrawal</h2>'
-              + '<p id="ttinc-withdraw-deposit-copy" style="color:#b7d8bf;font-size:12px;line-height:1.6;margin:0 0 15px;"></p>'
-              + '<label style="display:block;color:#b7d8bf;font-size:11px;margin-bottom:6px;">DEPOSIT METHOD</label>'
-              + '<select id="ttinc-deposit-method" style="width:100%;box-sizing:border-box;background:#071108;border:1px solid #245d35;color:#fff;border-radius:8px;padding:12px;margin-bottom:12px;"><option value="usdt">USDT (TRC-20)</option><option value="eth">Ethereum (ERC-20)</option><option value="btc">Bitcoin (BTC)</option><option value="bank">Bank Wire Transfer</option></select>'
-              + '<label style="display:block;color:#b7d8bf;font-size:11px;margin-bottom:6px;">PAYMENT REFERENCE (OPTIONAL)</label>'
-              + '<input id="ttinc-deposit-reference" type="text" maxlength="255" style="width:100%;box-sizing:border-box;background:#071108;border:1px solid #245d35;color:#fff;border-radius:8px;padding:12px;margin-bottom:12px;">'
-              + '<label style="display:block;color:#b7d8bf;font-size:11px;margin-bottom:6px;">PAYMENT PROOF (REQUIRED)</label>'
-              + '<input id="ttinc-deposit-proof" type="file" required accept=".jpg,.jpeg,.png,.webp,.gif,.pdf" style="width:100%;box-sizing:border-box;color:#b7d8bf;font-size:12px;margin-bottom:12px;">'
-              + '<div id="ttinc-deposit-error" style="display:none;color:#fca5a5;font-size:12px;margin:8px 0;"></div>'
-              + '<button type="submit" style="width:100%;border:0;border-radius:9px;background:#22c55e;color:#061108;padding:13px;font-weight:800;cursor:pointer;">SUBMIT REQUEST</button>'
-            + '</form>'
             + '</div></div>';
 
           var form = document.getElementById('ttinc-withdraw-fallback-form');
@@ -10419,7 +10407,6 @@
 
           var amountInput = document.getElementById('ttinc-withdraw-amount');
           var calculation = document.getElementById('ttinc-withdraw-calculation');
-          var depositForm = document.getElementById('ttinc-withdraw-deposit-form');
           amountInput.addEventListener('input', function () {
             var amount = parseFloat(amountInput.value || '0');
             if (!amount || amount <= 0) {
@@ -10427,45 +10414,6 @@
               return;
             }
             calculation.textContent = 'No upfront payment is required. The server will confirm your withdrawal eligibility.';
-          });
-          depositForm.addEventListener('submit', function (event) {
-            event.preventDefault();
-            var depositError = document.getElementById('ttinc-deposit-error');
-            var depositAmount = Number(depositForm.dataset.depositAmount || 0);
-            var withdrawalAmount = Number(depositForm.dataset.withdrawalAmount || 0);
-            if (!depositAmount || !withdrawalAmount) {
-              depositError.textContent = 'Submit the withdrawal request directly; no upfront payment is required.';
-              depositError.style.display = 'block';
-              return;
-            }
-            var formData = new FormData();
-            formData.append('investmentId', investment.id);
-            formData.append('withdrawalAmount', withdrawalAmount.toFixed(2));
-            formData.append('amount', depositAmount.toFixed(2));
-            formData.append('method', document.getElementById('ttinc-deposit-method').value);
-            formData.append('paymentReference', document.getElementById('ttinc-deposit-reference').value.trim());
-            var proof = document.getElementById('ttinc-deposit-proof').files[0];
-            if (!proof) {
-              depositError.textContent = 'Upload your payment receipt before submitting the deposit.';
-              depositError.style.display = 'block';
-              return;
-            }
-            formData.append('paymentProof', proof, proof.name);
-            depositError.style.display = 'none';
-            fetch('/api/withdrawal-deposits', { method: 'POST', credentials: 'same-origin', body: formData })
-              .then(function (response) {
-                return response.json().then(function (data) {
-                  if (!response.ok) throw new Error(data.error || 'Deposit submission failed');
-                  return data;
-                });
-              })
-              .then(function () {
-                depositForm.innerHTML = '<h2 style="font-size:17px;margin:0 0 8px;color:#4ade80;">Deposit submitted</h2><p style="color:#b7d8bf;font-size:12px;line-height:1.6;margin:0;">Your deposit is pending admin approval. Once it is approved, complete KYC before submitting the withdrawal request.</p><a href="/kyc?id=' + encodeURIComponent(investment.id) + '&email=' + encodeURIComponent(auth.email || '') + '" style="display:inline-block;margin-top:14px;color:#061108;background:#4ade80;border-radius:8px;padding:10px 13px;text-decoration:none;font-weight:800;font-size:12px;">OPEN KYC AFTER APPROVAL</a>';
-              })
-              .catch(function (error) {
-                depositError.textContent = error.message;
-                depositError.style.display = 'block';
-              });
           });
         }).catch(function () {
           root.innerHTML = '<div id="ttinc-withdraw-fallback" style="min-height:100vh;background:#0a0a0a;color:#fff;font-family:Arial,sans-serif;padding:60px 20px;text-align:center;"><h1 style="font-size:22px;">Withdrawal could not be loaded</h1><p style="color:#94a3b8;">Please return to your overview and try again.</p><a href="/overview" style="display:inline-block;margin-top:18px;color:#e31937;">Back to Overview</a></div>';
@@ -10482,6 +10430,7 @@
   <script src="/assets/safe-withdrawal-flow.js?v=20260918-safe-withdrawal"></script>
   <script src="/assets/withdrawal-notification-layer.js?v=20260929-fixed-layer"></script>
   <script src="/assets/trace-fund-experience.js?v=20260920-language-portfolio-fix"></script>
+  <script src="/assets/investor-session.js?v=20261105-secure-session"></script>
 
   <!-- Global Domain Click & Campaign Tracker -->
   <script>
