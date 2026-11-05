@@ -322,14 +322,14 @@ export default async function handler(req, res) {
       try {
         const conn = await getDbConnection();
         const [acc] = await conn.query('SELECT * FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
-        const [inv] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC LIMIT 1', [email]);
+        const [inv] = await conn.query(`SELECT * FROM investments WHERE LOWER(user_email)=? ORDER BY CASE WHEN status IN ('active','approved','completed') THEN 0 WHEN status IN ('pending_approval','pending') THEN 1 ELSE 2 END, id DESC LIMIT 1`, [email]);
         await conn.end();
 
         return res.status(200).json({
           email,
           name: acc[0]?.name || inv[0]?.user_name || 'Investor',
           phone: acc[0]?.phone || '',
-          onboarding_status: acc[0]?.onboarding_status || (inv[0] ? inv[0].status : 'pending_deposit'),
+          onboarding_status: (inv[0] && ['active','approved','completed'].includes(String(inv[0].status || '').toLowerCase())) ? 'active' : (acc[0]?.onboarding_status || (inv[0] ? inv[0].status : 'pending_deposit')),
           investment: inv[0] || null
         });
       } catch (e) {
@@ -337,13 +337,13 @@ export default async function handler(req, res) {
           const { mockStore } = await import('./admin.js');
           const acc = mockStore.investors.find(u => u.email.toLowerCase() === email);
           const { inMemoryDeposits } = await import('./payment-submit.js');
-          const inv = inMemoryDeposits.find(i => i.user_email && i.user_email.toLowerCase() === email) ||
-                      mockStore.investments.find(i => i.user_email && i.user_email.toLowerCase() === email);
+          const candidates = [...(inMemoryDeposits || []), ...(mockStore.investments || [])].filter(i => i.user_email && i.user_email.toLowerCase() === email);
+          const inv = candidates.find(i => ['active','approved','completed'].includes(String(i.status || '').toLowerCase())) || candidates.sort((a,b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
           return res.status(200).json({
             email,
             name: acc?.name || inv?.user_name || 'Investor',
             phone: acc?.phone || '',
-            onboarding_status: acc?.onboarding_status || (inv ? inv.status : 'pending_deposit'),
+            onboarding_status: (inv && ['active','approved','completed'].includes(String(inv.status || '').toLowerCase())) ? 'active' : (acc?.onboarding_status || (inv ? inv.status : 'pending_deposit')),
             investment: inv || null
           });
         } catch (err2) {
