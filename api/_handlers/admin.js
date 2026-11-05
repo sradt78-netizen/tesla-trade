@@ -1118,7 +1118,7 @@ export default async function handler(req, res) {
         for (const tx of txs) {
           const txEmail = String(tx.user_email || '').toLowerCase().trim();
           const txInvestmentId = String(tx.investment_id || '');
-          if (txEmail === targetEmail && tx.type === 'deposit' && tx.status === 'processed' &&
+          if (txEmail === String(targetEmail || (foundDeposit && foundDeposit.user_email) || '').toLowerCase().trim() && tx.type === 'deposit' && tx.status === 'processed' &&
               txInvestmentId && txInvestmentId !== String(rawId) && txInvestmentId !== String(depId)) {
             seen.add(txInvestmentId);
           }
