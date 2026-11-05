@@ -184,7 +184,7 @@ export default async function handler(req, res) {
     const depQId = cleanQId ? ('dep_' + cleanQId) : '';
 
     let dbRows = [];
-    let userAdminApproved = false;
+    let dbRead = false;
     let bonusByInvestment = Object.create(null);
     try {
       const conn = await getDbConnection();
@@ -200,18 +200,19 @@ export default async function handler(req, res) {
       }
       const checkEmail = qEmail || (dbRows[0] && (dbRows[0].user_email || dbRows[0].email));
       if (checkEmail) {
-        const [acc] = await conn.query('SELECT onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [checkEmail.toLowerCase()]);
-        if (acc.length > 0 && (acc[0].onboarding_status === 'active' || acc[0].onboarding_status === 'approved' || acc[0].onboarding_status === 'verified')) {
-          userAdminApproved = true;
-        }
         const [bonusRows] = await conn.query(
           "SELECT investment_id, COALESCE(SUM(amount), 0) AS bonus FROM account_transactions WHERE LOWER(user_email)=? AND type='bonus' AND status='processed' GROUP BY investment_id",
           [checkEmail.toLowerCase()]
         );
         for (const bonusRow of bonusRows) bonusByInvestment[String(bonusRow.investment_id)] = Number(bonusRow.bonus || 0);
       }
+      dbRead = true;
       await conn.end();
     } catch (e) {}
+
+    if (!dbRead) {
+      return res.status(503).json({ success: false, error: 'Investment status is unavailable from the database. Please retry.' });
+    }
 
     // The JSON-backed database is also used by local/mock deployments; read its
     // ledger when MySQL is unavailable so the bonus remains consistent there.
@@ -293,19 +294,6 @@ export default async function handler(req, res) {
           return (xId.length > 4 && cleanQId.includes(xId)) || (cleanQId.length > 4 && xId.includes(cleanQId));
         });
       }
-      // Check if user is active in persistent investors
-      try {
-        const { loadPersistentInvestors } = await import('./admin.js');
-        const pInvs = loadPersistentInvestors();
-        const pEmail = (found && (found.user_email || found.email || found.user_id)) || qEmail || (String(qId).includes('@') ? String(qId).replace(/^dep_/, '') : '');
-        if (pEmail) {
-          const matchP = pInvs.find(u => (u.email || '').toLowerCase().trim() === pEmail.toLowerCase().trim());
-          if (matchP && (matchP.onboarding_status === 'active' || matchP.onboarding_status === 'approved' || matchP.onboarding_status === 'verified')) {
-            userAdminApproved = true;
-          }
-        }
-      } catch (eP) {}
-
       if (!found && qEmail) {
         found = all.find(x => (x.user_email || x.email || '').toLowerCase().trim() === qEmail);
       }
@@ -313,7 +301,7 @@ export default async function handler(req, res) {
       if (!found) {
         return res.status(200).json({
           id: String(qId || 'dep_none'),
-          status: userAdminApproved ? 'active' : 'none',
+          status: 'none',
           total: 0,
           totalCurrentValue: 0,
           bonus: 0,
@@ -321,7 +309,7 @@ export default async function handler(req, res) {
         });
       }
 
-      const isApproved = userAdminApproved || found.status === 'active' || found.status === 'approved' || found.status === 'completed';
+      const isApproved = found.status === 'active' || found.status === 'approved';
       const tot = Number(found.total != null ? found.total : (found.amount != null ? found.amount : 0));
       let curVal = Number(found.totalCurrentValue || found.total_current_value || tot);
       if (curVal === 0 && tot > 0) curVal = tot;
@@ -352,18 +340,18 @@ export default async function handler(req, res) {
     }
 
     all = all.map(item => {
-      const st = (item.status || 'active').toLowerCase();
+      const st = (item.status || 'pending_approval').toLowerCase();
       const tot = Number(item.total != null ? item.total : (item.amount != null ? item.amount : 0));
       let curVal = Number(item.totalCurrentValue || item.total_current_value || tot);
       if (curVal === 0 && tot > 0) curVal = tot;
       return {
         ...item,
-        status: (st === 'approved' || st === 'completed' || !st) ? 'active' : st,
+        status: (st === 'approved') ? 'active' : st,
         portfolio: Array.isArray(item.portfolio) && item.portfolio.length > 0
           ? item.portfolio
           : [{ id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: tot }],
         planName: item.planName || item.plan_name || item.plan_label || 'Pioneer',
-        canWithdraw: st === 'active' || st === 'approved' || st === 'completed',
+        canWithdraw: st === 'active' || st === 'approved',
         total: tot,
         totalCurrentValue: curVal,
         total_current_value: curVal,
