@@ -405,8 +405,16 @@ export default async function handler(req, res) {
              updated_at=NOW()`,
           [email, name, phone, age]
         );
-        const [saved] = await conn.query('SELECT onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
-        persistedStatus = saved[0]?.onboarding_status || persistedStatus;
+        // A profile's onboarding flag is not proof of payment approval.
+        // Only an investment row explicitly approved by an admin can unlock access.
+        const [savedInvestments] = await conn.query(
+          "SELECT status FROM investments WHERE LOWER(user_email)=? ORDER BY CASE WHEN status IN ('active','approved') THEN 0 WHEN status IN ('pending_approval','pending') THEN 1 ELSE 2 END, id DESC LIMIT 1",
+          [email]
+        );
+        const savedInvestmentStatus = String(savedInvestments[0]?.status || '').toLowerCase();
+        persistedStatus = ['active', 'approved'].includes(savedInvestmentStatus)
+          ? 'active'
+          : (['pending', 'pending_approval'].includes(savedInvestmentStatus) ? 'pending_approval' : 'plan_selection');
         await conn.end();
       } catch (e) {
         console.error('[accounts] profile save failed:', e.message);
