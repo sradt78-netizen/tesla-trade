@@ -4597,7 +4597,7 @@
         if (status === 'create') return buildCreateAccountScreen();
         if (status === 'created') return buildPlanChooserScreen();
         if (status === 'status_error') return buildStatusErrorScreen();
-        var isApproved = (status === 'approved' || status === 'verified' || status === 'active');
+        var isApproved = (status === 'approved' || status === 'active');
         var isPending  = (status === 'pending_approval' || status === 'pending');
         var isDeclined = (status === 'declined' || status === 'rejected' || status === 'cancelled');
         if (isApproved) return null;
@@ -4698,7 +4698,7 @@
       // ── poll /api/my-status ────────────────────────────────────
       function getEffectiveStatus(d) {
         var s = (d && (d.investmentStatus || d.status)) ? (d.investmentStatus || d.status) : 'none';
-        var hasActive = (d && d.hasActiveInvestment) || s === 'active' || s === 'approved' || s === 'verified';
+        var hasActive = (d && d.hasActiveInvestment) || s === 'active' || s === 'approved';
         if (hasActive) {
           try {
             localStorage.removeItem('ttinc_deposit_status');
@@ -4738,7 +4738,7 @@
         var auth = getAuth();
         if (!auth || !auth.email) return;
         if (!isInvestorDashboardRoute()) { removeOverlay(); stopPoll(); return; }
-        fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin' })
+        fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin', cache: 'no-store' })
           .then(function (r) {
             return r.json().then(function (d) {
               if (!r.ok) throw new Error((d && (d.error || d.message)) || 'Secure account status check failed.');
@@ -4811,7 +4811,7 @@
             if (s === _lastStatus) return; // no change
             _lastStatus = s;
 
-            if (s === 'approved' || s === 'verified' || s === 'active') {
+            if (s === 'approved' || s === 'active') {
               _lastStatus = 'active';
               removeOverlay();
               stopPoll();
@@ -4916,7 +4916,7 @@
           removeOverlay();
         }
 
-        fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin' })
+        fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin', cache: 'no-store' })
           .then(function (r) {
             return r.json().then(function (d) {
               if (!r.ok) throw new Error((d && (d.error || d.message)) || 'Secure account status check failed.');
