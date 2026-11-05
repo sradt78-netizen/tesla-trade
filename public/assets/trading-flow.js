@@ -20,9 +20,6 @@
   var toastId = 'ttinc-trade-toast';
   var stackId = 'ttinc-dashboard-addon-stack';
 
-  // Client-side simulation fallback when server trading API is offline
-  var SIM_STORAGE_KEY = 'ttinc_active_sim_trade';
-
   function auth() {
     try { return JSON.parse(localStorage.getItem('ttinc_auth') || 'null'); } catch (e) { return null; }
   }
@@ -53,9 +50,8 @@
 
   function findInvestmentId() {
     var id = localStorage.getItem('ttinc_investment_id') || '';
-    if (id) return Promise.resolve(id);
     var currentUser = auth();
-    if (!currentUser || !currentUser.email) return Promise.resolve('sim_inv_1');
+    if (!currentUser || !currentUser.email) return Promise.reject(new Error('Sign in to access trading.'));
     return api('/api/investments?email=' + encodeURIComponent(currentUser.email))
       .then(function (rows) {
         var active = Array.isArray(rows)
@@ -67,7 +63,7 @@
           if (aPrimary !== bPrimary) return aPrimary ? -1 : 1;
           return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
         });
-        var first = active[0] || (Array.isArray(rows) && rows[0]);
+        var first = active[0];
         if (first && first.id) {
           localStorage.setItem('ttinc_investment_id', first.id);
           try {
@@ -85,9 +81,8 @@
           } catch (e) {}
           return first.id;
         }
-        return 'sim_inv_1';
-      })
-      .catch(function () { return 'sim_inv_1'; });
+        throw new Error('Trading unlocks only after an administrator approves a deposit.');
+      });
   }
 
   function injectStyles() {
@@ -398,7 +393,6 @@
   }
 
   function saveLocalSimTrade(trade) {
-    localStorage.removeItem(SIM_STORAGE_KEY);
   }
 
   function render(container, state) {
@@ -434,7 +428,7 @@
         '<div>' +
           '<div class="ttinc-trade-kicker"><span class="glow-dot"></span> Trading Engine</div>' +
           '<div class="ttinc-trade-title">Trading Activity</div>' +
-          '<p class="ttinc-trade-copy">Demo mode: trades are simulated; no live market orders are executed.</p>' +
+          '<p class="ttinc-trade-copy">Trading activity is simulated; no live market orders are executed.</p>' +
         '</div>' +
         '<div class="ttinc-trade-balance">' +
           '<span style="color:#d4af37;font-weight:700;">Available Wallet</span>' +
@@ -551,7 +545,7 @@
 
     var u = auth();
     findInvestmentId().then(function (id) {
-      lastInvestmentId = id || 'sim_inv_1';
+      lastInvestmentId = id;
       var emailParam = (u && u.email) ? ('?email=' + encodeURIComponent(u.email)) : '';
       return api('/api/investments/' + encodeURIComponent(lastInvestmentId) + '/trading/start' + emailParam, {
         method: 'POST',
@@ -692,7 +686,7 @@
     injectStyles();
     ensureModal();
     findInvestmentId().then(function (id) {
-      lastInvestmentId = id || 'sim_inv_1';
+      lastInvestmentId = id;
       var root = document.getElementById('root');
       if (!root) { mountInProgress = false; return; }
       var host = document.getElementById(stackId);

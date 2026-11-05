@@ -950,14 +950,19 @@ export async function getDbConnection() {
         password: cfg.password,
         database: cfg.database,
         ssl: cfg.ssl,
-        connectTimeout: 2000
+        connectTimeout: 6000
       });
-    } catch (e) {
-      // Fall through to persistent connection
+    } catch (connectionError) {
+      const error = new Error('The MySQL database is unavailable. Local mock storage is disabled.');
+      error.code = 'DB_UNAVAILABLE';
+      error.cause = connectionError;
+      throw error;
     }
   }
 
-  return new PersistentDbConnection();
+  const error = new Error('The MySQL database is unavailable. Local mock storage is disabled.');
+  error.code = 'DB_UNAVAILABLE';
+  throw error;
 }
 
 // ── Direct Database Helper Functions ────────────────────────────
