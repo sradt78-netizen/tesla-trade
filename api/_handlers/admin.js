@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { getDbConnection } from './dbcheck.js';
 import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
-import { sendPaymentApprovedEmail, sendPaymentDeclinedEmail } from '../mailer.js';
+import { sendPaymentApprovedEmail, sendPaymentDeclinedEmail, sendTestEmail, getMailerConfig } from '../mailer.js';
 import { notifyPaymentStatusUpdate, testTelegramConnection } from '../telegram.js';
 
 const INVESTORS_FILE = path.join(process.cwd(), 'data', 'saved_investors.json');
@@ -1526,6 +1526,12 @@ export default async function handler(req, res) {
       }
       mockStore.codes.unshift({ id: Date.now(), code: customCode, status: 'active', source: 'admin', created_at: new Date().toISOString() });
       return res.status(200).json({ success: true, created: customCode, codes: mockStore.codes });
+    }
+
+    if (action === 'test_email') {
+      const mailConfig = await getMailerConfig();
+      const result = await sendTestEmail(mailConfig.adminEmail);
+      return res.status(result.ok ? 200 : 503).json({ success: result.ok, error: result.ok ? undefined : result.error, message: result.ok ? 'Email provider accepted the test message.' : 'Test email was not sent.' });
     }
 
     if (action === 'test_telegram') {
