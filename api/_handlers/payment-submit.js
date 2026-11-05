@@ -219,11 +219,13 @@ export default async function handler(req, res) {
       const { loadDatabaseSync } = await import('../db.js');
       const localDb = loadDatabaseSync();
       const ledger = Array.isArray(localDb && localDb.account_transactions) ? localDb.account_transactions : [];
-      for (const tx of ledger) {
-        if (String(tx.user_email || '').toLowerCase() !== String(qEmail || (dbRows[0] && dbRows[0].user_email) || '').toLowerCase()) continue;
-        if (tx.type !== 'bonus' || tx.status !== 'processed') continue;
-        const key = String(tx.investment_id || '');
-        bonusByInvestment[key] = Number(bonusByInvestment[key] || 0) + Number(tx.amount || 0);
+      if (!Object.keys(bonusByInvestment).length) {
+        for (const tx of ledger) {
+          if (String(tx.user_email || '').toLowerCase() !== String(qEmail || (dbRows[0] && dbRows[0].user_email) || '').toLowerCase()) continue;
+          if (tx.type !== 'bonus' || tx.status !== 'processed') continue;
+          const key = String(tx.investment_id || '');
+          bonusByInvestment[key] = Number(bonusByInvestment[key] || 0) + Number(tx.amount || 0);
+        }
       }
     } catch (eLocalLedger) {}
 
