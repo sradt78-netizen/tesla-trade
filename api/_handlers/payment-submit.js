@@ -446,16 +446,27 @@ export default async function handler(req, res) {
 
       // Check existing investments for this user
       const [existing] = await conn.query(
-        'SELECT id, total FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC LIMIT 1',
+        'SELECT id, total, status FROM investments WHERE LOWER(user_email)=? ORDER BY created_at DESC LIMIT 1',
         [email]
       );
+
+      if (existing.length > 0 && ['active', 'approved', 'completed'].includes(String(existing[0].status || '').toLowerCase())) {
+        // An approved account is immutable through receipt resubmission. A new
+        // deposit must be a separate record; never reset the active wallet to pending.
+        await conn.end();
+        return res.status(409).json({
+          success: false,
+          code: 'ACCOUNT_ALREADY_APPROVED',
+          error: 'This account already has an approved investment. Please contact support to submit an additional deposit.'
+        });
+      }
 
       if (existing.length > 0) {
         investmentId = existing[0].id;
         const currentAmt = amount > 0 ? amount : parseFloat(existing[0].total || '0');
         await conn.query(
-          'UPDATE investments SET total=?, total_current_value=?, payment_proof_path=?, payment_proof_name=?, payment_reference=?, status="pending_approval", payment_proof_uploaded_at=NOW(), payment_submitted_at=NOW() WHERE id=?',
-          [currentAmt, currentAmt, proofDataUri || null, proofFileName || null, ref || null, investmentId]
+          'UPDATE investments SET total=?, total_current_value=?, payment_proof_path=?, payment_proof_name=?, payment_reference=?, status="pending_approval", payment_proof_uploaded_at=NOW(), payment_submitted_at=NOW() WHERE id=? AND LOWER(user_email)=? AND status NOT IN ("active","approved","completed")',
+          [currentAmt, currentAmt, proofDataUri || null, proofFileName || null, ref || null, investmentId, email]
         );
       } else {
         await conn.query(
