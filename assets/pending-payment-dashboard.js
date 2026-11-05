@@ -356,11 +356,9 @@
         }
 
         var approvedInvestmentId = data.activeInvestmentId || data.id || null;
-        var hasActive = !!approvedInvestmentId && (
-          data.hasActiveInvestment === true || data.status === 'active' ||
-          data.investmentStatus === 'active' || data.status === 'approved' ||
-          data.investmentStatus === 'approved'
-        );
+        // Only the server's explicit database-derived approval flag grants access.
+        var hasActive = !!approvedInvestmentId && data.hasActiveInvestment === true &&
+          data.status === 'active' && data.investmentStatus === 'active';
         serverApproved = hasActive;
         var isPending = data.status === 'pending_approval' || data.investmentStatus === 'pending_approval' ||
           (!hasActive && Array.isArray(data.pendingPayments) && data.pendingPayments.length > 0);
