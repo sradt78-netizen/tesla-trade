@@ -6,13 +6,22 @@ function cleanString(val) {
   return String(val).trim().replace(/^["']|["']$/g, '');
 }
 
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * Resolves Resend configuration from environment variables,
  * database app_settings, or in-memory persistent store.
  */
 export async function getMailerConfig() {
   let apiKey = cleanString(
-    process.env.RESEND_API_KEY || process.env.TT_RESEND_API_KEY || process.env.VITE_RESEND_API_KEY
+    process.env.RESEND_API_KEY || process.env.TT_RESEND_API_KEY
   );
   let fromEmail = cleanString(
     process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM || process.env.RESEND_SENDER_EMAIL
@@ -184,7 +193,7 @@ function emailWrapper(contentHtml) {
  * 1. Welcome email (to new investor)
  */
 export async function sendWelcomeEmail(toEmail, toName) {
-  const safeName = toName || 'Investor';
+  const safeName = escapeHtml(toName || 'Investor');
   const html = emailWrapper(`
     <h2 style="margin:0 0 16px 0;font-size:20px;color:#ffffff;font-weight:700;">Welcome to Tesla Trade Inc</h2>
     <p style="margin:0 0 16px 0;color:#94a3b8;">Hello <strong>${safeName}</strong>,</p>
@@ -210,7 +219,7 @@ export async function sendWelcomeEmail(toEmail, toName) {
  * 2. Payment received & pending approval email (to investor)
  */
 export async function sendPaymentReceivedEmail(toEmail, toName, { amount, planName, method, reference }) {
-  const safeName = toName || 'Investor';
+  const safeName = escapeHtml(toName || 'Investor');
   const fmtAmt = '$' + Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
   const html = emailWrapper(`
     <h2 style="margin:0 0 16px 0;font-size:20px;color:#ffffff;font-weight:700;">Deposit Receipt Received &mdash; Pending Review</h2>
@@ -219,10 +228,10 @@ export async function sendPaymentReceivedEmail(toEmail, toName, { amount, planNa
     <div style="background:#18181b;border:1px solid #27272a;border-radius:8px;padding:18px;margin:20px 0;">
       <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:12px;font-weight:700;">Deposit Details</div>
       <table width="100%" style="font-size:13px;line-height:1.8;">
-        <tr><td style="color:#64748b;">Plan:</td><td style="color:#ffffff;font-weight:600;text-align:right;">${planName || 'Investment Portfolio'}</td></tr>
+        <tr><td style="color:#64748b;">Plan:</td><td style="color:#ffffff;font-weight:600;text-align:right;">${escapeHtml(planName || 'Investment Portfolio')}</td></tr>
         <tr><td style="color:#64748b;">Amount:</td><td style="color:#22c55e;font-weight:700;text-align:right;">${fmtAmt}</td></tr>
-        <tr><td style="color:#64748b;">Payment Method:</td><td style="color:#ffffff;text-align:right;">${method || 'Crypto'}</td></tr>
-        ${reference ? `<tr><td style="color:#64748b;">Transaction Reference:</td><td style="color:#38bdf8;font-family:monospace;text-align:right;">${reference}</td></tr>` : ''}
+        <tr><td style="color:#64748b;">Payment Method:</td><td style="color:#ffffff;text-align:right;">${escapeHtml(method || 'Crypto')}</td></tr>
+        ${reference ? `<tr><td style="color:#64748b;">Transaction Reference:</td><td style="color:#38bdf8;font-family:monospace;text-align:right;">${escapeHtml(reference)}</td></tr>` : ''}
         <tr><td style="color:#64748b;">Status:</td><td style="color:#eab308;font-weight:700;text-align:right;">Pending Admin Approval</td></tr>
       </table>
     </div>
@@ -252,12 +261,12 @@ export async function sendAdminPaymentAlert({ userEmail, userName, amount, planN
     <p style="margin:0 0 16px 0;color:#cbd5e1;">A new investor deposit has been submitted and is waiting for your review and approval in the admin portal.</p>
     <div style="background:#18181b;border:1px solid #27272a;border-radius:8px;padding:18px;margin:20px 0;">
       <table width="100%" style="font-size:13px;line-height:1.8;">
-        <tr><td style="color:#64748b;">Investor:</td><td style="color:#ffffff;font-weight:600;text-align:right;">${userName || 'Investor'} (${userEmail})</td></tr>
-        <tr><td style="color:#64748b;">Plan:</td><td style="color:#ffffff;text-align:right;">${planName || 'Standard'}</td></tr>
+        <tr><td style="color:#64748b;">Investor:</td><td style="color:#ffffff;font-weight:600;text-align:right;">${escapeHtml(userName || 'Investor')} (${escapeHtml(userEmail)})</td></tr>
+        <tr><td style="color:#64748b;">Plan:</td><td style="color:#ffffff;text-align:right;">${escapeHtml(planName || 'Standard')}</td></tr>
         <tr><td style="color:#64748b;">Deposit Amount:</td><td style="color:#22c55e;font-weight:800;font-size:16px;text-align:right;">${fmtAmt}</td></tr>
-        <tr><td style="color:#64748b;">Method:</td><td style="color:#ffffff;text-align:right;">${method || 'Crypto'}</td></tr>
-        ${reference ? `<tr><td style="color:#64748b;">Reference / TX ID:</td><td style="color:#38bdf8;font-family:monospace;text-align:right;">${reference}</td></tr>` : ''}
-        ${investmentId ? `<tr><td style="color:#64748b;">Deposit ID:</td><td style="color:#94a3b8;font-family:monospace;text-align:right;">${investmentId}</td></tr>` : ''}
+        <tr><td style="color:#64748b;">Method:</td><td style="color:#ffffff;text-align:right;">${escapeHtml(method || 'Crypto')}</td></tr>
+        ${reference ? `<tr><td style="color:#64748b;">Reference / TX ID:</td><td style="color:#38bdf8;font-family:monospace;text-align:right;">${escapeHtml(reference)}</td></tr>` : ''}
+        ${investmentId ? `<tr><td style="color:#64748b;">Deposit ID:</td><td style="color:#94a3b8;font-family:monospace;text-align:right;">${escapeHtml(investmentId)}</td></tr>` : ''}
       </table>
     </div>
     <div style="text-align:center;margin:24px 0 12px 0;">
@@ -267,7 +276,7 @@ export async function sendAdminPaymentAlert({ userEmail, userName, amount, planN
   return sendEmail({
     to: adminEmail,
     name: 'Admin',
-    subject: `⚡ Action Required: New Deposit of ${fmtAmt} from ${userEmail}`,
+    subject: `⚡ Action Required: New Deposit of ${fmtAmt} from ${escapeHtml(userEmail)}`,
     html,
     category: 'admin_alert'
   });
@@ -277,12 +286,12 @@ export async function sendAdminPaymentAlert({ userEmail, userName, amount, planN
  * 4. Payment approved email (to investor)
  */
 export async function sendPaymentApprovedEmail(toEmail, toName, { amount, planName }) {
-  const safeName = toName || 'Investor';
+  const safeName = escapeHtml(toName || 'Investor');
   const fmtAmt = '$' + Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
   const html = emailWrapper(`
     <h2 style="margin:0 0 16px 0;font-size:20px;color:#22c55e;font-weight:700;">✅ Deposit Approved &amp; Account Active!</h2>
     <p style="margin:0 0 16px 0;color:#94a3b8;">Hello <strong>${safeName}</strong>,</p>
-    <p style="margin:0 0 16px 0;color:#cbd5e1;">Great news! Your deposit of <strong style="color:#22c55e;">${fmtAmt}</strong> for the <strong>${planName || 'Investment Portfolio'}</strong> has been verified and approved.</p>
+    <p style="margin:0 0 16px 0;color:#cbd5e1;">Great news! Your deposit of <strong style="color:#22c55e;">${fmtAmt}</strong> for the <strong>${escapeHtml(planName || 'Investment Portfolio')}</strong> has been verified and approved.</p>
     <div style="background:#064e3b22;border:1px solid #05966955;border-radius:8px;padding:18px;margin:20px 0;">
       <div style="color:#34d399;font-weight:700;font-size:14px;margin-bottom:6px;">Your Capital is Now Active</div>
       <div style="color:#a7f3d0;font-size:13px;line-height:1.6;">Your investment is officially earning compounding trading returns. You can view your real-time performance and portfolio accruals anytime in your live dashboard.</div>
@@ -304,7 +313,7 @@ export async function sendPaymentApprovedEmail(toEmail, toName, { amount, planNa
  * 5. Payment declined email (to investor)
  */
 export async function sendPaymentDeclinedEmail(toEmail, toName, { amount, planName }) {
-  const safeName = toName || 'Investor';
+  const safeName = escapeHtml(toName || 'Investor');
   const fmtAmt = '$' + Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
   const html = emailWrapper(`
     <h2 style="margin:0 0 16px 0;font-size:20px;color:#ef4444;font-weight:700;">Investment Deposit Update</h2>
@@ -334,7 +343,7 @@ export async function sendTestEmail(toEmail) {
     <div style="background:#18181b;border:1px solid #27272a;border-radius:8px;padding:18px;margin:20px 0;">
       <div style="color:#38bdf8;font-weight:700;font-size:13px;margin-bottom:6px;">Delivery Audit Record</div>
       <div style="color:#94a3b8;font-size:12px;">Timestamp: ${new Date().toISOString()}</div>
-      <div style="color:#94a3b8;font-size:12px;">Target: ${toEmail}</div>
+      <div style="color:#94a3b8;font-size:12px;">Target: ${escapeHtml(toEmail)}</div>
     </div>
   `);
   return sendEmail({
