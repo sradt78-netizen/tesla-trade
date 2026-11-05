@@ -119,6 +119,34 @@
     });
   }
 
+  function fetchPrimaryPlan(auth) {
+    return fetchPlans(auth).then(function (rows) {
+      return choosePlan(rows);
+    }).catch(function () {
+      return null;
+    }).then(function (plan) {
+      if (plan) return plan;
+      // Recover from a temporarily empty investment-list response after approval.
+      return fetch('/api/account-status?email=' + encodeURIComponent(auth.email), {
+        credentials: 'same-origin',
+        cache: 'no-store'
+      }).then(function (response) {
+        if (!response.ok) return null;
+        return response.json();
+      }).then(function (account) {
+        if (!account || !(account.hasActiveInvestment || account.status === 'active') || !account.activeInvestmentId) return null;
+        return {
+          id: account.activeInvestmentId,
+          total: Number(account.total || 0),
+          totalCurrentValue: Number(account.totalCurrentValue != null ? account.totalCurrentValue : account.total || 0),
+          bonus: Number(account.bonus || 0),
+          status: 'active',
+          planName: account.planName || 'Investment plan'
+        };
+      });
+    });
+  }
+
   function renderFocus(plan) {
     if (window.location.pathname !== '/dashboard' || document.getElementById(FOCUS_ID)) return;
     var host = document.getElementById(STACK_ID);
@@ -152,6 +180,7 @@
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:20px;">' +
         '<div style="background:#0a0a0a;border-radius:10px;padding:12px;"><div style="color:#64748b;font-size:10px;text-transform:uppercase;">Principal</div><strong style="display:block;margin-top:5px;font-size:16px;">' + money(principal) + '</strong></div>' +
         '<div style="background:#0a0a0a;border-radius:10px;padding:12px;"><div style="color:#64748b;font-size:10px;text-transform:uppercase;">Current value</div><strong style="display:block;margin-top:5px;font-size:16px;">' + money(current) + '</strong></div>' +
+        '<div style="background:#0a0a0a;border-radius:10px;padding:12px;"><div style="color:#64748b;font-size:10px;text-transform:uppercase;">Match bonus</div><strong style="display:block;margin-top:5px;font-size:16px;color:#34d399;">' + money(plan.bonus || plan.bonus_balance || 0) + '</strong></div>' +
         '<div style="background:#0a0a0a;border-radius:10px;padding:12px;"><div style="color:#64748b;font-size:10px;text-transform:uppercase;">Projected ROI</div><strong style="display:block;margin-top:5px;font-size:16px;">' + escapeHtml(roi) + '</strong></div>' +
         '<div style="background:#0a0a0a;border-radius:10px;padding:12px;"><div style="color:#64748b;font-size:10px;text-transform:uppercase;">Term</div><strong style="display:block;margin-top:5px;font-size:16px;">' + escapeHtml(cycle) + '</strong></div>' +
       '</div>' +
@@ -169,9 +198,8 @@
     var target = readTarget();
     if (target && target.id) renderFocus(target);
 
-    fetchPlans(auth)
-      .then(function (rows) {
-        var plan = choosePlan(rows);
+    fetchPrimaryPlan(auth)
+      .then(function (plan) {
         if (!plan) return;
         var cachedId = null;
         try { cachedId = localStorage.getItem('ttinc_investment_id'); } catch (error) {}
@@ -213,11 +241,10 @@
     // Always validate the cached ID before entering the compiled dashboard.
     // A stale ID makes that screen wait forever, even though the account has
     // a valid plan that the fallback panel can render after scrolling.
-    fetchPlans(auth).then(function (rows) {
-      var plan = choosePlan(rows);
+    fetchPrimaryPlan(auth).then(function (plan) {
       if (plan) rememberPlan(plan);
     }).catch(function () {
-      // Fall back to the cached value if the lookup is temporarily unavailable.
+      // Fall back to the cached value only if both authoritative endpoints fail.
     }).then(function () {
       window.location.replace('/dashboard');
     });
