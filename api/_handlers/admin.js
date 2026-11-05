@@ -524,6 +524,12 @@ export default async function handler(req, res) {
 
     // ── 1. GET ALL DASHBOARD DATA ───────────────────────────────────
     if (action === 'all_data' || req.method === 'GET') {
+      if (!isDbConnected || !conn) {
+        return res.status(503).json({
+          success: false,
+          error: 'The investor database is unavailable. Admin data was not replaced with mock or cached records.'
+        });
+      }
       let investors = mockStore.investors;
       let investments = mockStore.investments;
       let dbInvestmentsAuthoritative = false; // true when investments came from MySQL
@@ -1029,6 +1035,12 @@ export default async function handler(req, res) {
 
     // ── 6. APPROVE / REJECT INVESTMENT DEPOSIT RECEIPT ──────────────
     if (action === 'approve_deposit' || action === 'reject_deposit' || action === 'approve_investor') {
+      if (!isDbConnected || !conn) {
+        return res.status(503).json({
+          success: false,
+          error: 'Approval requires a live database connection. No fallback or mock approval was applied.'
+        });
+      }
       const rawId = body.id || '';
       const cleanId = String(rawId).replace(/^dep_/, '').trim();
       const depId = cleanId ? ('dep_' + cleanId) : '';
