@@ -267,8 +267,19 @@ export default async function handler(req, res) {
           [email]
         );
         for (const inv of legacyInvestments || []) {
-          const exists = results.some(tx => tx.type === 'deposit' && String(tx.investment_id || '') === String(inv.id));
-          if (!exists) {
+          const investmentStatus = String(inv.status || '').toLowerCase();
+          const ledgerStatus = ['active','approved','completed'].includes(investmentStatus) ? 'processed' :
+            (['declined','rejected','cancelled'].includes(investmentStatus) ? 'declined' : 'pending');
+          const existingDeposit = results.find(tx =>
+            tx.type === 'deposit' && String(tx.investment_id || '') === String(inv.id)
+          );
+          if (existingDeposit) {
+            // The investment approval state is authoritative if an older
+            // payment endpoint left its ledger row marked pending.
+            existingDeposit.status = ledgerStatus;
+            if (Number(existingDeposit.amount || 0) <= 0) existingDeposit.amount = Number(inv.total || 0);
+            if (!existingDeposit.method) existingDeposit.method = inv.method || '';
+          } else {
             results.push({
               id: inv.tx_id || ('legacy-deposit-' + inv.id),
               investment_id: inv.id,
@@ -276,8 +287,7 @@ export default async function handler(req, res) {
               type: 'deposit',
               amount: Number(inv.total || 0),
               method: inv.method || '',
-              status: ['active','approved','completed'].includes(String(inv.status || '').toLowerCase()) ? 'processed' :
-                (String(inv.status || '').toLowerCase() === 'declined' ? 'declined' : 'pending'),
+              status: ledgerStatus,
               reference_id: inv.tx_id || null,
               note: 'Investment deposit',
               created_at: inv.payment_submitted_at || inv.created_at
