@@ -1,4 +1,4 @@
-import { loadDatabase, saveDatabase } from './db.js';
+import { loadDatabase, saveDatabase, getDbConnection } from './db.js';
 
 /**
  * Telegram Notification Bot Integration for Tesla Trade Inc.
@@ -11,13 +11,29 @@ import { loadDatabase, saveDatabase } from './db.js';
  */
 
 // Retrieve effective Telegram credentials from process.env or persistent store
-export function getTelegramConfig() {
+let telegramConfigCache = null;
+let telegramConfigCacheUntil = 0;
+
+export async function getTelegramConfig() {
+  if (telegramConfigCache && Date.now() < telegramConfigCacheUntil) return telegramConfigCache;
   let dbSettings = {};
   try {
     const db = loadDatabase();
     dbSettings = db.app_settings || {};
   } catch (e) {
     dbSettings = {};
+  }
+  // Admin-panel settings are persisted in MySQL; read them when environment
+  // variables are not supplied so serverless instances share one config.
+  try {
+    const conn = await getDbConnection();
+    const [rows] = await conn.query('SELECT `key`, `value` FROM app_settings WHERE `key` IN (?, ?, ?)', [
+      'telegram_bot_token', 'telegram_chat_id', 'telegram_alerts_enabled'
+    ]);
+    for (const row of rows || []) dbSettings[row.key] = row.value;
+    await conn.end();
+  } catch (e) {
+    // Environment variables remain available if the settings table is offline.
   }
 
   const botToken = (
@@ -49,20 +65,16 @@ export function getTelegramConfig() {
   const alertsEnabled = alertsEnabledRaw === 'true' || alertsEnabledRaw === '1' || alertsEnabledRaw === 'yes';
   const notifyClicks = notifyClicksRaw === 'true' || notifyClicksRaw === '1' || notifyClicksRaw === 'yes';
 
-  return {
-    botToken,
-    chatId,
-    alertsEnabled,
-    notifyClicks,
-    isConfigured: !!(botToken && chatId)
-  };
+  telegramConfigCache = { botToken, chatId, alertsEnabled, notifyClicks, isConfigured: !!(botToken && chatId) };
+  telegramConfigCacheUntil = Date.now() + 30000;
+  return telegramConfigCache;
 }
 
 /**
  * Low-level dispatch to Telegram Bot API sendMessage endpoint
  */
 export async function sendTelegramMessage(htmlContent, customConfig = null) {
-  const config = customConfig || getTelegramConfig();
+  const config = customConfig || await getTelegramConfig();
 
   if (!config.botToken || !config.chatId) {
     console.log('[Telegram Bot] Skipped (Token or Chat ID not configured)');
@@ -263,7 +275,7 @@ ${icon} <b>DEPOSIT ${statusText}</b>
  * Alert 4: Ad / Link Click Traffic (Optional toggle)
  */
 export async function notifyLinkClick(click = {}) {
-  const config = getTelegramConfig();
+  const config = await getTelegramConfig();
   if (!config.notifyClicks) return { ok: false, skipped: true };
 
   const source = click.campaign_source || click.source || 'direct';
@@ -289,7 +301,7 @@ export async function notifyLinkClick(click = {}) {
  * Alert 5: Test Connection Ping
  */
 export async function testTelegramConnection(customToken = '', customChatId = '') {
-  const config = getTelegramConfig();
+  const config = await getTelegramConfig();
   const token = (customToken || config.botToken || '').trim();
   const chatId = (customChatId || config.chatId || '').trim();
 
