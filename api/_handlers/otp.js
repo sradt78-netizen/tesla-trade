@@ -164,7 +164,7 @@ export default async function handler(req, res) {
 
     // Read Resend configuration from environment variables or database app_settings
     let resendApiKey = cleanString(
-      process.env.RESEND_API_KEY || process.env.TT_RESEND_API_KEY || process.env.VITE_RESEND_API_KEY
+      process.env.RESEND_API_KEY || process.env.TT_RESEND_API_KEY
     );
     let resendFrom = cleanString(
       process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM || process.env.RESEND_SENDER_EMAIL
