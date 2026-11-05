@@ -760,7 +760,13 @@ function credit_deposit_match_bonus(PDO $db, array $inv): float {
     if ($depositAmount <= 0 || !$email || !$investmentId || !$txId) return 0.00;
     if (($inv['deposit_purpose'] ?? 'investment') !== 'investment') return 0.00;
 
-    $reference = 'deposit_match:' . $investmentId;
+    // Bonuses belong to the account's canonical active investment, not the
+    // newly approved child deposit that may already have been merged away.
+    // This keeps the displayed portfolio balance and ledger tied together.
+    $primaryInvestmentId = find_primary_active_investment_id($db, $email);
+    if ($primaryInvestmentId) $investmentId = $primaryInvestmentId;
+
+    $reference = 'deposit_match:' . trim((string)($inv['id'] ?? ''));
     $db->beginTransaction();
     try {
         // Serialize bonus approvals for this account. This makes a repeated
