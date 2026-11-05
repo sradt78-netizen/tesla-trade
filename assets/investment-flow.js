@@ -85,16 +85,12 @@
     { symbol: 'TBC', name: 'The Boring Company', exchange: 'Private', price: 12.80, private: true }
   ];
 
+  // Accepted deposit channels: cryptocurrency assets and bank transfer only.
   var PAYMENT_METHODS = [
     { key: 'usdt', label: 'USDT (TRC-20)', field: 'address', icon: '₮' },
-    { key: 'bank', label: 'Bank transfer', field: 'account', icon: '⌂' },
-    { key: 'btc', label: 'Bitcoin (BTC)', field: 'address', icon: '₿' },
     { key: 'eth', label: 'Ethereum (ERC-20)', field: 'address', icon: '◆' },
-    { key: 'paypal', label: 'PayPal', field: 'handle', icon: 'P' },
-    { key: 'cashapp', label: 'Cash App', field: 'handle', icon: '$' },
-    { key: 'venmo', label: 'Venmo', field: 'handle', icon: 'V' },
-    { key: 'alipay', label: 'Alipay', field: 'account', icon: 'A' },
-    { key: 'wechat', label: 'WeChat Pay', field: 'account', icon: 'W' }
+    { key: 'btc', label: 'Bitcoin (BTC)', field: 'address', icon: '₿' },
+    { key: 'bank', label: 'Bank transfer', field: 'account', icon: '⌂' }
   ];
 
   var state = {
