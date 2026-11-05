@@ -1309,7 +1309,7 @@ export default async function handler(req, res) {
             [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, rawId, cleanId, depId, rawId, effectiveEmail]
           );
 
-          if ((!result || !result.affectedRows) && effectiveEmail) {
+          if ((!result || !result.affectedRows) && !rawId && effectiveEmail) {
             [result] = await conn.query(
               `UPDATE investments 
                SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
