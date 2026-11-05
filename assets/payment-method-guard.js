@@ -1,7 +1,14 @@
 (function () {
   'use strict';
   var ALLOWED = ['usdt', 'eth', 'btc', 'bank'];
-  function isAllowed(value) { return ALLOWED.indexOf(String(value || '').trim().toLowerCase()) !== -1; }
+  function isAllowed(value) {
+    var raw = String(value || '').trim().toLowerCase();
+    var normalized = raw.replace(/[()]/g, '').replace(/[_-]+/g, ' ').replace(/\\s+/g, ' ').trim();
+    return ALLOWED.indexOf(raw) !== -1 || [
+      'usdt trc 20', 'tether usdt', 'tether', 'ethereum eth', 'ethereum erc 20',
+      'bitcoin btc', 'bitcoin', 'bank transfer', 'bank wire transfer', 'wire transfer'
+    ].indexOf(normalized) !== -1;
+  }
   function filterPaymentSettings(data) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
     var output = Object.assign({}, data);
