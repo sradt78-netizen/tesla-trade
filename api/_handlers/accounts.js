@@ -358,6 +358,7 @@ export default async function handler(req, res) {
       const phone = cleanString(body.phone || '');
       const age = parseInt(body.age || '0', 10);
 
+      let persistedStatus = 'plan_selection';
       try {
         const conn = await getDbConnection();
         await conn.query(
@@ -366,11 +367,21 @@ export default async function handler(req, res) {
            ON DUPLICATE KEY UPDATE name=VALUES(name),
              phone=IF(VALUES(phone)='', phone, VALUES(phone)),
              age=IF(VALUES(age)=0, age, VALUES(age)),
+             onboarding_status=IF(onboarding_status IN ('active','approved','completed','pending_approval','pending_deposit'), onboarding_status, VALUES(onboarding_status)),
              updated_at=NOW()`,
           [email, name, phone, age]
         );
+        const [saved] = await conn.query('SELECT onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
+        persistedStatus = saved[0]?.onboarding_status || persistedStatus;
         await conn.end();
-      } catch (e) {}
+      } catch (e) {
+        // Preserve the last known state in fallback stores; do not downgrade it.
+        try {
+          const { mockStore } = await import('./admin.js');
+          const existing = mockStore.investors.find(u => (u.email || '').toLowerCase() === email);
+          persistedStatus = existing?.onboarding_status || persistedStatus;
+        } catch (e2) {}
+      }
 
       try {
         const { mockStore, savePersistentInvestor } = await import('./admin.js');
@@ -379,7 +390,7 @@ export default async function handler(req, res) {
             name,
             email,
             phone,
-            onboarding_status: 'pending_deposit'
+            onboarding_status: persistedStatus
           });
         }
         const existing = mockStore.investors.find(u => u.email.toLowerCase() === email);
@@ -392,7 +403,7 @@ export default async function handler(req, res) {
             name,
             email,
             phone,
-            onboarding_status: 'pending_deposit',
+            onboarding_status: persistedStatus,
             registered_at: new Date().toISOString()
           });
         }
@@ -400,7 +411,7 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         success: true,
-        status: 'plan_selection',
+        status: persistedStatus,
         email,
         name
       });
