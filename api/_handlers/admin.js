@@ -1127,8 +1127,8 @@ export default async function handler(req, res) {
           plan_label: 'Explorer',
           plan_name: 'Explorer',
           total: approvedDepositAmount,
-          total_current_value: totalBalanceReal,
-          totalCurrentValue: totalBalanceReal,
+          total_current_value: totalBalanceWithBonus,
+          totalCurrentValue: totalBalanceWithBonus,
           earnings: 0,
           status: 'active',
           method: 'Crypto',
@@ -1180,7 +1180,7 @@ export default async function handler(req, res) {
           id: effectiveId,
           status: status,
           total: totalBalanceReal,
-          totalCurrentValue: totalBalanceReal,
+          totalCurrentValue: totalBalanceWithBonus,
           tradingStatus: 'idle',
           tradingAmount: 0,
           tradingStartedAt: null
@@ -1214,8 +1214,8 @@ export default async function handler(req, res) {
               user_name: (foundDeposit && foundDeposit.user_name) || 'Investor',
               portfolio: 'Tesla · Explorer',
               total: approvedDepositAmount,
-              total_current_value: totalBalanceReal,
-              totalCurrentValue: totalBalanceReal,
+              total_current_value: totalBalanceWithBonus,
+              totalCurrentValue: totalBalanceWithBonus,
               status: 'active',
               method: 'Crypto',
               created_at: new Date().toISOString()
@@ -1241,6 +1241,19 @@ export default async function handler(req, res) {
                 created_at: new Date().toISOString()
               });
             }
+            const bonusExists = db.account_transactions.some(t => String(t.investment_id) === String(effectiveId) && t.type === 'bonus');
+            if (!bonusExists && bonusMatch > 0) {
+              db.account_transactions.unshift({
+                id: 'tx_bonus_' + Math.random().toString(36).substring(2, 9),
+                investment_id: effectiveId,
+                user_email: effectiveEmail,
+                type: 'bonus',
+                amount: bonusMatch,
+                status: 'processed',
+                note: '100% First Deposit Match Bonus',
+                created_at: new Date().toISOString()
+              });
+            }
           }
           saveDatabaseSync();
         }
@@ -1257,7 +1270,7 @@ export default async function handler(req, res) {
             `UPDATE investments 
              SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
              WHERE id=? OR id=? OR id=? OR (LOWER(user_email)=? AND (status="pending_approval" OR status="pending"))`,
-            [status, approvedDepositAmount, status === 'active' ? totalBalanceReal : approvedDepositAmount, 0, rawId, cleanId, depId, effectiveEmail]
+            [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, rawId, cleanId, depId, effectiveEmail]
           );
 
           if ((!result || !result.affectedRows) && effectiveEmail) {
@@ -1265,7 +1278,7 @@ export default async function handler(req, res) {
               `UPDATE investments 
                SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
                WHERE LOWER(user_email)=?`,
-              [status, approvedDepositAmount, status === 'active' ? totalBalanceReal : approvedDepositAmount, 0, effectiveEmail]
+              [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, effectiveEmail]
             );
           }
 
