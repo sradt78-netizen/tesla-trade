@@ -1230,7 +1230,7 @@ export default async function handler(req, res) {
 
       // If no deposit was found on disk or memory yet, create an approved record now
       // Reuse the validated email; never synthesize a placeholder investor.
-      const effectiveId = rawId || depId || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
+      const effectiveId = selectedDepositId || rawId || depId || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
 
       if (!foundDeposit && effectiveEmail && status === 'active') {
         const freshDep = {
