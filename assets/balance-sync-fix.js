@@ -23,7 +23,6 @@
               total: p,
               totalCurrentValue: c,
               total_current_value: c,
-              bonus: 0,
               planName: meta.planName || 'Explorer',
               portfolio: [
                 { id: 'tsla', name: 'Tesla, Inc.', ticker: 'TSLA', investedAmount: Math.round(p * 0.5) },
