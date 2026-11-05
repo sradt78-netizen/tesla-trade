@@ -1407,17 +1407,22 @@ export default async function handler(req, res) {
             // Idempotent deposit ledger write: retries must not create duplicate credits.
             try {
               const [depositTxRows] = await conn.query(
-                'SELECT id FROM account_transactions WHERE LOWER(user_email)=? AND investment_id=? AND type="deposit" LIMIT 1',
+                'SELECT id FROM account_transactions WHERE LOWER(user_email)=? AND investment_id=? AND type="deposit" ORDER BY created_at DESC LIMIT 1',
                 [effectiveEmail, effectiveId]
               );
-              if (!depositTxRows.length) {
+              if (depositTxRows.length) {
+                await conn.query(
+                  "UPDATE account_transactions SET amount=?, status='processed', reference_id=COALESCE(reference_id, ?), note=COALESCE(note, 'Investment deposit approved') WHERE id=?",
+                  [approvedDepositAmount, authoritativeDeposit.tx_id || null, depositTxRows[0].id]
+                );
+              } else {
                 const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
                 await conn.query(
-                  'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "processed", "Investment deposit approved", NOW())',
-                  [txDepId, effectiveId, effectiveEmail, approvedDepositAmount]
+                  'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, reference_id, note, created_at) VALUES (?, ?, ?, "deposit", ?, "processed", ?, "Investment deposit approved", NOW())',
+                  [txDepId, effectiveId, effectiveEmail, approvedDepositAmount, authoritativeDeposit.tx_id || null]
                 );
               }
-            } catch (eTx) { console.error('[admin approve] ledger insert failed:', eTx.message); }
+            } catch (eTx) { console.error('[admin approve] ledger upsert failed:', eTx.message); }
           }
           await conn.end();
         } catch (e) {
