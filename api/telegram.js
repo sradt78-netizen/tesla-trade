@@ -107,6 +107,44 @@ export async function sendTelegramMessage(htmlContent, customConfig = null) {
   }
 }
 
+
+/**
+ * Send a private receipt image to the configured admin chat.
+ * Accepts a data URI generated from the uploaded receipt; never exposes it publicly.
+ */
+export async function sendTelegramPhoto(photoDataUri, caption, fileName = 'deposit-receipt.jpg') {
+  const config = getTelegramConfig();
+  if (!config.botToken || !config.chatId) {
+    return { ok: false, error: 'Telegram Bot Token or Chat ID not configured' };
+  }
+  if (!config.alertsEnabled) return { ok: false, error: 'Telegram alerts are disabled' };
+  const match = String(photoDataUri || '').match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return { ok: false, error: 'Receipt is not a supported image data URI' };
+  const bytes = Buffer.from(match[2], 'base64');
+  if (!bytes.length || bytes.length > 10 * 1024 * 1024) {
+    return { ok: false, error: 'Receipt image must be smaller than 10 MB' };
+  }
+  const form = new FormData();
+  form.append('chat_id', config.chatId);
+  form.append('caption', String(caption || '').slice(0, 1024));
+  form.append('parse_mode', 'HTML');
+  form.append('photo', new Blob([bytes], { type: match[1] }), String(fileName || 'deposit-receipt.jpg').replace(/[^a-zA-Z0-9._-]/g, '_'));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendPhoto`, {
+      method: 'POST', body: form, signal: controller.signal
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) return { ok: false, error: data.description || 'Telegram receipt upload failed' };
+    return { ok: true, messageId: data.result?.message_id };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 /**
  * Alert 1: New Investor Signup
  */
@@ -164,6 +202,10 @@ export async function notifyPaymentSubmission(deposit = {}) {
 👉 <a href="https://teslawealths.org/admin">Review & Approve Deposit</a>
 `.trim();
 
+  if (deposit.payment_proof_path && String(deposit.payment_proof_path).startsWith('data:image/')) {
+    const caption = `💰 <b>DEPOSIT RECEIPT SUBMITTED</b>\n👤 ${escapeHtml(name)} — <code>${escapeHtml(email)}</code>\n💵 <b>${amount} USD</b> · ${escapeHtml(plan)}\n💳 ${escapeHtml(method)} · Ref: <code>${escapeHtml(ref)}</code>\n⚠️ Pending admin review\n<a href="https://teslawealths.org/admin">Open Admin Dashboard</a>`;
+    return sendTelegramPhoto(deposit.payment_proof_path, caption, proofFile);
+  }
   return sendTelegramMessage(message);
 }
 
@@ -291,5 +333,6 @@ export default {
   notifyPaymentSubmission,
   notifyPaymentStatusUpdate,
   notifyLinkClick,
-  testTelegramConnection
+  testTelegramConnection,
+  sendTelegramPhoto
 };
