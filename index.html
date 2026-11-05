@@ -4738,13 +4738,6 @@
         var auth = getAuth();
         if (!auth || !auth.email) return;
         if (!isInvestorDashboardRoute()) { removeOverlay(); stopPoll(); return; }
-        if (localStorage.getItem('ttinc_account_approved') === 'true') {
-          _lastStatus = 'active';
-          removeOverlay();
-          stopPoll();
-          return;
-        }
-
         fetch('/api/account-status?email=' + encodeURIComponent(auth.email), { credentials: 'same-origin' })
           .then(function (r) {
             return r.json().then(function (d) {
@@ -4756,7 +4749,7 @@
             var s = getEffectiveStatus(d);
             var isPendingState = (s === 'pending_approval' || s === 'pending');
 
-            if (s === 'active' || (d && d.hasActiveInvestment) || s === 'approved' || localStorage.getItem('ttinc_account_approved') === 'true') {
+            if (s === 'active' || (d && d.hasActiveInvestment) || s === 'approved') {
               _lastStatus = 'active';
               removeOverlay();
               stopPoll();
@@ -4943,7 +4936,7 @@
             }
 
             if (!d || (!d.account && !isPendingState)) {
-              if (localStorage.getItem('ttinc_account_approved') === 'true' || isUserApproved) {
+              if (isUserApproved) {
                 removeOverlay();
                 stopPoll();
                 return;
