@@ -2210,6 +2210,16 @@
         function completeLogin(data) {
           var em = (data.email || '').toLowerCase().trim();
           var nm = data.name || data.email;
+          // A new login must not inherit the previous user's investment ID,
+          // cached balance, or approval flag. The database repopulates them.
+          [
+            'ttinc_investment_id',
+            'ttinc_inv_meta',
+            'ttinc_account_approved',
+            'ttinc_account_approved_email',
+            'ttinc_deposit_status',
+            'ttinc_payment_status'
+          ].forEach(function (key) { localStorage.removeItem(key); });
           localStorage.setItem('ttinc_auth', JSON.stringify({
             email: em,
             name: nm,
@@ -2218,16 +2228,29 @@
             onboardingState: data.onboardingStatus || data.investmentStatus || 'registered'
           }));
 
-          fetch('/api/investments?email=' + encodeURIComponent(em))
+          fetch('/api/investments?email=' + encodeURIComponent(em), {
+            credentials: 'same-origin',
+            cache: 'no-store'
+          })
             .then(function(r) { return r.ok ? r.json() : null; })
             .then(function(rows) {
               if (Array.isArray(rows) && rows.length > 0) {
-                var act = rows.find(function(x) { return x.status === 'active' || x.status === 'approved'; }) || rows[0];
+                var activeRows = rows.filter(function (x) {
+                  return x.status === 'active' || x.status === 'approved' || x.status === 'completed';
+                });
+                activeRows.sort(function (a, b) {
+                  var aPrimary = !a.deposit_parent_id && !a.depositParentId;
+                  var bPrimary = !b.deposit_parent_id && !b.depositParentId;
+                  if (aPrimary !== bPrimary) return aPrimary ? -1 : 1;
+                  return String(a.created_at || a.createdAt || '').localeCompare(String(b.created_at || b.createdAt || ''));
+                });
+                var act = activeRows[0] || rows[0];
                 if (act && act.id) {
                   localStorage.setItem('ttinc_investment_id', String(act.id));
                   localStorage.setItem('ttinc_inv_meta', JSON.stringify(act));
-                  if (act.status === 'active' || act.status === 'approved') {
+                  if (act.status === 'active' || act.status === 'approved' || act.status === 'completed') {
                     localStorage.setItem('ttinc_account_approved', 'true');
+                    localStorage.setItem('ttinc_account_approved_email', em);
                   }
                 }
               }
