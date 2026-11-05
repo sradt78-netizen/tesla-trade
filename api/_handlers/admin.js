@@ -577,8 +577,8 @@ export default async function handler(req, res) {
         await conn.end();
       }
 
-      // Merge disk persistent deposits (guaranteed cross-serverless persistence)
-      try {
+      // Cached deposits are for local fallback only. Once MySQL answered, its rows are authoritative.
+      if (!dbInvestmentsAuthoritative) try {
         const diskDeposits = loadPersistentDeposits();
         if (Array.isArray(diskDeposits) && diskDeposits.length > 0) {
           const mergedInvs = [...investments];
@@ -601,7 +601,7 @@ export default async function handler(req, res) {
       } catch (e) {}
 
       // Merge memory deposits submitted via client
-      if (Array.isArray(inMemoryDeposits) && inMemoryDeposits.length > 0) {
+      if (!dbInvestmentsAuthoritative && Array.isArray(inMemoryDeposits) && inMemoryDeposits.length > 0) {
         const mergedInvs = [...investments];
         for (const dep of inMemoryDeposits) {
           const idx = mergedInvs.findIndex(x => String(x.id) === String(dep.id));
@@ -614,8 +614,8 @@ export default async function handler(req, res) {
         investments = mergedInvs;
       }
 
-      // Merge disk persistent registered investors
-      try {
+      // Persistent investor snapshots are fallback-only; never override MySQL account state.
+      if (!dbInvestmentsAuthoritative) try {
         const diskInvestors = loadPersistentInvestors();
         if (Array.isArray(diskInvestors)) {
           for (const u of diskInvestors) {
@@ -1156,7 +1156,7 @@ export default async function handler(req, res) {
         ].filter(Boolean))];
         const marks = ids.map(() => '?').join(',');
         const [dbRows] = await conn.query(
-          'SELECT * FROM investments WHERE id IN (' + marks + ') LIMIT 1',
+          "SELECT * FROM investments WHERE id IN (" + marks + ") AND status IN ('pending','pending_approval','awaiting_payment') LIMIT 1",
           ids
         );
         authoritativeDeposit = dbRows[0] || null;
