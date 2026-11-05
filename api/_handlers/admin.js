@@ -1111,6 +1111,17 @@ export default async function handler(req, res) {
       const bonusMatch = status === 'active' && approvedDepositAmount > 0 ? Number(approvedDepositAmount.toFixed(2)) : 0;
       const totalBalanceWithBonus = Number((totalBalanceReal + bonusMatch).toFixed(2));
 
+      // Persist the matched value in the selected fallback record as well as
+      // MySQL. Otherwise a later serverless instance can reload the stale
+      // principal-only JSON copy and temporarily erase the match from the UI.
+      if (foundDeposit && status === 'active') {
+        foundDeposit.total = totalBalanceReal;
+        foundDeposit.total_current_value = totalBalanceWithBonus;
+        foundDeposit.totalCurrentValue = totalBalanceWithBonus;
+        foundDeposit.bonus = bonusMatch;
+        savePersistentDeposit(foundDeposit);
+      }
+
       // If no deposit was found on disk or memory yet, create an approved record now
       const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || 'investor@teslawealths.org';
       const effectiveId = rawId || depId || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
@@ -1339,8 +1350,10 @@ export default async function handler(req, res) {
         }
       }
 
-      // If persistent disk or mockStore already recorded the approval, consider saved
-      if (!dbSaved && (foundDeposit || inMemoryDeposits.length || mockStore.investments.length)) {
+      // Disk/memory copies are only a valid persistence fallback when MySQL
+      // was unavailable. If MySQL connected, a failed update/insert must not
+      // be reported as a successful approval: the admin list is DB-backed.
+      if (!isDbConnected && !dbSaved && foundDeposit) {
         dbSaved = true;
       }
 
