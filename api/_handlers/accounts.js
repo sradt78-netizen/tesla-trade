@@ -306,7 +306,7 @@ export default async function handler(req, res) {
 
       try {
         const [legacyWithdrawals] = await conn.query(
-          'SELECT id, investment_id, amount, method, status, created_at FROM withdrawals WHERE LOWER(user_id)=? ORDER BY created_at DESC',
+          'SELECT w.id, w.investment_id, w.amount, w.method, w.status, w.created_at FROM withdrawals w LEFT JOIN investments i ON i.id=w.investment_id WHERE LOWER(i.user_email)=? ORDER BY w.created_at DESC',
           [email]
         );
         for (const wd of legacyWithdrawals || []) {
