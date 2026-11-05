@@ -87,9 +87,14 @@ export default async function handler(req, res) {
       bonusBalance = Number(bonusRows[0]?.bonus || 0);
       dbRead = true;
       await conn.end();
-    } catch (dbErr) {}
+    } catch (dbErr) {
+      console.error('[account-status] authoritative MySQL lookup failed:', dbErr.message);
+    }
+    if (!dbRead) {
+      return res.status(503).json({ success: false, error: 'Investor approval status is temporarily unavailable. No cached approval was used.' });
+    }
 
-    // 2. Merge disk/memory copies ONLY when MySQL could not be read (they go stale across serverless instances)
+    // 2. MySQL is the sole source of truth; fallback records cannot grant approval.
     if (!dbRead) try {
       const { inMemoryDeposits, loadPersistentDeposits } = await import('./payment-submit.js');
       if (typeof loadPersistentDeposits === 'function') {
@@ -372,7 +377,9 @@ export default async function handler(req, res) {
           phone: acc[0]?.phone || '',
           age: Number(acc[0]?.age || 0),
           registered_at: acc[0]?.registered_at || null,
-          onboarding_status: (inv[0] && ['active','approved','completed'].includes(String(inv[0].status || '').toLowerCase())) ? 'active' : (acc[0]?.onboarding_status || (inv[0] ? inv[0].status : 'pending_deposit')),
+          onboarding_status: (inv[0] && ['active','approved','completed'].includes(String(inv[0].status || '').toLowerCase())) ? 'active' :
+            (inv[0] && ['pending','pending_approval'].includes(String(inv[0].status || '').toLowerCase())) ? 'pending_approval' :
+            (['active','approved','verified','completed'].includes(String(acc[0]?.onboarding_status || '').toLowerCase()) ? 'plan_selection' : (acc[0]?.onboarding_status || (inv[0] ? inv[0].status : 'pending_deposit'))),
           investment: inv[0] || null
         });
       } catch (e) {
@@ -401,7 +408,16 @@ export default async function handler(req, res) {
           [email, name, phone, age]
         );
         const [saved] = await conn.query('SELECT onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
-        persistedStatus = saved[0]?.onboarding_status || persistedStatus;
+        const [approvedRows] = await conn.query("SELECT status FROM investments WHERE LOWER(user_email)=? ORDER BY created_at DESC", [email]);
+        const investmentStates = approvedRows.map(row => String(row.status || '').toLowerCase());
+        if (investmentStates.some(value => ['active','approved','completed'].includes(value))) {
+          persistedStatus = 'active';
+        } else if (investmentStates.some(value => ['pending','pending_approval'].includes(value))) {
+          persistedStatus = 'pending_approval';
+        } else {
+          const stored = String(saved[0]?.onboarding_status || persistedStatus).toLowerCase();
+          persistedStatus = ['active','approved','verified','completed'].includes(stored) ? 'plan_selection' : (stored || 'plan_selection');
+        }
         await conn.end();
       } catch (e) {
         console.error('[accounts] profile save failed:', e.message);
