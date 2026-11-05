@@ -75,8 +75,11 @@ export default async function handler(req, res) {
 
       // Resolve persisted onboarding and investment state at login. Never infer
       // approval from client storage or a stale session response.
-      const [acc] = await conn.query('SELECT name, onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
+      const [acc] = await conn.query('SELECT name, phone, age, onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1', [email]);
       if (acc.length > 0 && acc[0].name) investorName = acc[0].name;
+      var investorPhone = acc[0]?.phone || '';
+      var investorAge = Number(acc[0]?.age || 0);
+      var onboardingStatus = String(acc[0]?.onboarding_status || 'registered');
       const [investments] = await conn.query(
         "SELECT status FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC",
         [email]
@@ -124,6 +127,9 @@ export default async function handler(req, res) {
       success: true,
       email,
       name: investorName || email,
+      phone: investorPhone || '',
+      age: Number(investorAge || 0),
+      onboardingStatus: onboardingStatus || 'registered',
       investmentStatus: typeof investmentStatus === 'string' ? investmentStatus : 'none'
     });
   }
