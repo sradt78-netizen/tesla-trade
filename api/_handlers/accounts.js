@@ -89,6 +89,11 @@ export default async function handler(req, res) {
       await conn.end();
     } catch (dbErr) {}
 
+    // Approval must be verified from MySQL. A stale disk or browser copy must never unlock an investor.
+    if (!dbRead) {
+      return res.status(503).json({ success: false, error: 'Investor approval status is temporarily unavailable. Please retry.' });
+    }
+
     // 2. Merge disk/memory copies ONLY when MySQL could not be read (they go stale across serverless instances)
     if (!dbRead) try {
       const { inMemoryDeposits, loadPersistentDeposits } = await import('./payment-submit.js');
