@@ -1106,9 +1106,27 @@ export default async function handler(req, res) {
       if (!approvedDepositAmount && body.amount) approvedDepositAmount = parseFloat(body.amount);
       if (!approvedDepositAmount) approvedDepositAmount = (foundDeposit && parseFloat(foundDeposit.total)) || 0;
       const totalBalanceReal = approvedDepositAmount;
-      // Apply the advertised 100% deposit-match bonus to approved deposits.
-      // Keep principal in `total`; the match is reflected in current wallet value.
-      const bonusMatch = status === 'active' && approvedDepositAmount > 0 ? Number(approvedDepositAmount.toFixed(2)) : 0;
+      // The offer is limited to the first two approved deposits per investor.
+      // Use the persistent ledger to determine prior approved deposits; the
+      // current investment is excluded so retries remain idempotent.
+      let priorApprovedDeposits = 0;
+      try {
+        const { loadDatabaseSync } = await import('../db.js');
+        const ledgerDb = loadDatabaseSync();
+        const txs = Array.isArray(ledgerDb?.account_transactions) ? ledgerDb.account_transactions : [];
+        const seen = new Set();
+        for (const tx of txs) {
+          const txEmail = String(tx.user_email || '').toLowerCase().trim();
+          const txInvestmentId = String(tx.investment_id || '');
+          if (txEmail === targetEmail && tx.type === 'deposit' && tx.status === 'processed' &&
+              txInvestmentId && txInvestmentId !== String(rawId) && txInvestmentId !== String(depId)) {
+            seen.add(txInvestmentId);
+          }
+        }
+        priorApprovedDeposits = seen.size;
+      } catch (e) {}
+      const bonusMatch = status === 'active' && approvedDepositAmount > 0 && priorApprovedDeposits < 2
+        ? Number(approvedDepositAmount.toFixed(2)) : 0;
       const totalBalanceWithBonus = Number((totalBalanceReal + bonusMatch).toFixed(2));
 
       // Persist the matched value in the selected fallback record as well as
