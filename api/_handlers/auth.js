@@ -82,11 +82,11 @@ export default async function handler(req, res) {
         [email]
       );
       const states = investments.map(row => String(row.status || '').toLowerCase());
-      investmentStatus = states.some(s => ['active','approved','completed'].includes(s))
+      investmentStatus = states.some(s => ['active','approved'].includes(s))
         ? 'active'
         : states.some(s => ['pending','pending_approval'].includes(s))
           ? 'pending_approval'
-          : String(acc[0]?.onboarding_status || 'none').toLowerCase();
+          : 'none';
       await conn.end();
 
     } catch (e) {
@@ -268,7 +268,7 @@ export default async function handler(req, res) {
         ? 'active'
         : states.some(s => ['pending','pending_approval'].includes(s))
           ? 'pending_approval'
-          : persistedOnboarding;
+          : 'none';
       await conn.end();
     } catch (e) {
       console.error('[auth social-session] database lookup failed:', e.message);
