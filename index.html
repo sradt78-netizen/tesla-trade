@@ -4802,7 +4802,7 @@
             if (s === _lastStatus) return; // no change
             _lastStatus = s;
 
-            if (s === 'approved' || s === 'active') {
+            if (d && d.hasActiveInvestment === true && d.status === 'active' && d.investmentStatus === 'active') {
               _lastStatus = 'active';
               removeOverlay();
               stopPoll();
@@ -4853,10 +4853,10 @@
             var s = (d && d.status) ? d.status : 'pending_approval';
             _lastStatus = s;
             if (s === 'active') {
-              removeOverlay();
-              stopPoll();
+              // Registration status alone is not an approval decision; the account-status endpoint must confirm it.
+              checkStatus();
             } else if (s === 'pending_approval' || s === 'pending') {
-              showOverlay('approved');
+              showOverlay('pending_approval');
               stopPoll();
             } else if (s === 'declined' || s === 'rejected') {
               showOverlay('declined');
