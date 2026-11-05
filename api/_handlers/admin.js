@@ -992,7 +992,7 @@ export default async function handler(req, res) {
 
       if (isDbConnected && conn) {
         try {
-          const [invRows] = await conn.query('SELECT * FROM investments WHERE LOWER(user_email)=? LIMIT 1', [email]);
+          const [invRows] = await conn.query('SELECT * FROM investments WHERE id=? LIMIT 1', [email]);
           if (invRows.length > 0) {
             await conn.query('UPDATE investments SET total=?, total_current_value=?, earnings=?, status="active" WHERE id=?', [updatedTotal, updatedCurrentValue, updatedCurrentValue - updatedTotal, invRows[0].id]);
           } else {
@@ -1037,15 +1037,32 @@ export default async function handler(req, res) {
 
       let approvedDepositAmount = parseFloat(body.amount || '0');
       let foundDeposit = null;
+      let selectedDepositId = String(rawId || '').trim();
+      // If the admin action only supplies an email, select one pending deposit,
+      // then apply the action only to that deposit across the backing stores.
+      if (!selectedDepositId && targetEmail) {
+        const candidates = [
+          ...loadPersistentDeposits(),
+          ...inMemoryDeposits,
+          ...mockStore.investments
+        ];
+        const candidate = candidates.find(d =>
+          String(d.user_email || d.email || d.user_id || d.userId || '').toLowerCase().trim() === targetEmail &&
+          ['pending', 'pending_approval', 'awaiting_payment', ''].includes(String(d.status || '').toLowerCase())
+        );
+        if (candidate?.id) selectedDepositId = String(candidate.id).trim();
+      }
 
       const matchesDeposit = (d) => {
         if (!d) return false;
         const dId = String(d.id || '').trim();
         const dCleanId = dId.replace(/^dep_/, '').trim();
-        const dEmail = String(d.user_email || d.email || d.user_id || d.userId || '').toLowerCase().trim();
-        if (rawId && (dId === String(rawId) || dId === cleanId || dId === depId || dCleanId === cleanId)) return true;
-        if (!rawId && targetEmail && dEmail === targetEmail) return true;
-        return false;
+        return !!selectedDepositId && (
+          dId === selectedDepositId ||
+          dId === selectedDepositId.replace(/^dep_/, '') ||
+          dId === ('dep_' + selectedDepositId.replace(/^dep_/, '')) ||
+          dCleanId === selectedDepositId.replace(/^dep_/, '')
+        );
       };
 
       // 1. Check disk persistent deposits
@@ -1305,8 +1322,8 @@ export default async function handler(req, res) {
           [result] = await conn.query(
             `UPDATE investments 
              SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
-             WHERE id=? OR id=? OR id=? OR (? = "" AND LOWER(user_email)=? AND (status="pending_approval" OR status="pending"))`,
-            [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, rawId, cleanId, depId, rawId, effectiveEmail]
+             WHERE id=? OR id=? OR id=? OR (? = "" AND LOWER(user_email)=? AND id=? AND (status="pending_approval" OR status="pending"))`,
+            [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, rawId, cleanId, depId, rawId, effectiveEmail, effectiveId]
           );
 
           if ((!result || !result.affectedRows) && !rawId && effectiveEmail) {
@@ -1314,7 +1331,7 @@ export default async function handler(req, res) {
               `UPDATE investments 
                SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
                WHERE LOWER(user_email)=?`,
-              [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, effectiveEmail]
+              [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, effectiveId]
             );
           }
 
