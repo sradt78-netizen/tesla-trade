@@ -1171,6 +1171,7 @@
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
           <button type="button" class="primary" onclick="saveSettings()">Save API Credentials</button>
           <button type="button" onclick="testTelegramAlerts()">📨 Send Telegram Test Alert</button>
+          <button type="button" onclick="testEmailDelivery()">✉️ Send Test Email</button>
         </div>
       </div>
     </section>
@@ -2280,6 +2281,16 @@
       navigator.clipboard.writeText(link).then(function() {
         showToast('Invitation link copied!');
       });
+    }
+
+    function testEmailDelivery() {
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_email' })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        showToast(d.success ? 'Email provider accepted the test message.' : (d.error || 'Test email was not sent.'));
+      }).catch(function() { showToast('Email test could not reach the server.'); });
     }
 
     function testTelegramAlerts() {
