@@ -4,6 +4,7 @@ import { getDbConnection } from './dbcheck.js';
 import { resolveSupabaseCredentials } from './supabase-config.js';
 import { notifyAdminEvent, notifySignup } from '../telegram.js';
 import { sendWelcomeEmail } from '../mailer.js';
+import { createInvestorSessionCookie, clearInvestorSessionCookie } from '../session.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -32,6 +33,11 @@ export default async function handler(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = url.pathname.replace(/^\/api/, '');
   const body = req.method === 'POST' ? await parseJsonBody(req) : {};
+
+  if (pathname === '/auth/logout' && req.method === 'POST') {
+    res.setHeader('Set-Cookie', clearInvestorSessionCookie());
+    return res.status(200).json({ success: true, message: 'Signed out.' });
+  }
 
   // ── 1. POST /api/auth/login ──────────────────────────────────────
   if (pathname === '/auth/login' || pathname === '/auth/login.php') {
@@ -112,6 +118,12 @@ export default async function handler(req, res) {
 
     if (!passwordValid) {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+    try {
+      res.setHeader('Set-Cookie', createInvestorSessionCookie(email));
+    } catch (sessionError) {
+      console.error('[auth login] secure investor session could not be issued:', sessionError.message);
+      return res.status(503).json({ success: false, message: 'Secure sign-in is not fully configured. Please contact support; no investor session was issued.' });
     }
     try {
       const notice = await notifyAdminEvent('Investor sign-in', { email, name: investorName || email, status: 'success' });
@@ -287,6 +299,13 @@ export default async function handler(req, res) {
         success: false,
         message: 'Social sign-in is temporarily unavailable because the account database could not be reached. Please retry.'
       });
+    }
+
+    try {
+      res.setHeader('Set-Cookie', createInvestorSessionCookie(email));
+    } catch (sessionError) {
+      console.error('[auth social-session] secure investor session could not be issued:', sessionError.message);
+      return res.status(503).json({ success: false, message: 'Secure sign-in is not fully configured. Please contact support; no investor session was issued.' });
     }
 
     if (isNewAccount) {
