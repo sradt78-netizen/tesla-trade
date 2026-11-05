@@ -4,7 +4,7 @@ import path from 'path';
 import { getDbConnection } from './dbcheck.js';
 import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
 import { sendPaymentApprovedEmail, sendPaymentDeclinedEmail, sendTestEmail, getMailerConfig } from '../mailer.js';
-import { notifyPaymentStatusUpdate, testTelegramConnection } from '../telegram.js';
+import { notifyPaymentStatusUpdate, testTelegramConnection, notifyAdminEvent } from '../telegram.js';
 
 const INVESTORS_FILE = path.join(process.cwd(), 'data', 'saved_investors.json');
 
@@ -1575,7 +1575,7 @@ export default async function handler(req, res) {
         'bank_name', 'bank_account', 'bank_routing', 'bank_swift',
         'resend_api_key', 'resend_from_email',
         'supabase_url', 'supabase_anon_key',
-        'telegram_bot_token', 'telegram_chat_id', 'telegram_alerts_enabled'
+        'telegram_bot_token', 'telegram_chat_id', 'telegram_alerts_enabled', 'telegram_notify_clicks'
       ]);
       try {
         for (const [key, value] of Object.entries(supplied)) {
