@@ -1168,7 +1168,10 @@
           </div>
           <label style="display:flex;align-items:center;gap:9px;color:var(--text);font-size:13px;"><input type="checkbox" id="cfg-telegram-enabled" checked style="width:16px;height:16px;"> Enable Telegram admin alerts</label>
         </div>
-        <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save API Credentials</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;">
+          <button type="button" class="primary" onclick="saveSettings()">Save API Credentials</button>
+          <button type="button" onclick="testTelegramAlerts()">📨 Send Telegram Test Alert</button>
+        </div>
       </div>
     </section>
   </main>
@@ -2277,6 +2280,19 @@
       navigator.clipboard.writeText(link).then(function() {
         showToast('Invitation link copied!');
       });
+    }
+
+    function testTelegramAlerts() {
+      var token = (document.getElementById('cfg-telegram-token')?.value || '').trim();
+      var chatId = (document.getElementById('cfg-telegram-chat')?.value || '').trim();
+      if (!token || !chatId) { showToast('Enter the Telegram bot token and admin chat ID first.'); return; }
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_telegram', bot_token: token, chat_id: chatId })
+      }).then(function(r) { return r.json(); }).then(function(d) {
+        showToast(d.success ? 'Telegram test alert delivered.' : (d.error || 'Telegram test failed.'));
+      }).catch(function() { showToast('Telegram test could not reach the server.'); });
     }
 
     function saveSettings() {
