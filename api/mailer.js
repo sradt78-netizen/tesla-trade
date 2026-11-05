@@ -30,6 +30,23 @@ export async function getMailerConfig() {
     }
   } catch (e) {}
 
+  if (!apiKey || !fromEmail) {
+    let conn;
+    try {
+      conn = await getDbConnection();
+      const [rows] = await conn.query('SELECT `key`, `value` FROM app_settings WHERE `key` IN (?, ?, ?)', ['resend_api_key', 'resend_from_email', 'admin_email']);
+      for (const row of rows || []) {
+        if (row.key === 'resend_api_key' && !apiKey) apiKey = cleanString(row.value);
+        if (row.key === 'resend_from_email' && !fromEmail) fromEmail = cleanString(row.value);
+        if (row.key === 'admin_email' && row.value) adminEmail = cleanString(row.value);
+      }
+    } catch (e) {
+      console.warn('[Mailer] Could not read email settings from MySQL:', e.message);
+    } finally {
+      if (conn) { try { await conn.end(); } catch (e) {} }
+    }
+  }
+
   return { apiKey, fromEmail, adminEmail };
 }
 
