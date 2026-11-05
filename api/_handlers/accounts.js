@@ -353,6 +353,12 @@ export default async function handler(req, res) {
       }
     } catch (e3) {}
 
+    results.sort((a, b) => {
+      const aTime = new Date(a.created_at || a.createdAt || 0).getTime() || 0;
+      const bTime = new Date(b.created_at || b.createdAt || 0).getTime() || 0;
+      return bTime - aTime;
+    });
+
     // Format fields consistently for frontend
     const formatted = results.map(t => ({
       id: t.id || ('tx_' + Math.random().toString(36).substring(2, 9)),
