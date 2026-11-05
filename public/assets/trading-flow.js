@@ -678,7 +678,16 @@
   }
 
   function mount() {
-    if (!isDashboardRoute() || mounted || mountInProgress) return;
+    if (!isDashboardRoute()) {
+      mounted = false;
+      mountInProgress = false;
+      return;
+    }
+    // React can replace #root during client-side navigation. Re-mount the
+    // trading panel whenever its host was removed, even if it mounted earlier.
+    if (mounted && document.getElementById(stackId)) return;
+    if (mountInProgress) return;
+    mounted = false;
     mountInProgress = true;
     injectStyles();
     ensureModal();
