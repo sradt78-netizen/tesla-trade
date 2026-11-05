@@ -252,10 +252,16 @@ export default async function handler(req, res) {
     let results = [];
     try {
       const conn = await getDbConnection();
-      const [txs] = await conn.query(
-        'SELECT * FROM account_transactions WHERE LOWER(user_email)=? ORDER BY created_at DESC, id DESC LIMIT 250',
-        [email]
-      );
+      let txs = [];
+      try {
+        const [rows] = await conn.query(
+          'SELECT * FROM account_transactions WHERE LOWER(user_email)=? ORDER BY created_at DESC, id DESC LIMIT 250',
+          [email]
+        );
+        txs = rows;
+      } catch (ledgerReadError) {
+        console.error('[transactions] ledger lookup failed; checking persisted investment records:', ledgerReadError.message);
+      }
       results = Array.isArray(txs) ? txs : [];
 
       // Older accounts may have funded investment/withdrawal rows created
@@ -321,47 +327,10 @@ export default async function handler(req, res) {
         console.error('[transactions] legacy withdrawal lookup failed:', legacyWithdrawalError.message);
       }
       await conn.end();
-    } catch (e) {}
-
-    // Merge persistent transactions as a fallback source even when MySQL returned
-    // some rows. Previously, one MySQL row suppressed all JSON-backed history.
-    try {
-      const { loadDatabaseSync } = await import('../db.js');
-      const db = loadDatabaseSync();
-      if (db && Array.isArray(db.account_transactions)) {
-        const fallbackRows = db.account_transactions.filter(t => (t.user_email || '').toLowerCase().trim() === email);
-        const seen = new Set(results.map(t => String(t.id || t.reference_id || '')));
-        for (const tx of fallbackRows) {
-          const key = String(tx.id || tx.reference_id || '');
-          if (!key || !seen.has(key)) {
-            results.push(tx);
-            if (key) seen.add(key);
-          }
-        }
-      }
-    } catch (e2) {}
-
-    try {
-      const { loadPersistentDeposits } = await import('./payment-submit.js');
-      const diskDeps = loadPersistentDeposits();
-      const userDeps = diskDeps.filter(d => (d.user_email || d.email || '').toLowerCase().trim() === email && (d.status === 'active' || d.status === 'approved'));
-      for (const dep of userDeps) {
-        const depAmt = parseFloat(dep.total || dep.amount || 0);
-        const hasDepTx = results.some(t => t.type === 'deposit' && (String(t.investment_id) === String(dep.id) || Math.abs(parseFloat(t.amount || 0) - depAmt) < 0.01));
-        if (depAmt > 0 && !hasDepTx) {
-          results.push({
-            id: dep.tx_id || ('tx_' + (dep.id || 'dep').replace(/^dep_/, '')),
-            investment_id: dep.id,
-            user_email: email,
-            type: 'deposit',
-            amount: depAmt,
-            status: 'processed',
-            note: 'Investment deposit approved',
-            created_at: dep.activated_at || dep.created_at || new Date().toISOString()
-          });
-        }
-      }
-    } catch (e3) {}
+    } catch (e) {
+      console.error('[transactions] database connection failed:', e.message);
+      return res.status(503).json({ error: 'Transaction history is temporarily unavailable. Your records have not been marked as empty.' });
+    }
 
     results.sort((a, b) => {
       const aTime = new Date(a.created_at || a.createdAt || 0).getTime() || 0;
@@ -407,22 +376,8 @@ export default async function handler(req, res) {
           investment: inv[0] || null
         });
       } catch (e) {
-        try {
-          const { mockStore } = await import('./admin.js');
-          const acc = mockStore.investors.find(u => u.email.toLowerCase() === email);
-          const { inMemoryDeposits } = await import('./payment-submit.js');
-          const candidates = [...(inMemoryDeposits || []), ...(mockStore.investments || [])].filter(i => i.user_email && i.user_email.toLowerCase() === email);
-          const inv = candidates.find(i => ['active','approved','completed'].includes(String(i.status || '').toLowerCase())) || candidates.sort((a,b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0];
-          return res.status(200).json({
-            email,
-            name: acc?.name || inv?.user_name || 'Investor',
-            phone: acc?.phone || '',
-            onboarding_status: (inv && ['active','approved','completed'].includes(String(inv.status || '').toLowerCase())) ? 'active' : (acc?.onboarding_status || (inv ? inv.status : 'pending_deposit')),
-            investment: inv || null
-          });
-        } catch (err2) {
-          return res.status(200).json({ email, name: 'Investor', onboarding_status: 'pending_deposit' });
-        }
+        console.error('[accounts] profile lookup failed:', e.message);
+        return res.status(503).json({ error: 'Your saved investor profile is temporarily unavailable. Please retry; do not create another account.' });
       }
     }
 
@@ -449,39 +404,9 @@ export default async function handler(req, res) {
         persistedStatus = saved[0]?.onboarding_status || persistedStatus;
         await conn.end();
       } catch (e) {
-        // Preserve the last known state in fallback stores; do not downgrade it.
-        try {
-          const { mockStore } = await import('./admin.js');
-          const existing = mockStore.investors.find(u => (u.email || '').toLowerCase() === email);
-          persistedStatus = existing?.onboarding_status || persistedStatus;
-        } catch (e2) {}
+        console.error('[accounts] profile save failed:', e.message);
+        return res.status(503).json({ success: false, error: 'Your investor profile could not be saved. Please retry before choosing an investment plan.' });
       }
-
-      try {
-        const { mockStore, savePersistentInvestor } = await import('./admin.js');
-        if (typeof savePersistentInvestor === 'function') {
-          savePersistentInvestor({
-            name,
-            email,
-            phone,
-            onboarding_status: persistedStatus
-          });
-        }
-        const existing = mockStore.investors.find(u => u.email.toLowerCase() === email);
-        if (existing) {
-          existing.name = name;
-          if (phone) existing.phone = phone;
-        } else {
-          mockStore.investors.unshift({
-            id: Date.now(),
-            name,
-            email,
-            phone,
-            onboarding_status: persistedStatus,
-            registered_at: new Date().toISOString()
-          });
-        }
-      } catch (e2) {}
 
       return res.status(200).json({
         success: true,
