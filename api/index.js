@@ -158,5 +158,5 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(200).json({ ok: true, path: pathname });
+  return res.status(404).json({ success: false, error: 'API endpoint not found. This action was not completed.', path: pathname });
 }
