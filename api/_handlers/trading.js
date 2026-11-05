@@ -112,50 +112,24 @@ const COLS = 'id, status, total, total_current_value, trading_status, trading_am
 
 export async function getOrCreateInvestment(id, email) {
   const lcEmail = String(email || '').trim().toLowerCase();
-  if (!lcEmail) {
-    const error = new Error('Sign in is required to access trading.');
-    error.statusCode = 401;
-    throw error;
-  }
-
+  if (!lcEmail) { const error = new Error('Sign in is required to access trading.'); error.statusCode = 401; throw error; }
   const conn = await realConn();
-  if (!conn) {
-    const error = new Error('Trading is unavailable because the investor database could not be reached.');
-    error.statusCode = 503;
-    throw error;
-  }
-
+  if (!conn) { const error = new Error('Trading is unavailable because the investor database could not be reached.'); error.statusCode = 503; throw error; }
   try {
     let rows = [];
     if (id && !String(id).startsWith('sim_')) {
-      [rows] = await conn.query(
-        "SELECT " + COLS + " FROM investments WHERE id=? AND LOWER(user_email)=? AND status IN ('active','approved') LIMIT 1",
-        [id, lcEmail]
-      );
+      [rows] = await conn.query("SELECT " + COLS + " FROM investments WHERE id=? AND LOWER(user_email)=? AND status IN ('active','approved') LIMIT 1", [id, lcEmail]);
     }
     if (!rows.length) {
-      [rows] = await conn.query(
-        "SELECT " + COLS + " FROM investments WHERE LOWER(user_email)=? AND status IN ('active','approved') ORDER BY (deposit_parent_id IS NULL) DESC, created_at ASC LIMIT 1",
-        [lcEmail]
-      );
+      [rows] = await conn.query("SELECT " + COLS + " FROM investments WHERE LOWER(user_email)=? AND status IN ('active','approved') ORDER BY (deposit_parent_id IS NULL) DESC, created_at ASC LIMIT 1", [lcEmail]);
     }
-    if (!rows.length) {
-      const error = new Error('Trading unlocks only after an administrator approves a deposit.');
-      error.statusCode = 403;
-      throw error;
-    }
+    if (!rows.length) { const error = new Error('Trading unlocks only after an administrator approves a deposit.'); error.statusCode = 403; throw error; }
     return rowToInv(rows[0]);
-  } finally {
-    try { await conn.end(); } catch (closeError) {}
-  }
+  } finally { try { await conn.end(); } catch (closeError) {} }
 }
 async function saveInv(inv, fields) {
   const conn = await realConn();
-  if (!conn) {
-    const error = new Error('Trading changes could not be saved because the investor database is unavailable.');
-    error.statusCode = 503;
-    throw error;
-  }
+  if (!conn) { const error = new Error('Trading changes could not be saved because the investor database is unavailable.'); error.statusCode = 503; throw error; }
   try {
     const [result] = await conn.query(
       "UPDATE investments SET total_current_value=?, earnings=?, trading_status=?, trading_amount=?, trading_started_at=" +
@@ -165,15 +139,9 @@ async function saveInv(inv, fields) {
         ? [inv.totalCurrentValue, Math.max(0, inv.totalCurrentValue - inv.total), inv.tradingStatus, inv.tradingAmount, fields.startedAt, inv.id]
         : [inv.totalCurrentValue, Math.max(0, inv.totalCurrentValue - inv.total), inv.tradingStatus, inv.tradingAmount, inv.id]
     );
-    if (!result || !result.affectedRows) {
-      const error = new Error('The approved investment could not be updated. Refresh and retry.');
-      error.statusCode = 409;
-      throw error;
-    }
+    if (!result || !result.affectedRows) { const error = new Error('The approved investment could not be updated. Refresh and retry.'); error.statusCode = 409; throw error; }
     tradingInvestments[inv.id] = inv;
-  } finally {
-    try { await conn.end(); } catch (closeError) {}
-  }
+  } finally { try { await conn.end(); } catch (closeError) {} }
 }
 async function recordTradeSettlement(inv, email, pnl) {
   if (!email) return;
@@ -182,35 +150,13 @@ async function recordTradeSettlement(inv, email, pnl) {
   const txId = 'tx_trade_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
   const note = 'Simulated trade settled';
   const conn = await realConn();
-  if (conn) {
-    try {
-      await conn.query(
-        'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, ?, ?, "processed", ?, NOW())',
-        [txId, inv.id, email, type, amount, note]
-      );
-      await conn.end();
-      return;
-    } catch (error) {
-      try { await conn.end(); } catch (ignored) {}
-    }
-  }
-  // Keep local/mock history in step with the wallet when MySQL is offline.
+  if (!conn) { const error = new Error('Trade history could not be saved because the investor database is unavailable.'); error.statusCode = 503; throw error; }
   try {
-    const { loadDatabaseSync, saveDatabaseSync } = await import('../db.js');
-    const db = loadDatabaseSync();
-    if (!Array.isArray(db.account_transactions)) db.account_transactions = [];
-    db.account_transactions.unshift({
-      id: txId,
-      investment_id: inv.id,
-      user_email: email,
-      type,
-      amount,
-      status: 'processed',
-      note,
-      created_at: new Date().toISOString()
-    });
-    saveDatabaseSync();
-  } catch (error) {}
+    await conn.query(
+      'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, ?, ?, "processed", ?, NOW())',
+      [txId, inv.id, email, type, amount, note]
+    );
+  } finally { try { await conn.end(); } catch (closeError) {} }
 }
 
 function withWallet(inv, trade) {
