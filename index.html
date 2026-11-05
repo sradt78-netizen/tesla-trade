@@ -2161,7 +2161,13 @@
                 return data;
               });
             }).then(function () {
-              localStorage.setItem('ttinc_auth', JSON.stringify({ email: email, name: name }));
+              localStorage.setItem('ttinc_auth', JSON.stringify({
+                email: email,
+                name: name,
+                phone: phone,
+                age: age,
+                onboardingState: 'plan_selection'
+              }));
               showRegisterMessage('Email verified. Choose your investment plan next.', true);
               // Verification grants access to onboarding, not the investor
               // dashboard. Start with plan selection so the investor cannot
@@ -2201,7 +2207,13 @@
         function completeLogin(data) {
           var em = (data.email || '').toLowerCase().trim();
           var nm = data.name || data.email;
-          localStorage.setItem('ttinc_auth', JSON.stringify({ email: em, name: nm }));
+          localStorage.setItem('ttinc_auth', JSON.stringify({
+            email: em,
+            name: nm,
+            phone: data.phone || '',
+            age: Number(data.age || 0),
+            onboardingState: data.onboardingStatus || data.investmentStatus || 'registered'
+          }));
 
           fetch('/api/investments?email=' + encodeURIComponent(em))
             .then(function(r) { return r.ok ? r.json() : null; })
