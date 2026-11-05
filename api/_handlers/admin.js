@@ -1148,7 +1148,7 @@ export default async function handler(req, res) {
       }
 
       // If no deposit was found on disk or memory yet, create an approved record now
-      const effectiveEmail = targetEmail || (foundDeposit && foundDeposit.user_email) || 'investor@teslawealths.org';
+      // Reuse the validated email; never synthesize a placeholder investor.
       const effectiveId = rawId || depId || (foundDeposit && foundDeposit.id) || ('dep_' + Date.now().toString(36));
 
       if (!foundDeposit && effectiveEmail && status === 'active') {
