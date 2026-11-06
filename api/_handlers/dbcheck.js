@@ -12,6 +12,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ status: 'error', message: 'Method not allowed.' });
+  const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
   // Use the exact same resolver and health probe used by authentication and
   // every other API handler. Never default a failed connection to "connected".
@@ -41,8 +42,45 @@ export default async function handler(req, res) {
   const rawError = health?.error || null;
   const errorCode = rawError && typeof rawError === 'object' ? rawError.code || null : null;
 
+  // Optional, read-only schema check for the social registration queries.
+  // Invoke with /api/dbcheck?check=auth; this checks table/column availability
+  // without creating test users or changing investor data.
+  let authentication_schema = null;
+  if (connected && requestUrl.searchParams.get('check') === 'auth') {
+    let conn = null;
+    try {
+      conn = await getDbConnection();
+      const inspectColumns = async (table) => {
+        const [rows] = await conn.query('SHOW COLUMNS FROM `' + table + '`');
+        return rows.map((row) => String(row.Field || '').toLowerCase()).filter(Boolean);
+      };
+      const accountColumns = await inspectColumns('investor_accounts');
+      const investmentColumns = await inspectColumns('investments');
+      const accountRequired = ['email', 'name', 'onboarding_status'];
+      const investmentRequired = ['user_email', 'status'];
+      const accountMissing = accountRequired.filter((column) => !accountColumns.includes(column));
+      const investmentMissing = investmentRequired.filter((column) => !investmentColumns.includes(column));
+      authentication_schema = {
+        ok: accountMissing.length === 0 && investmentMissing.length === 0,
+        investor_accounts: { present: true, missing_required_columns: accountMissing },
+        investments: { present: true, missing_required_columns: investmentMissing }
+      };
+    } catch (error) {
+      const code = String(error?.code || error?.errno || 'DB_ERROR')
+        .replace(/[^A-Z0-9_]/gi, '')
+        .slice(0, 40);
+      authentication_schema = { ok: false, error_code: code };
+      console.error('[dbcheck] authentication schema inspection failed:', code, error?.message || error);
+    } finally {
+      if (conn) {
+        try { await conn.end(); } catch (closeError) {}
+      }
+    }
+  }
+
   return res.status(200).json({
     status: connected ? 'ok' : 'degraded',
+    ...(authentication_schema ? { authentication_schema } : {}),
     database: {
       connected,
       tables_count: connected ? Number(health.tablesCount || 0) : null,
