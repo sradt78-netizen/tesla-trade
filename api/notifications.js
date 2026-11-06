@@ -1,0 +1,24 @@
+import { sendEmail, getMailerConfig } from './mailer.js';
+
+function esc(value) {
+  return String(value == null ? '' : value).replace(/[&<>\"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '\"':'&quot;', "'":'&#39;' }[ch]));
+}
+
+function shell(content) {
+  return '<!doctype html><html><body style="margin:0;background:#08090c;color:#eef2f7;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;"><div style="max-width:620px;margin:28px auto;background:#101217;border:1px solid #292d36;border-radius:18px;overflow:hidden;"><div style="padding:30px 24px;text-align:center;background:linear-gradient(135deg,#1b2029,#090a0d);border-bottom:1px solid #303540;"><div style="display:inline-block;width:42px;height:42px;line-height:42px;border-radius:12px;background:#e31937;color:#fff;font-size:24px;font-weight:900;">T</div><div style="margin-top:10px;color:#fff;font-size:19px;font-weight:850;letter-spacing:2px;">TESLA TRADE</div><div style="margin-top:5px;color:#9299a6;font-size:10px;letter-spacing:2px;text-transform:uppercase;">Investor communications</div></div><div style="padding:30px 26px;">'+content+'</div><div style="padding:20px 24px;text-align:center;background:#090a0d;border-top:1px solid #292d36;color:#78808e;font-size:11px;line-height:1.7;">You are receiving this message because of activity on your Tesla Trade account.<br>For assistance, reply to this email or visit <a style="color:#ff647b;" href="https://teslawealths.org/support">Support Centre</a>.</div></div></body></html>';
+}
+
+export async function sendEventEmail({to,name,event,subject,message,ctaLabel='Open Investor Dashboard',ctaPath='/overview',details=[]}) {
+  const rows = (Array.isArray(details) ? details : []).map(item => '<tr><td style="padding:8px 0;color:#9aa3b2;font-size:12px;">'+esc(item.label)+'</td><td style="padding:8px 0;color:#fff;text-align:right;font-size:12px;font-weight:700;">'+esc(item.value)+'</td></tr>').join('');
+  const path = /^\/(?!\/)[a-zA-Z0-9_/?=&%.#-]*$/.test(String(ctaPath)) ? String(ctaPath) : '/overview';
+  const html = shell('<span style="display:inline-block;padding:6px 10px;border:1px solid #e3193755;border-radius:30px;color:#ff8497;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;">'+esc(event || 'Account update')+'</span><h1 style="margin:18px 0 12px;color:#fff;font-size:27px;line-height:1.2;letter-spacing:-.6px;">'+esc(subject || 'Your account has been updated')+'</h1><p style="color:#d2d7e0;font-size:14px;line-height:1.8;">Hello <strong>'+esc(name || 'Investor')+'</strong>,</p><p style="color:#c2c9d4;font-size:14px;line-height:1.8;">'+esc(message || '')+'</p>'+(rows?'<table width="100%" style="margin:20px 0;border-collapse:collapse;background:#171a21;border:1px solid #303540;padding:12px;">'+rows+'</table>':'')+'<div style="text-align:center;margin:28px 0 12px;"><a href="https://teslawealths.org'+path+'" style="display:inline-block;background:linear-gradient(135deg,#f02d4b,#b90e2d);color:#fff;text-decoration:none;font-size:14px;font-weight:800;padding:14px 26px;border-radius:10px;">'+esc(ctaLabel)+' &rarr;</a></div><p style="color:#747d8b;font-size:11px;line-height:1.6;text-align:center;">Please sign in to review your latest account information.</p>');
+  return sendEmail({to,name,subject:subject || 'Tesla Trade account update',html,category:'transactional_'+String(event || 'update').toLowerCase().replace(/[^a-z0-9]+/g,'_')});
+}
+
+export async function sendSupportMessageEmail({to,toAdmin=false,userEmail='',userName='Investor',subject='Support message',message='',ticketUrl='https://teslawealths.org/support'}) {
+  const config = await getMailerConfig();
+  const recipient = to || (toAdmin ? config.adminEmail : userEmail);
+  const title = toAdmin ? 'New investor support request' : 'Your support conversation has been updated';
+  const html = shell('<h1 style="margin:0 0 16px;color:#fff;font-size:24px;">'+title+'</h1><p style="color:#cbd5e1;font-size:13px;line-height:1.7;">'+esc(userName)+(toAdmin?' ('+esc(userEmail)+')':'')+'</p><div style="padding:18px;background:#171a21;border:1px solid #303540;border-radius:12px;"><strong style="color:#fff;">'+esc(subject)+'</strong><p style="white-space:pre-wrap;color:#cbd5e1;font-size:13px;line-height:1.7;">'+esc(message)+'</p></div><div style="text-align:center;margin:24px 0;"><a href="'+esc(ticketUrl)+'" style="display:inline-block;background:#e31937;color:#fff;text-decoration:none;padding:13px 24px;border-radius:9px;font-weight:800;">'+(toAdmin?'Open Admin Inbox':'View Conversation & Reply')+' &rarr;</a></div>');
+  return sendEmail({to:recipient,name:toAdmin?'Admin':userName,subject:(toAdmin?'[Support] ':'')+subject,html,category:'support'});
+}
