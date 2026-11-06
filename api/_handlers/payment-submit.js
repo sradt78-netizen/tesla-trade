@@ -445,10 +445,11 @@ export default async function handler(req, res) {
     // MySQL is the sole source of truth. Never acknowledge a deposit from local or in-memory state.
     try {
       const [{ notifyPaymentSubmission }] = await Promise.all([import('../telegram.js')]);
-      const { sendPaymentReceivedEmail } = await import('../mailer.js');
+      const { sendPaymentReceivedEmail, sendAdminPaymentAlert } = await import('../mailer.js');
       const alerts = await Promise.allSettled([
         notifyPaymentSubmission(depositRecord),
-        sendPaymentReceivedEmail(email, userName, { amount, planName, method, reference: ref })
+        sendPaymentReceivedEmail(email, userName, { amount, planName, method, reference: ref }),
+        sendAdminPaymentAlert({ userEmail:email, userName, amount, planName, method, reference:ref, investmentId })
       ]);
       for (const result of alerts) {
         if (result.status === 'rejected') console.error('[payment-submit] notification failed:', result.reason?.message || result.reason);
