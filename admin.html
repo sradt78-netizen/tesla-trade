@@ -239,6 +239,9 @@
       box-shadow: 0 10px 30px rgba(0,0,0,0.5);
       z-index: 200;
     }
+    .support-layout { grid-template-columns: minmax(0,.8fr) minmax(0,1.4fr); }
+    @media (max-width: 760px) { .support-layout { grid-template-columns: 1fr !important; } }
+
     /* Mobile Topbar & Drawer */
     .mobile-topbar {
       display: none;
@@ -505,6 +508,7 @@
         <button class="nav-btn" onclick="switchTab('access')">
           <span>🔐 Invitation Codes</span> <span class="badge green" id="b-codes">0</span>
         </button>
+        <button class="nav-btn" onclick="switchTab('support')"><span>💬 Investor Support Inbox</span> <span class="badge amber" id="b-support">0</span></button>
         <button class="nav-btn" onclick="switchTab('marketing')">
           <span>📣 Marketing &amp; Emails</span> <span class="badge green" id="b-marketing">Autopilot</span>
         </button>
@@ -766,6 +770,8 @@
         </table>
       </div>
     </section>
+
+<section id="tab-support" style="display:none;"><div class="card"><h2>Investor Support Inbox</h2><p style="color:var(--muted);font-size:13px;">Read investor messages and reply from the admin dashboard.</p><button type="button" onclick="loadSupportInbox()">Refresh inbox</button></div><div class="support-layout" style="display:grid;grid-template-columns:minmax(250px,.8fr) minmax(300px,1.4fr);gap:14px;margin-top:14px;"><div class="card"><div id="supportThreadList">Loading conversations…</div></div><div class="card"><div id="supportThreadHeader">Select a conversation</div><div id="supportMessageList" style="display:grid;gap:10px;margin:16px 0;"></div><div id="supportReplyBox" style="display:none;"><textarea id="supportReplyText" rows="5" maxlength="5000" placeholder="Write a reply…" style="width:100%;background:#090a0d;border:1px solid #333;border-radius:9px;padding:12px;color:#fff;"></textarea><button type="button" class="primary" onclick="sendSupportReply()">Send reply & email investor</button><button type="button" onclick="closeSupportThread()">Close conversation</button></div></div></div></section>
 
     <!-- TAB 8: MARKETING & EMAIL CAMPAIGNS (AUTOPILOT ENGINE) -->
     <section id="tab-marketing" style="display: none;">
@@ -1143,9 +1149,16 @@
               <input type="password" id="cfg-resend-key" placeholder="re_123456789..." />
             </div>
             <div class="form-group">
-              <label>Sender Email (From)</label>
+              <label>Sender Name (shown in inbox)</label>
+              <input type="text" id="cfg-sender-name" placeholder="Tesla Trade Investor Relations" />
+            </div>
+            <div class="form-group">
+              <label>Sender Email (From — verified in Resend)</label>
               <input type="text" id="cfg-resend-from" placeholder="onboarding@resend.dev or no-reply@yourdomain.com" />
             </div>
+            <div class="form-group"><label>Admin notification email</label><input type="email" id="cfg-admin-email" placeholder="admin@teslawealths.org" /></div>
+            <div class="form-group"><label>Reply-to / Support email</label><input type="email" id="cfg-reply-to" placeholder="support@teslawealths.org" /></div>
+            <button type="button" onclick="sendEmailTest()" style="margin-top:4px;">✉ Send test email</button>
           </div>
           <div>
             <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Supabase (Social Google, X & Facebook Login)</h4>
@@ -1289,7 +1302,7 @@
       closeMobileSidebar();
       try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
 
-      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'trading', 'settings'];
+      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'support', 'marketing', 'trading', 'settings'];
       tabs.forEach(function(t) {
         var el = document.getElementById('tab-' + t);
         if (el) el.style.display = (t === tabId) ? 'block' : 'none';
@@ -1311,6 +1324,7 @@
         withdrawals: ['Withdrawal Requests', 'Review and process investor payout requests'],
         financing: ['Vehicle Financing Applications', 'Approve or decline customer financing applications'],
         access: ['Private Invitation Access', 'Manage active and revoked investor invitation tokens'],
+        support: ['Investor Support Inbox', 'Read and respond to investor support conversations'],
         marketing: ['Marketing & Click Analytics', 'Track domain clicks, referral sources, and campaigns'],
         trading: ['Trading Graph Engine & Control', 'Configure live profit and loss cycle intervals, gain/loss percentages, and graph dynamics on investors dashboard'],
         settings: ['System Settings & Environment', 'Database health, Vercel environment variables, and wallets']
@@ -1321,11 +1335,31 @@
         document.getElementById('panelDesc').textContent = titles[tabId][1];
       }
 
+      if (tabId === 'support') loadSupportInbox();
       if (tabId === 'trading') {
         initTradingSimCanvas();
       }
     }
 
+    var activeSupportThread = '';
+    function supportEsc(v){return String(v==null?'':v).replace(/[&<>"]/g,function(c){return c==='&'?'&amp;':c==='<'?'&lt;':c==='>'?'&gt;':'&quot;';});}
+    function loadSupportInbox(){
+      adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'support_list'})}).then(function(r){return r.json();}).then(function(d){
+        if(!d.success)throw new Error(d.error||'Could not load support inbox');
+        var threads=d.threads||[],list=document.getElementById('supportThreadList');
+        document.getElementById('b-support').textContent=threads.filter(function(t){return t.status==='open';}).length;
+        if(!threads.length){list.innerHTML='<p style=\"color:var(--muted);font-size:12px;\">No investor messages yet.</p>';return;}
+        list.innerHTML=threads.map(function(t){return '<button type=\"button\" data-support-id=\"'+supportEsc(t.id)+'\" onclick=\"openSupportThread(this.dataset.supportId)\" style=\"display:block;width:100%;text-align:left;padding:12px;margin-bottom:8px;background:#0c0e13;border:1px solid var(--card-border);border-radius:9px;\"><strong style=\"font-size:12px;\">'+supportEsc(t.user_name)+'</strong><span class=\"badge\" style=\"float:right;\">'+supportEsc(t.status)+'</span><div style=\"font-size:11px;color:#aab2bf;margin-top:5px;\">'+supportEsc(t.subject)+'</div><div style=\"font-size:10px;color:#707987;margin-top:5px;\">'+supportEsc(t.user_email)+' · '+Number(t.message_count||0)+' messages</div><div style=\"font-size:11px;color:#8993a2;margin-top:6px;\">'+supportEsc(t.last_message||'')+'</div></button>';}).join('');
+      }).catch(function(e){document.getElementById('supportThreadList').textContent=e.message;});
+    }
+    function openSupportThread(id){activeSupportThread=id;adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'support_thread',threadId:id})}).then(function(r){return r.json();}).then(function(d){
+      if(!d.success)throw new Error(d.error||'Could not open conversation');var t=d.thread;
+      document.getElementById('supportThreadHeader').innerHTML='<h3 style=\"font-size:16px;\">'+supportEsc(t.subject)+'</h3><p style=\"font-size:12px;color:var(--muted);\">'+supportEsc(t.user_name)+' · '+supportEsc(t.user_email)+' · '+supportEsc(t.status)+'</p>';
+      document.getElementById('supportMessageList').innerHTML=(d.messages||[]).map(function(m){return '<div style=\"padding:12px;border:1px solid '+(m.sender_role==='admin'?'#e3193755':'var(--card-border)')+';border-radius:9px;background:'+(m.sender_role==='admin'?'#1a1015':'#0c0e13')+';\"><strong style=\"font-size:12px;\">'+supportEsc(m.sender_name)+'</strong><small style=\"float:right;color:#7b8492;\">'+supportEsc(m.created_at)+'</small><p style=\"font-size:13px;white-space:pre-wrap;line-height:1.6;color:#cbd5e1;\">'+supportEsc(m.message)+'</p></div>';}).join('');
+      document.getElementById('supportReplyBox').style.display=t.status==='closed'?'none':'block';loadSupportInbox();
+    }).catch(function(e){showToast(e.message);});}
+    function sendSupportReply(){var box=document.getElementById('supportReplyText'),message=(box.value||'').trim();if(!activeSupportThread||message.length<2){showToast('Write a reply first.');return;}adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'support_reply',threadId:activeSupportThread,message:message})}).then(function(r){return r.json();}).then(function(d){if(!d.success)throw new Error(d.error||'Reply failed');box.value='';showToast(d.message||'Reply saved.');openSupportThread(activeSupportThread);}).catch(function(e){showToast(e.message);});}
+    function closeSupportThread(){if(!activeSupportThread||!confirm('Close this support conversation?'))return;adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'support_close',threadId:activeSupportThread})}).then(function(r){return r.json();}).then(function(d){showToast(d.message||'Conversation closed.');openSupportThread(activeSupportThread);});}
     function toggleGatePasswordVisibility() {
       var inp = document.getElementById('adminGatePassword');
       if (inp) {
@@ -1787,11 +1821,11 @@
       
       var isResendLive = !!(mkStats.resendApiKeyConfigured);
       if (document.getElementById('stat-mk-apimode')) {
-        document.getElementById('stat-mk-apimode').textContent = isResendLive ? '● Live Resend SMTP' : '● Sandbox Simulator';
+        document.getElementById('stat-mk-apimode').textContent = isResendLive ? '● Live Resend API' : '● Not configured';
         document.getElementById('stat-mk-apimode').style.color = isResendLive ? '#4ade80' : '#38bdf8';
       }
       if (document.getElementById('healthResendStatus')) {
-        document.getElementById('healthResendStatus').textContent = isResendLive ? 'Active (Live)' : 'Connected (Sandbox Mock)';
+        document.getElementById('healthResendStatus').textContent = isResendLive ? 'Active (Live Resend)' : 'Not configured — no emails sent';
         document.getElementById('healthResendStatus').style.color = isResendLive ? '#86efac' : '#93c5fd';
       }
       if (document.getElementById('healthAutopilotStatus')) {
@@ -1812,8 +1846,9 @@
       } else {
         var mRows = '';
         mkLogs.forEach(function(l) {
+          var isFailed = (l.status || '').toLowerCase() === 'failed';
           var isSim = (l.status || '').indexOf('sandbox') !== -1;
-          var statusBadge = isSim ? '<span class="badge" style="background:#0c4a6e;color:#7dd3fc;">Sent (Sandbox)</span>' : '<span class="badge green">Delivered</span>';
+          var statusBadge = isFailed ? '<span class="badge red">Failed</span>' : isSim ? '<span class="badge" style="background:#0c4a6e;color:#7dd3fc;">Sandbox (not sent)</span>' : '<span class="badge green">Accepted by Resend</span>';
           mRows += '<tr>' +
             '<td style="color: var(--muted); font-size: 12px;">' + (l.created_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
             '<td style="font-family: monospace; font-weight: 500;">' + (l.user_email || '—') + '</td>' +
@@ -1837,6 +1872,9 @@
       if (s.bank_swift && document.getElementById('cfg-bank-swift')) document.getElementById('cfg-bank-swift').value = s.bank_swift;
       if (s.resend_api_key && document.getElementById('cfg-resend-key')) document.getElementById('cfg-resend-key').value = s.resend_api_key;
       if (s.resend_from_email && document.getElementById('cfg-resend-from')) document.getElementById('cfg-resend-from').value = s.resend_from_email;
+      if (s.sender_name && document.getElementById('cfg-sender-name')) document.getElementById('cfg-sender-name').value = s.sender_name;
+      if (s.admin_email && document.getElementById('cfg-admin-email')) document.getElementById('cfg-admin-email').value = s.admin_email;
+      if (s.reply_to_email && document.getElementById('cfg-reply-to')) document.getElementById('cfg-reply-to').value = s.reply_to_email;
       if (s.supabase_url && document.getElementById('cfg-supabase-url')) document.getElementById('cfg-supabase-url').value = s.supabase_url;
       if (s.supabase_anon_key && document.getElementById('cfg-supabase-anon')) document.getElementById('cfg-supabase-anon').value = s.supabase_anon_key;
     }
@@ -2267,6 +2305,8 @@
       });
     }
 
+    function sendEmailTest(){var email=(document.getElementById('cfg-admin-email')?.value||'').trim();if(!email)email=prompt('Send a test email to which address?','');if(!email)return;adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send_test_email',email:email})}).then(function(r){return r.json();}).then(function(d){if(!d.success)throw new Error(d.error||'Test email failed');showToast(d.message||'Test email accepted by Resend.');}).catch(function(e){showToast(e.message);});}
+
     function saveSettings() {
       var s = {
         wallet_usdt: (document.getElementById('cfg-usdt')?.value || '').trim(),
@@ -2278,6 +2318,9 @@
         bank_swift: (document.getElementById('cfg-bank-swift')?.value || '').trim(),
         resend_api_key: (document.getElementById('cfg-resend-key')?.value || '').trim(),
         resend_from_email: (document.getElementById('cfg-resend-from')?.value || '').trim(),
+        sender_name: (document.getElementById('cfg-sender-name')?.value || '').trim(),
+        admin_email: (document.getElementById('cfg-admin-email')?.value || '').trim(),
+        reply_to_email: (document.getElementById('cfg-reply-to')?.value || '').trim(),
         supabase_url: (document.getElementById('cfg-supabase-url')?.value || '').trim(),
         supabase_anon_key: (document.getElementById('cfg-supabase-anon')?.value || '').trim()
       };

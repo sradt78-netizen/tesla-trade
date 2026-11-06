@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { getDbConnection } from './dbcheck.js';
+import { ensureSupportTables } from './support.js';
+import { ensureSupportTables } from './support.js';
 import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
 
 const INVESTORS_FILE = path.join(process.cwd(), 'data', 'saved_investors.json');
@@ -46,6 +48,7 @@ function cleanString(val) {
   if (!val) return '';
   return String(val).trim().replace(/^["']|["']$/g, '');
 }
+function escapeHtml(value) { return String(value == null ? '' : value).replace(/[&<>\"]/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '\"':'&quot;' }[ch])); }
 
 export function getAdminExpectedPassword() {
   return cleanString(
@@ -349,17 +352,10 @@ const MARKETING_TEMPLATES = {
   }
 };
 
-async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subject, htmlBody) {
+async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subject, htmlBody, fromName, replyTo) {
   const sender = fromEmail || 'no-reply@teslawealths.org';
 
-  if (!apiKey) {
-    return {
-      ok: true,
-      simulated: true,
-      id: 'sim_' + Math.random().toString(36).substring(2, 10),
-      note: 'Simulated dispatch (Set RESEND_API_KEY in environment or admin settings for live SMTP delivery)'
-    };
-  }
+  if (!apiKey) return { ok: false, simulated: false, error: 'Resend API key is not configured. No email was sent.' };
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -369,10 +365,11 @@ async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subjec
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: `Tesla Trade Inc <${sender}>`,
+        from: `${fromName || 'Tesla Trade'} <${sender}>`,
         to: [toEmail],
         subject: subject,
-        html: htmlBody
+        html: htmlBody,
+        ...(replyTo ? { reply_to: [replyTo] } : {})
       })
     });
 
@@ -380,12 +377,11 @@ async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subjec
     if (res.ok && data.id) {
       return { ok: true, simulated: false, id: data.id };
     }
-    return { ok: true, simulated: true, id: 'sim_resend_' + Date.now(), error: data.message };
+    return { ok: false, simulated: false, error: data.message || ('Resend HTTP ' + res.status) };
   } catch (err) {
     return {
-      ok: true,
-      simulated: true,
-      id: 'sim_fallback_' + Date.now(),
+      ok: false,
+      simulated: false,
       error: err.message
     };
   }
@@ -714,6 +710,104 @@ export default async function handler(req, res) {
       });
     }
 
+    // ── SUPPORT INBOX: THREADS, REPLIES, AND CLOSE ─────────────────
+    if (action === 'send_test_email') {
+      if (conn) { try { await conn.end(); } catch {} conn = null; }
+      const recipient = cleanString(body.email || body.to || '');
+      if (!recipient.includes('@')) return res.status(400).json({success:false,error:'Enter a valid test recipient email.'});
+      try {
+        const { sendTestEmail } = await import('../mailer.js');
+        const result = await sendTestEmail(recipient);
+        if (!result.ok) return res.status(502).json({success:false,error:result.error || 'Email provider rejected the test message.'});
+        return res.status(200).json({success:true,message:'Test email accepted by Resend.',resendId:result.id});
+      } catch (error) { return res.status(502).json({success:false,error:error.message || 'Test email failed.'}); }
+    }
+    if (['support_list','support_thread','support_reply','support_close'].includes(action)) {
+      if (!isDbConnected || !conn) return res.status(503).json({ success:false, error:'Support inbox requires the live database.' });
+      await ensureSupportTables(conn);
+      if (action === 'support_list') {
+        const [threads] = await conn.query(
+          "SELECT t.id,t.user_email,t.user_name,t.subject,t.status,t.created_at,t.updated_at,(SELECT COUNT(*) FROM support_messages m WHERE m.thread_id=t.id) AS message_count,(SELECT m.message FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,(SELECT m.sender_role FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender FROM support_threads t ORDER BY t.updated_at DESC LIMIT 200"
+        );
+        return res.status(200).json({success:true,threads});
+      }
+      const threadId = cleanString(body.threadId || body.id);
+      if (!threadId) return res.status(400).json({success:false,error:'Support ticket ID is required.'});
+      const [threadRows] = await conn.query('SELECT id,user_email,user_name,subject,status,created_at,updated_at FROM support_threads WHERE id=? LIMIT 1',[threadId]);
+      const thread = threadRows[0];
+      if (!thread) return res.status(404).json({success:false,error:'Support ticket not found.'});
+      if (action === 'support_thread') {
+        const [messages] = await conn.query('SELECT sender_role,sender_name,message,created_at FROM support_messages WHERE thread_id=? ORDER BY created_at ASC',[threadId]);
+        return res.status(200).json({success:true,thread,messages});
+      }
+      if (action === 'support_close') {
+        await conn.query("UPDATE support_threads SET status='closed',updated_at=NOW() WHERE id=?",[threadId]);
+        return res.status(200).json({success:true,message:'Support conversation closed.'});
+      }
+      const message = String(body.message || '').trim().slice(0,5000);
+      if (message.length < 2) return res.status(400).json({success:false,error:'Write a reply before sending.'});
+      const accessToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+      await conn.beginTransaction();
+      await conn.query('INSERT INTO support_messages (id,thread_id,sender_role,sender_name,message) VALUES (?,?,?,?,?)',[crypto.randomUUID(),threadId,'admin','Tesla Trade Support',message]);
+      await conn.query("INSERT INTO support_thread_tokens (id,thread_id,token_hash) VALUES (?,?,?)",[crypto.randomUUID(),threadId,tokenHash]);
+      await conn.query("UPDATE support_threads SET status='answered',updated_at=NOW() WHERE id=?",[threadId]);
+      await conn.commit();
+      const ticketUrl = 'https://teslawealths.org/support?ticket='+encodeURIComponent(threadId)+'&token='+encodeURIComponent(accessToken);
+      try {
+        const { sendSupportMessageEmail } = await import('../notifications.js');
+        const mail = await sendSupportMessageEmail({to:thread.user_email,userName:thread.user_name,subject:'Support replied: '+thread.subject,message,ticketUrl});
+        return res.status(200).json({success:true,emailSent:!!mail?.ok,message:mail?.ok?'Reply sent and investor notified.':'Reply saved, but email notification failed: '+(mail?.error || 'unknown delivery error')});
+      } catch (mailError) {
+        console.error('[support admin reply] email failed:',mailError.message);
+        return res.status(200).json({success:true,emailSent:false,message:'Reply saved, but email notification failed. Check the email delivery log.'});
+      }
+    }
+
+    if (['support_list','support_thread','support_reply','support_close'].includes(action)) {
+      if (!isDbConnected || !conn) return res.status(503).json({success:false,error:'Support inbox requires the live database.'});
+      await ensureSupportTables(conn);
+      if (action === 'support_list') {
+        const [threads] = await conn.query("SELECT t.id,t.user_email,t.user_name,t.subject,t.status,t.created_at,t.updated_at,(SELECT COUNT(*) FROM support_messages m WHERE m.thread_id=t.id) AS message_count,(SELECT m.message FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,(SELECT m.sender_role FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender FROM support_threads t ORDER BY t.updated_at DESC LIMIT 200");
+        try { await conn.end(); } catch {}
+        return res.status(200).json({success:true,threads});
+      }
+      const threadId = cleanString(body.threadId || body.id);
+      if (!threadId) { try { await conn.end(); } catch {} return res.status(400).json({success:false,error:'Support ticket ID is required.'}); }
+      const [threadRows] = await conn.query('SELECT id,user_email,user_name,subject,status,created_at,updated_at FROM support_threads WHERE id=? LIMIT 1',[threadId]);
+      const thread = threadRows[0];
+      if (!thread) { try { await conn.end(); } catch {} return res.status(404).json({success:false,error:'Support ticket not found.'}); }
+      if (action === 'support_thread') {
+        const [messages] = await conn.query('SELECT sender_role,sender_name,message,created_at FROM support_messages WHERE thread_id=? ORDER BY created_at ASC',[threadId]);
+        try { await conn.end(); } catch {}
+        return res.status(200).json({success:true,thread,messages});
+      }
+      if (action === 'support_close') {
+        await conn.query("UPDATE support_threads SET status='closed',updated_at=NOW() WHERE id=?",[threadId]);
+        try { await conn.end(); } catch {}
+        return res.status(200).json({success:true,message:'Support conversation closed.'});
+      }
+      const message = String(body.message || '').trim().slice(0,5000);
+      if (message.length < 2) { try { await conn.end(); } catch {} return res.status(400).json({success:false,error:'Write a reply before sending.'}); }
+      const accessToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+      await conn.beginTransaction();
+      await conn.query('INSERT INTO support_messages (id,thread_id,sender_role,sender_name,message) VALUES (?,?,?,?,?)',['msg_'+crypto.randomUUID(),threadId,'admin','Tesla Trade Support',message]);
+      await conn.query('INSERT INTO support_thread_tokens (id,thread_id,token_hash) VALUES (?,?,?)',[crypto.randomUUID(),threadId,tokenHash]);
+      await conn.query("UPDATE support_threads SET status='answered',updated_at=NOW() WHERE id=?",[threadId]);
+      await conn.commit();
+      try { await conn.end(); } catch {}
+      const ticketUrl = 'https://teslawealths.org/support?ticket='+encodeURIComponent(threadId)+'&token='+encodeURIComponent(accessToken);
+      try {
+        const { sendSupportMessageEmail } = await import('../notifications.js');
+        const mail = await sendSupportMessageEmail({to:thread.user_email,userName:thread.user_name,subject:'Support replied: '+thread.subject,message,ticketUrl});
+        return res.status(200).json({success:true,emailSent:!!mail?.ok,message:mail?.ok?'Reply saved and investor notified.':'Reply saved, but email notification failed: '+(mail?.error || 'unknown delivery error')});
+      } catch (mailError) {
+        console.error('[support admin reply] email failed:',mailError.message);
+        return res.status(200).json({success:true,emailSent:false,message:'Reply saved, but email notification failed. Check email delivery logs.'});
+      }
+    }
+
     // ── 2. MARKETING BLAST / AUTOPILOT CAMPAIGN DISPATCH ────────────
     if (action === 'marketing_blast') {
       const campaignType = body.campaign_type || 'no_deposit';
@@ -742,6 +836,8 @@ export default async function handler(req, res) {
 
       const resendApiKey = cleanString(process.env.RESEND_API_KEY || settings.resend_api_key);
       const fromEmail = cleanString(settings.resend_from_email || process.env.RESEND_FROM_EMAIL || 'no-reply@teslawealths.org');
+      const fromName = cleanString(settings.sender_name || process.env.TT_SENDER_NAME || 'Tesla Trade');
+      const replyTo = cleanString(settings.reply_to_email || process.env.TT_REPLY_TO_EMAIL || 'support@teslawealths.org');
       const defaultCode = invCodes.length > 0 ? invCodes[0].code : 'TT-2026-VIP';
 
       let targetList = [];
@@ -767,7 +863,8 @@ export default async function handler(req, res) {
       }
 
       if (targetList.length === 0) {
-        targetList.push({ email: 'investor@teslawealths.org', name: 'Verified Investor', code: defaultCode });
+        if (conn) { try { await conn.end(); } catch {} }
+        return res.status(200).json({ success: true, sent: 0, targetCount: 0, isSimulated: false, message: 'No eligible investors were found. No email was sent.' });
       }
 
       let sentCount = 0;
@@ -781,8 +878,9 @@ export default async function handler(req, res) {
           subject = customSubject || 'Important Announcement — Tesla Trade Inc';
           htmlBody = `
             <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;background:#0c0d10;color:#ffffff;border-radius:16px;border:1px solid #232730;padding:28px 24px;">
-              <h2 style="color:#ffffff;margin-top:0;">${subject}</h2>
-              <p style="color:#e2e8f0;font-size:14px;line-height:1.7;white-space:pre-wrap;">${customBody || 'Hello from Tesla Trade Inc administration.'}</p>
+              <div style="text-align:center;padding:22px 18px;background:linear-gradient(135deg,#1b2029,#090a0d);border-bottom:1px solid #303540;"><div style="display:inline-grid;place-items:center;width:42px;height:42px;line-height:42px;border-radius:12px;background:#e31937;color:#fff;font-size:23px;font-weight:900;">T</div><div style="margin-top:9px;font-size:18px;font-weight:850;letter-spacing:2px;color:#fff;">TESLA TRADE</div><div style="margin-top:4px;color:#9299a6;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;">Investor communications</div></div>
+              <h2 style="color:#ffffff;margin-top:24px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:-.4px;">${escapeHtml(subject)}</h2>
+              <p style="color:#e2e8f0;font-size:14px;line-height:1.8;white-space:pre-wrap;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${escapeHtml(customBody || 'Hello from Tesla Trade administration.')}</p>
               <div style="margin-top:24px;text-align:center;">
                 <a href="https://teslawealths.org/overview" style="display:inline-block;background:#e31937;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">Open Dashboard →</a>
               </div>
@@ -790,15 +888,15 @@ export default async function handler(req, res) {
           `;
         }
 
-        const resendRes = await sendMarketingViaResend(resendApiKey, fromEmail, target.email, target.name, subject, htmlBody);
+        const resendRes = await sendMarketingViaResend(resendApiKey, fromEmail, target.email, target.name, subject, htmlBody, fromName, replyTo);
 
         const newLog = {
           id: Date.now() + Math.floor(Math.random() * 1000),
           user_email: target.email,
           campaign_type: campaignType,
           subject,
-          status: resendRes.simulated ? 'sent (sandbox)' : 'delivered',
-          resend_id: resendRes.id || 'sim',
+          status: resendRes.ok ? 'accepted' : 'failed',
+          resend_id: resendRes.id || '',
           created_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
         };
 
@@ -813,7 +911,7 @@ export default async function handler(req, res) {
           mockStore.marketingLogs.unshift(newLog);
         }
 
-        sentCount++;
+        if (resendRes.ok) sentCount++;
       }
 
       if (isDbConnected && conn) {
@@ -830,9 +928,10 @@ export default async function handler(req, res) {
         campaign: campaignType,
         sent: sentCount,
         targetCount: targetList.length,
-        isSimulated: !resendApiKey,
+        isSimulated: false,
         logs: mockStore.marketingLogs,
-        message: `Successfully dispatched "${template.name}" to ${sentCount} investor(s)!`
+        failed: targetList.length - sentCount,
+        message: `Email provider accepted ${sentCount} of ${targetList.length} message(s) for "${template.name}". Failed: ${targetList.length - sentCount}.`
       });
     }
 
@@ -1482,15 +1581,20 @@ export default async function handler(req, res) {
     if (action === 'approve_kyc' || action === 'reject_kyc') {
       const id = body.id;
       const status = action === 'approve_kyc' ? 'approved' : 'rejected';
+      let kycEmail = '', kycName = 'Investor';
       if (isDbConnected && conn) {
         try {
+          const [kycRows] = await conn.query('SELECT user_email,full_name FROM kyc_submissions WHERE id=? LIMIT 1',[id]);
+          kycEmail = String(kycRows[0]?.user_email || '').toLowerCase();
+          kycName = kycRows[0]?.full_name || 'Investor';
           await conn.query('UPDATE kyc_submissions SET status=? WHERE id=?', [status, id]);
           await conn.end();
-        } catch (e) {}
+        } catch (e) { try { await conn.end(); } catch {} return res.status(500).json({success:false,error:'KYC status could not be saved.'}); }
       } else {
         const k = mockStore.kyc.find(i => String(i.id) === String(id));
-        if (k) k.status = status;
+        if (k) { k.status = status; kycEmail = k.user_email || ''; kycName = k.full_name || 'Investor'; }
       }
+      if (kycEmail) { try { const { sendEventEmail } = await import('../notifications.js'); await sendEventEmail({to:kycEmail,name:kycName,event:'Identity verification',subject:status==='approved'?'Your identity verification is approved':'Action needed for identity verification',message:status==='approved'?'Your identity verification has been approved. You can review your verification status and continue using your investor account.':'Your identity verification was not approved. Please sign in, review the KYC section for the latest status, and contact support if you need help.',ctaLabel:'View Verification Status',ctaPath:'/kyc'}); } catch (mailError) { console.error('[admin KYC email] failed:',mailError.message); } }
       return res.status(200).json({ success: true, message: `KYC updated to ${status}.` });
     }
 
@@ -1529,17 +1633,18 @@ export default async function handler(req, res) {
     // ── 10. SETTINGS SAVE ──────────────────────────────────────────
     if (action === 'save_settings') {
       const s = body.settings || {};
-      if (isDbConnected && conn) {
-        try {
-          for (const [k, v] of Object.entries(s)) {
-            await conn.query('INSERT INTO app_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=?', [k, String(v), String(v)]);
-          }
-          await conn.end();
-        } catch (e) {}
-      } else {
-        Object.assign(mockStore.settings, s);
+      if (!isDbConnected || !conn) return res.status(503).json({success:false,error:'Settings require the live database. Nothing was saved.'});
+      try {
+        for (const [k, v] of Object.entries(s)) {
+          await conn.query('INSERT INTO app_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=?', [k, String(v), String(v)]);
+        }
+        await conn.end();
+        return res.status(200).json({ success: true, message: 'Settings saved successfully to the live database.' });
+      } catch (error) {
+        try { await conn.end(); } catch {}
+        console.error('[admin save settings] failed:',error.message);
+        return res.status(500).json({success:false,error:'Settings could not be saved to the live database: '+error.message});
       }
-      return res.status(200).json({ success: true, message: 'Settings saved successfully.' });
     }
 
     // ── 11. DELETE INVESTOR ─────────────────────────────────────────

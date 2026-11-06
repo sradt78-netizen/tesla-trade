@@ -9,6 +9,7 @@ import authHandler from './_handlers/auth.js';
 import supabaseConfigHandler from './_handlers/supabase-config.js';
 import accountsHandler from './_handlers/accounts.js';
 import stocksHandler from './_handlers/stocks.js';
+import supportHandler from './_handlers/support.js';
 import {
   handleTradingState,
   handleTradingStart,
@@ -71,6 +72,11 @@ export default async function handler(req, res) {
   // 5. Authentication (Login, Set-Password, Supabase Social-Session)
   if (normalizedPath.startsWith('/auth/')) {
     return await authHandler(req, res);
+  }
+
+  // Investor support tickets (public ticket links use high-entropy access tokens).
+  if (normalizedPath === '/support') {
+    return await supportHandler(req, res);
   }
 
   // 6. Investor accounts, profile, status & transactions
