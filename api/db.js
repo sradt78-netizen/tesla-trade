@@ -941,6 +941,8 @@ export async function ensureTradingColumns(cfg) {
   for (const c of cols) {
     try { await conn.query('ALTER TABLE investments ADD COLUMN ' + c); } catch (e) {}
   }
+  // Receipts are submitted as data URLs; VARCHAR(500) cannot hold even small image uploads.
+  await conn.query('ALTER TABLE investments MODIFY COLUMN payment_proof_path LONGTEXT NULL');
   await conn.end();
 }
 
