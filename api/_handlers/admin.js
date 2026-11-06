@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { getDbConnection } from './dbcheck.js';
 import { ensureSupportTables } from './support.js';
+import { ensureSupportTables } from './support.js';
 import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
 
 const INVESTORS_FILE = path.join(process.cwd(), 'data', 'saved_investors.json');
@@ -755,6 +756,50 @@ export default async function handler(req, res) {
       } catch (mailError) {
         console.error('[support admin reply] email failed:',mailError.message);
         return res.status(200).json({success:true,emailSent:false,message:'Reply saved, but email notification failed. Check the email delivery log.'});
+      }
+    }
+
+    if (['support_list','support_thread','support_reply','support_close'].includes(action)) {
+      if (!isDbConnected || !conn) return res.status(503).json({success:false,error:'Support inbox requires the live database.'});
+      await ensureSupportTables(conn);
+      if (action === 'support_list') {
+        const [threads] = await conn.query("SELECT t.id,t.user_email,t.user_name,t.subject,t.status,t.created_at,t.updated_at,(SELECT COUNT(*) FROM support_messages m WHERE m.thread_id=t.id) AS message_count,(SELECT m.message FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,(SELECT m.sender_role FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender FROM support_threads t ORDER BY t.updated_at DESC LIMIT 200");
+        try { await conn.end(); } catch {}
+        return res.status(200).json({success:true,threads});
+      }
+      const threadId = cleanString(body.threadId || body.id);
+      if (!threadId) { try { await conn.end(); } catch {} return res.status(400).json({success:false,error:'Support ticket ID is required.'}); }
+      const [threadRows] = await conn.query('SELECT id,user_email,user_name,subject,status,created_at,updated_at FROM support_threads WHERE id=? LIMIT 1',[threadId]);
+      const thread = threadRows[0];
+      if (!thread) { try { await conn.end(); } catch {} return res.status(404).json({success:false,error:'Support ticket not found.'}); }
+      if (action === 'support_thread') {
+        const [messages] = await conn.query('SELECT sender_role,sender_name,message,created_at FROM support_messages WHERE thread_id=? ORDER BY created_at ASC',[threadId]);
+        try { await conn.end(); } catch {}
+        return res.status(200).json({success:true,thread,messages});
+      }
+      if (action === 'support_close') {
+        await conn.query("UPDATE support_threads SET status='closed',updated_at=NOW() WHERE id=?",[threadId]);
+        try { await conn.end(); } catch {}
+        return res.status(200).json({success:true,message:'Support conversation closed.'});
+      }
+      const message = String(body.message || '').trim().slice(0,5000);
+      if (message.length < 2) { try { await conn.end(); } catch {} return res.status(400).json({success:false,error:'Write a reply before sending.'}); }
+      const accessToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
+      await conn.beginTransaction();
+      await conn.query('INSERT INTO support_messages (id,thread_id,sender_role,sender_name,message) VALUES (?,?,?,?,?)',['msg_'+crypto.randomUUID(),threadId,'admin','Tesla Trade Support',message]);
+      await conn.query('INSERT INTO support_thread_tokens (id,thread_id,token_hash) VALUES (?,?,?)',[crypto.randomUUID(),threadId,tokenHash]);
+      await conn.query("UPDATE support_threads SET status='answered',updated_at=NOW() WHERE id=?",[threadId]);
+      await conn.commit();
+      try { await conn.end(); } catch {}
+      const ticketUrl = 'https://teslawealths.org/support?ticket='+encodeURIComponent(threadId)+'&token='+encodeURIComponent(accessToken);
+      try {
+        const { sendSupportMessageEmail } = await import('../notifications.js');
+        const mail = await sendSupportMessageEmail({to:thread.user_email,userName:thread.user_name,subject:'Support replied: '+thread.subject,message,ticketUrl});
+        return res.status(200).json({success:true,emailSent:!!mail?.ok,message:mail?.ok?'Reply saved and investor notified.':'Reply saved, but email notification failed: '+(mail?.error || 'unknown delivery error')});
+      } catch (mailError) {
+        console.error('[support admin reply] email failed:',mailError.message);
+        return res.status(200).json({success:true,emailSent:false,message:'Reply saved, but email notification failed. Check email delivery logs.'});
       }
     }
 
