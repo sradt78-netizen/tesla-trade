@@ -392,15 +392,14 @@ export default async function handler(req, res) {
         );
       } catch (e) {}
 
-      // Record in account_transactions
+      // The transaction ledger is required: do not report a saved receipt if its
+      // pending deposit cannot also be recorded for admin review and history.
       failedStep = 'transaction_ledger_insert';
-      try {
-        const txRecordId = 'act_' + Math.random().toString(36).substring(2, 9);
-        await conn.query(
-          'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, method, status, reference_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
-          [txRecordId, investmentId, email, 'deposit', amount, method, 'pending', ref || txId, `Investment deposit (${planName}) pending approval`]
-        );
-      } catch (e) {}
+      const txRecordId = 'act_' + Math.random().toString(36).substring(2, 9);
+      await conn.query(
+        'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, method, status, reference_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+        [txRecordId, investmentId, email, 'deposit', amount, method, 'pending', ref || txId, `Investment deposit (${planName}) pending approval`]
+      );
 
       await conn.end();
       dbSaved = true;
