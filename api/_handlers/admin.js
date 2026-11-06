@@ -354,14 +354,7 @@ const MARKETING_TEMPLATES = {
 async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subject, htmlBody) {
   const sender = fromEmail || 'no-reply@teslawealths.org';
 
-  if (!apiKey) {
-    return {
-      ok: true,
-      simulated: true,
-      id: 'sim_' + Math.random().toString(36).substring(2, 10),
-      note: 'Simulated dispatch (Set RESEND_API_KEY in environment or admin settings for live SMTP delivery)'
-    };
-  }
+  if (!apiKey) return { ok: false, simulated: false, error: 'Resend API key is not configured. No email was sent.' };
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -382,12 +375,11 @@ async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subjec
     if (res.ok && data.id) {
       return { ok: true, simulated: false, id: data.id };
     }
-    return { ok: true, simulated: true, id: 'sim_resend_' + Date.now(), error: data.message };
+    return { ok: false, simulated: false, error: data.message || ('Resend HTTP ' + res.status) };
   } catch (err) {
     return {
-      ok: true,
-      simulated: true,
-      id: 'sim_fallback_' + Date.now(),
+      ok: false,
+      simulated: false,
       error: err.message
     };
   }
@@ -856,7 +848,8 @@ export default async function handler(req, res) {
       }
 
       if (targetList.length === 0) {
-        targetList.push({ email: 'investor@teslawealths.org', name: 'Verified Investor', code: defaultCode });
+        if (conn) { try { await conn.end(); } catch {} }
+        return res.status(200).json({ success: true, sent: 0, targetCount: 0, isSimulated: false, message: 'No eligible investors were found. No email was sent.' });
       }
 
       let sentCount = 0;
@@ -886,8 +879,8 @@ export default async function handler(req, res) {
           user_email: target.email,
           campaign_type: campaignType,
           subject,
-          status: resendRes.simulated ? 'sent (sandbox)' : 'delivered',
-          resend_id: resendRes.id || 'sim',
+          status: resendRes.ok ? 'accepted' : 'failed',
+          resend_id: resendRes.id || '',
           created_at: new Date().toISOString().replace('T', ' ').substring(0, 19)
         };
 
@@ -902,7 +895,7 @@ export default async function handler(req, res) {
           mockStore.marketingLogs.unshift(newLog);
         }
 
-        sentCount++;
+        if (resendRes.ok) sentCount++;
       }
 
       if (isDbConnected && conn) {
@@ -919,9 +912,10 @@ export default async function handler(req, res) {
         campaign: campaignType,
         sent: sentCount,
         targetCount: targetList.length,
-        isSimulated: !resendApiKey,
+        isSimulated: false,
         logs: mockStore.marketingLogs,
-        message: `Successfully dispatched "${template.name}" to ${sentCount} investor(s)!`
+        failed: targetList.length - sentCount,
+        message: `Email provider accepted ${sentCount} of ${targetList.length} message(s) for "${template.name}". Failed: ${targetList.length - sentCount}.`
       });
     }
 
