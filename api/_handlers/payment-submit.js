@@ -322,7 +322,11 @@ export default async function handler(req, res) {
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         `);
       } catch (e) {}
-      try { const { ensureTradingColumns } = await import('../db.js'); if (!globalThis.__ttCols) { globalThis.__ttCols = true; await ensureTradingColumns(); } } catch (e) {}
+      const { ensureTradingColumns } = await import('../db.js');
+      if (!globalThis.__ttCols) {
+        await ensureTradingColumns();
+        globalThis.__ttCols = true;
+      }
 
       // Check existing investments for this user
       const [existing] = await conn.query(
@@ -385,8 +389,8 @@ export default async function handler(req, res) {
       try {
         const txRecordId = 'act_' + Math.random().toString(36).substring(2, 9);
         await conn.query(
-          'INSERT INTO account_transactions (user_email, transaction_type, amount, status, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-          [email, 'deposit', amount, 'pending', `Investment deposit (${planName}) pending approval`]
+          'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, method, status, reference_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+          [txRecordId, investmentId, email, 'deposit', amount, method, 'pending', ref || null, `Investment deposit (${planName}) pending approval`]
         );
       } catch (e) {}
 
