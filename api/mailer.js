@@ -30,11 +30,8 @@ export async function getMailerConfig() {
     }
   } catch (e) {}
 
-  if (!fromEmail) {
-    fromEmail = 'onboarding@resend.dev';
-  }
-
-  return { apiKey, fromEmail, adminEmail };
+  // Require a verified sender configured by the site owner; never silently use a test sender.
+return { apiKey, fromEmail, adminEmail };
 }
 
 /**
@@ -56,16 +53,16 @@ export async function sendEmail({ to, name, subject, html, replyTo, category = '
     return { ok: false, error: 'Invalid recipient email' };
   }
 
-  if (!apiKey) {
-    console.warn(`[Mailer] No RESEND_API_KEY configured. Email to ${to} ("${subject}") recorded in log.`);
+  if (!apiKey || !fromEmail) {
+    const error = !apiKey ? 'RESEND_API_KEY is not configured' : 'RESEND_FROM_EMAIL is not configured';
     await logUserAction({
       user_email: to,
-      action_type: 'email.simulated',
-      description: `Email recorded (Sandbox Simulator): "${subject}" to ${to}`,
-      status: 'warning',
-      details: { subject, recipient: to, category, reason: 'RESEND_API_KEY not configured' }
+      action_type: 'email.failed',
+      description: `Email not sent to ${to}: ${error}`,
+      status: 'error',
+      details: { subject, recipient: to, category, reason: error }
     });
-    return { ok: true, simulated: true, id: 'sim_' + Date.now().toString(36) };
+    return { ok: false, error };
   }
 
   async function postToResend(senderAddress) {
@@ -89,15 +86,6 @@ export async function sendEmail({ to, name, subject, html, replyTo, category = '
 
   try {
     let result = await postToResend(fromEmail);
-
-    // If custom domain is not verified, automatically retry with onboarding@resend.dev
-    if (!result.ok && fromEmail !== 'onboarding@resend.dev') {
-      const msg = (result.data?.message || '').toLowerCase();
-      if (result.status === 403 || msg.includes('domain') || msg.includes('verify') || msg.includes('from')) {
-        console.warn(`[Mailer] Custom sender <${fromEmail}> failed (${result.data?.message}). Retrying with onboarding@resend.dev`);
-        result = await postToResend('onboarding@resend.dev');
-      }
-    }
 
     if (result.ok && result.data?.id) {
       console.log(`[Mailer] Email sent successfully to ${to} (id: ${result.data.id}): "${subject}"`);
