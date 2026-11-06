@@ -1575,15 +1575,20 @@ export default async function handler(req, res) {
     if (action === 'approve_kyc' || action === 'reject_kyc') {
       const id = body.id;
       const status = action === 'approve_kyc' ? 'approved' : 'rejected';
+      let kycEmail = '', kycName = 'Investor';
       if (isDbConnected && conn) {
         try {
+          const [kycRows] = await conn.query('SELECT user_email,full_name FROM kyc_submissions WHERE id=? LIMIT 1',[id]);
+          kycEmail = String(kycRows[0]?.user_email || '').toLowerCase();
+          kycName = kycRows[0]?.full_name || 'Investor';
           await conn.query('UPDATE kyc_submissions SET status=? WHERE id=?', [status, id]);
           await conn.end();
-        } catch (e) {}
+        } catch (e) { try { await conn.end(); } catch {} return res.status(500).json({success:false,error:'KYC status could not be saved.'}); }
       } else {
         const k = mockStore.kyc.find(i => String(i.id) === String(id));
-        if (k) k.status = status;
+        if (k) { k.status = status; kycEmail = k.user_email || ''; kycName = k.full_name || 'Investor'; }
       }
+      if (kycEmail) { try { const { sendEventEmail } = await import('../notifications.js'); await sendEventEmail({to:kycEmail,name:kycName,event:'Identity verification',subject:status==='approved'?'Your identity verification is approved':'Action needed for identity verification',message:status==='approved'?'Your identity verification has been approved. You can review your verification status and continue using your investor account.':'Your identity verification was not approved. Please sign in, review the KYC section for the latest status, and contact support if you need help.',ctaLabel:'View Verification Status',ctaPath:'/kyc'}); } catch (mailError) { console.error('[admin KYC email] failed:',mailError.message); } }
       return res.status(200).json({ success: true, message: `KYC updated to ${status}.` });
     }
 
