@@ -292,9 +292,10 @@ export default async function handler(req, res) {
     const portfolio = (userName || 'Tesla') + ' · ' + planName;
     let dbSaved = false;
     let failedStep = 'database_connection';
+    let conn = null;
 
     try {
-      const conn = await getDbConnection();
+      conn = await getDbConnection();
 
       // Ensure table exists with complete schema matching original DB
       failedStep = 'schema_migration';
