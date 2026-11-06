@@ -143,7 +143,7 @@ async function saveInv(inv, fields, ledgerEntry, email) {
     if (!result || !result.affectedRows) { const error = new Error('The approved investment could not be updated. Refresh and retry.'); error.statusCode = 409; throw error; }
     if (ledgerEntry) {
       if (!email) { const error = new Error('Investor email is required to record this trade movement.'); error.statusCode = 400; throw error; }
-      const txId = 'tx_trade_' + ledgerEntry.type + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+      const txId = 'tt_' + (ledgerEntry.type === 'trade_debit' ? 'd' : 'c') + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
       await conn.query(
         "INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, reference_id, note, created_at) VALUES (?, ?, ?, ?, ?, 'processed', ?, ?, NOW())",
         [txId, inv.id, email, ledgerEntry.type, Number(Number(ledgerEntry.amount || 0).toFixed(2)), txId, ledgerEntry.note]
