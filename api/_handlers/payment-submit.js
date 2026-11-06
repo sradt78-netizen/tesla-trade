@@ -109,9 +109,6 @@ function parseBody(req) {
   });
 }
 
-// In-memory fallback deposits when database is offline or in test environments
-export const inMemoryDeposits = [];
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
