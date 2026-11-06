@@ -239,6 +239,9 @@
       box-shadow: 0 10px 30px rgba(0,0,0,0.5);
       z-index: 200;
     }
+    .support-layout { grid-template-columns: minmax(0,.8fr) minmax(0,1.4fr); }
+    @media (max-width: 760px) { .support-layout { grid-template-columns: 1fr !important; } }
+
     /* Mobile Topbar & Drawer */
     .mobile-topbar {
       display: none;
@@ -768,7 +771,7 @@
       </div>
     </section>
 
-<section id="tab-support" style="display:none;"><div class="card"><h2>Investor Support Inbox</h2><p style="color:var(--muted);font-size:13px;">Read investor messages and reply from the admin dashboard.</p><button type="button" onclick="loadSupportInbox()">Refresh inbox</button></div><div style="display:grid;grid-template-columns:minmax(250px,.8fr) minmax(300px,1.4fr);gap:14px;margin-top:14px;"><div class="card"><div id="supportThreadList">Loading conversations…</div></div><div class="card"><div id="supportThreadHeader">Select a conversation</div><div id="supportMessageList" style="display:grid;gap:10px;margin:16px 0;"></div><div id="supportReplyBox" style="display:none;"><textarea id="supportReplyText" rows="5" maxlength="5000" placeholder="Write a reply…" style="width:100%;background:#090a0d;border:1px solid #333;border-radius:9px;padding:12px;color:#fff;"></textarea><button type="button" class="primary" onclick="sendSupportReply()">Send reply & email investor</button><button type="button" onclick="closeSupportThread()">Close conversation</button></div></div></div></section>
+<section id="tab-support" style="display:none;"><div class="card"><h2>Investor Support Inbox</h2><p style="color:var(--muted);font-size:13px;">Read investor messages and reply from the admin dashboard.</p><button type="button" onclick="loadSupportInbox()">Refresh inbox</button></div><div class="support-layout" style="display:grid;grid-template-columns:minmax(250px,.8fr) minmax(300px,1.4fr);gap:14px;margin-top:14px;"><div class="card"><div id="supportThreadList">Loading conversations…</div></div><div class="card"><div id="supportThreadHeader">Select a conversation</div><div id="supportMessageList" style="display:grid;gap:10px;margin:16px 0;"></div><div id="supportReplyBox" style="display:none;"><textarea id="supportReplyText" rows="5" maxlength="5000" placeholder="Write a reply…" style="width:100%;background:#090a0d;border:1px solid #333;border-radius:9px;padding:12px;color:#fff;"></textarea><button type="button" class="primary" onclick="sendSupportReply()">Send reply & email investor</button><button type="button" onclick="closeSupportThread()">Close conversation</button></div></div></div></section>
 
     <!-- TAB 8: MARKETING & EMAIL CAMPAIGNS (AUTOPILOT ENGINE) -->
     <section id="tab-marketing" style="display: none;">
