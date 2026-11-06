@@ -1,65 +1,8 @@
 import { getDbConnection } from './dbcheck.js';
-import fs from 'fs';
-import path from 'path';
 
 function cleanString(val) {
   if (!val) return '';
   return String(val).trim().replace(/^["']|["']$/g, '');
-}
-
-function getSavedDepositsFilePath() {
-  const p = path.resolve(process.cwd(), 'data', 'saved_deposits.json');
-  try {
-    const dir = path.dirname(p);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  } catch (e) {}
-  return p;
-}
-
-export function loadPersistentDeposits() {
-  const list = [];
-  // 1. Try local data file
-  try {
-    const p = getSavedDepositsFilePath();
-    if (fs.existsSync(p)) {
-      const content = fs.readFileSync(p, 'utf8');
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) list.push(...parsed);
-    }
-  } catch (e) {}
-  // 2. Try /tmp file
-  try {
-    const tmpPath = '/tmp/tesla_saved_deposits.json';
-    if (fs.existsSync(tmpPath)) {
-      const content = fs.readFileSync(tmpPath, 'utf8');
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) {
-        for (const item of parsed) {
-          if (!list.some(x => String(x.id) === String(item.id))) list.push(item);
-        }
-      }
-    }
-  } catch (e) {}
-  return list;
-}
-
-export function savePersistentDeposit(deposit) {
-  try {
-    const current = loadPersistentDeposits();
-    const idx = current.findIndex(x => String(x.id) === String(deposit.id) || (x.user_email && deposit.user_email && x.user_email.toLowerCase() === deposit.user_email.toLowerCase()));
-    if (idx >= 0) {
-      current[idx] = { ...current[idx], ...deposit };
-    } else {
-      current.unshift(deposit);
-    }
-    const json = JSON.stringify(current, null, 2);
-    try {
-      fs.writeFileSync(getSavedDepositsFilePath(), json, 'utf8');
-    } catch (e) {}
-    try {
-      fs.writeFileSync('/tmp/tesla_saved_deposits.json', json, 'utf8');
-    } catch (e) {}
-  } catch (e) {}
 }
 
 function parseMultipart(buffer, boundary) {
@@ -313,7 +256,10 @@ export default async function handler(req, res) {
 
     const email = cleanString(fields.email || fields.userEmail || fields.userId || fields.user_email).toLowerCase();
     const amount = parseFloat(fields.amount || fields.total || '0');
-    const method = fields.method || fields.paymentMethod || fields.payment_method || 'crypto';
+    const rawMethod = String(fields.method || fields.paymentMethod || fields.payment_method || 'crypto').trim().toLowerCase().replace(/[ -]+/g, '_');
+    const methodAliases = { crypto: 'crypto', usdt: 'usdt', usdt_trc20: 'usdt', eth: 'eth', ethereum: 'eth', btc: 'btc', bitcoin: 'btc', bank: 'bank', bank_transfer: 'bank' };
+    const method = methodAliases[rawMethod];
+    if (!method) return res.status(400).json({ success: false, error: 'Only cryptocurrency or bank transfer payments are accepted.' });
     const ref = fields.paymentReference || fields.reference || fields.tx_id || '';
     const planId = fields.planId || fields.plan_id || 'standard';
     const planName = fields.planName || fields.plan_name || fields.portfolio || 'Explorer';
@@ -442,7 +388,7 @@ export default async function handler(req, res) {
       await conn.end();
       dbSaved = true;
     } catch (dbErr) {
-      console.warn('DB payment submit notice (persisting to disk & memory):', dbErr.message);
+      console.error('DB payment submit failed:', dbErr.message);
     }
 
     if (!dbSaved) {
@@ -472,39 +418,21 @@ export default async function handler(req, res) {
       created_at: new Date().toISOString()
     };
 
-    // 1. Save to persistent file storage (guaranteed persistence across restarts and serverless container shifts)
-    savePersistentDeposit(depositRecord);
-
-    // 2. Save in memory fallback
-    inMemoryDeposits.unshift(depositRecord);
-
-    // 3. Sync to mockStore and persistent investors for immediate admin reactivity
+    // MySQL is the sole source of truth. Never acknowledge a deposit from local or in-memory state.
     try {
-      const { mockStore, savePersistentInvestor } = await import('./admin.js');
-      if (typeof savePersistentInvestor === 'function') {
-        savePersistentInvestor({
-          email,
-          name: userName,
-          onboarding_status: 'pending_deposit'
-        });
+      const [{ notifyPaymentSubmission }] = await Promise.all([import('../telegram.js')]);
+      const { sendPaymentReceivedEmail } = await import('../mailer.js');
+      const alerts = await Promise.allSettled([
+        notifyPaymentSubmission(depositRecord),
+        sendPaymentReceivedEmail(email, userName, { amount, planName, method, reference: ref })
+      ]);
+      for (const result of alerts) {
+        if (result.status === 'rejected') console.error('[payment-submit] notification failed:', result.reason?.message || result.reason);
+        else if (result.value && result.value.ok === false) console.error('[payment-submit] notification not delivered:', result.value.error);
       }
-      if (mockStore && Array.isArray(mockStore.investments)) {
-        mockStore.investments.unshift(depositRecord);
-      }
-      if (mockStore && Array.isArray(mockStore.investors)) {
-        const existingInv = mockStore.investors.find(u => (u.email || '').toLowerCase() === email);
-        if (existingInv) {
-          existingInv.onboarding_status = 'pending_deposit';
-        } else {
-          mockStore.investors.unshift({
-            email,
-            name: userName,
-            onboarding_status: 'pending_deposit',
-            registered_at: new Date().toISOString()
-          });
-        }
-      }
-    } catch (e) {}
+    } catch (notifyError) {
+      console.error('[payment-submit] notification dispatch failed:', notifyError.message);
+    }
 
     return res.status(200).json({
       success: true,
