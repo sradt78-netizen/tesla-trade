@@ -1371,7 +1371,7 @@ export default async function handler(req, res) {
           [result] = await conn.query(
             `UPDATE investments 
              SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW() 
-             WHERE id=? OR id=? OR id=? OR (? = "" AND LOWER(user_email)=? AND id=? AND (status="pending_approval" OR status="pending"))`,
+             WHERE id=? OR id=? OR id=? OR (? = '' AND LOWER(user_email)=? AND id=? AND (status='pending_approval' OR status='pending'))`,
             [status, approvedDepositAmount, status === 'active' ? totalBalanceWithBonus : approvedDepositAmount, 0, rawId, cleanId, depId, rawId, effectiveEmail, effectiveId]
           );
 
