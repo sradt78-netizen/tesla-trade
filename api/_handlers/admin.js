@@ -709,6 +709,16 @@ export default async function handler(req, res) {
     }
 
     // ── SUPPORT INBOX: THREADS, REPLIES, AND CLOSE ─────────────────
+    if (action === 'send_test_email') {
+      const recipient = cleanString(body.email || body.to || '');
+      if (!recipient.includes('@')) return res.status(400).json({success:false,error:'Enter a valid test recipient email.'});
+      try {
+        const { sendTestEmail } = await import('../mailer.js');
+        const result = await sendTestEmail(recipient);
+        if (!result.ok) return res.status(502).json({success:false,error:result.error || 'Email provider rejected the test message.'});
+        return res.status(200).json({success:true,message:'Test email accepted by Resend.',resendId:result.id});
+      } catch (error) { return res.status(502).json({success:false,error:error.message || 'Test email failed.'}); }
+    }
     if (['support_list','support_thread','support_reply','support_close'].includes(action)) {
       if (!isDbConnected || !conn) return res.status(503).json({ success:false, error:'Support inbox requires the live database.' });
       await ensureSupportTables(conn);
