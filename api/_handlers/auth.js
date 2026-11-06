@@ -272,8 +272,8 @@ export default async function handler(req, res) {
       // investor_accounts schemas can also accept a new social identity.
       failedStep = 'investor_account_write';
       await conn.query(
-        'INSERT INTO investor_accounts (email, name, onboarding_status) VALUES (?, ?, "pending_approval") ON DUPLICATE KEY UPDATE email=VALUES(email)',
-        [email, name]
+        'INSERT INTO investor_accounts (email, name, onboarding_status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE email=VALUES(email)',
+        [email, name, 'pending_approval']
       );
 
       // Read only after the upsert so returning users and first-time users both
