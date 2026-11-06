@@ -1331,6 +1331,25 @@
       }
     }
 
+    var activeSupportThread = '';
+    function supportEsc(v){return String(v==null?'':v).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];});}
+    function loadSupportInbox(){
+      adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'support_list'})}).then(function(r){return r.json();}).then(function(d){
+        if(!d.success)throw new Error(d.error||'Could not load support inbox');
+        var threads=d.threads||[],list=document.getElementById('supportThreadList');
+        document.getElementById('b-support').textContent=threads.filter(function(t){return t.status==='open';}).length;
+        if(!threads.length){list.innerHTML='<p style=\"color:var(--muted);font-size:12px;\">No investor messages yet.</p>';return;}
+        list.innerHTML=threads.map(function(t){return '<button type=\"button\" data-support-id=\"'+supportEsc(t.id)+'\" onclick=\"openSupportThread(this.dataset.supportId)\" style=\"display:block;width:100%;text-align:left;padding:12px;margin-bottom:8px;background:#0c0e13;border:1px solid var(--card-border);border-radius:9px;\"><strong style=\"font-size:12px;\">'+supportEsc(t.user_name)+'</strong><span class=\"badge\" style=\"float:right;\">'+supportEsc(t.status)+'</span><div style=\"font-size:11px;color:#aab2bf;margin-top:5px;\">'+supportEsc(t.subject)+'</div><div style=\"font-size:10px;color:#707987;margin-top:5px;\">'+supportEsc(t.user_email)+' · '+Number(t.message_count||0)+' messages</div><div style=\"font-size:11px;color:#8993a2;margin-top:6px;\">'+supportEsc(t.last_message||'')+'</div></button>';}).join('');
+      }).catch(function(e){document.getElementById('supportThreadList').textContent=e.message;});
+    }
+    function openSupportThread(id){activeSupportThread=id;adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'support_thread',threadId:id})}).then(function(r){return r.json();}).then(function(d){
+      if(!d.success)throw new Error(d.error||'Could not open conversation');var t=d.thread;
+      document.getElementById('supportThreadHeader').innerHTML='<h3 style=\"font-size:16px;\">'+supportEsc(t.subject)+'</h3><p style=\"font-size:12px;color:var(--muted);\">'+supportEsc(t.user_name)+' · '+supportEsc(t.user_email)+' · '+supportEsc(t.status)+'</p>';
+      document.getElementById('supportMessageList').innerHTML=(d.messages||[]).map(function(m){return '<div style=\"padding:12px;border:1px solid '+(m.sender_role==='admin'?'#e3193755':'var(--card-border)')+';border-radius:9px;background:'+(m.sender_role==='admin'?'#1a1015':'#0c0e13')+';\"><strong style=\"font-size:12px;\">'+supportEsc(m.sender_name)+'</strong><small style=\"float:right;color:#7b8492;\">'+supportEsc(m.created_at)+'</small><p style=\"font-size:13px;white-space:pre-wrap;line-height:1.6;color:#cbd5e1;\">'+supportEsc(m.message)+'</p></div>';}).join('');
+      document.getElementById('supportReplyBox').style.display=t.status==='closed'?'none':'block';loadSupportInbox();
+    }).catch(function(e){showToast(e.message);});}
+    function sendSupportReply(){var box=document.getElementById('supportReplyText'),message=(box.value||'').trim();if(!activeSupportThread||message.length<2){showToast('Write a reply first.');return;}adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'support_reply',threadId:activeSupportThread,message:message})}).then(function(r){return r.json();}).then(function(d){if(!d.success)throw new Error(d.error||'Reply failed');box.value='';showToast(d.message||'Reply saved.');openSupportThread(activeSupportThread);}).catch(function(e){showToast(e.message);});}
+    function closeSupportThread(){if(!activeSupportThread||!confirm('Close this support conversation?'))return;adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'support_close',threadId:activeSupportThread})}).then(function(r){return r.json();}).then(function(d){showToast(d.message||'Conversation closed.');openSupportThread(activeSupportThread);});}
     function toggleGatePasswordVisibility() {
       var inp = document.getElementById('adminGatePassword');
       if (inp) {
