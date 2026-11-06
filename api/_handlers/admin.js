@@ -3,7 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { getDbConnection } from './dbcheck.js';
 import { ensureSupportTables } from './support.js';
-import { ensureSupportTables } from './support.js';
 import { inMemoryDeposits, loadPersistentDeposits, savePersistentDeposit } from './payment-submit.js';
 
 const INVESTORS_FILE = path.join(process.cwd(), 'data', 'saved_investors.json');
