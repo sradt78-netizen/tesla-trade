@@ -295,14 +295,19 @@ export async function ensureMysqlTables(conn) {
 
     await conn.query(`
       CREATE TABLE IF NOT EXISTS account_transactions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+        id VARCHAR(36) PRIMARY KEY,
+        investment_id VARCHAR(36) NOT NULL,
         user_email VARCHAR(255) NOT NULL,
-        transaction_type VARCHAR(50) NOT NULL,
-        amount DECIMAL(15, 2) NOT NULL,
-        status VARCHAR(50) DEFAULT 'processed',
-        description VARCHAR(255) DEFAULT '',
+        type VARCHAR(20) NOT NULL,
+        amount DECIMAL(15,2) NOT NULL,
+        method VARCHAR(100) NOT NULL DEFAULT '',
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        reference_id VARCHAR(255) DEFAULT NULL,
+        note VARCHAR(255) DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_user_tx (user_email)
+        INDEX idx_account_transactions_email (user_email),
+        INDEX idx_account_transactions_reference (reference_id),
+        INDEX idx_account_transactions_investment (investment_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
