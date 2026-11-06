@@ -121,7 +121,6 @@ export default async function handler(req, res) {
       const [accessRows] = await conn.query('SELECT id FROM support_thread_tokens WHERE thread_id=? AND token_hash=? LIMIT 1', [ticketId, hashToken(token)]);
       if (!thread || !accessRows.length) { await conn.end(); return res.status(404).json({ success: false, error: 'Support conversation not found. Check your private ticket link.' }); }
       const [messages] = await conn.query('SELECT sender_role,sender_name,message,created_at FROM support_messages WHERE thread_id=? ORDER BY created_at ASC', [ticketId]);
-      await conn.query('UPDATE support_threads SET status=IF(status="answered","open",status) WHERE id=? AND status="answered"', [ticketId]);
       await conn.end();
       return res.status(200).json({ success: true, thread: { id: thread.id, name: thread.user_name, subject: thread.subject, status: thread.status }, messages });
     }
@@ -139,7 +138,7 @@ export default async function handler(req, res) {
       await conn.commit();
       await conn.end();
       const { adminEmail } = await (await import('../mailer.js')).getMailerConfig();
-      const mail = await sendSupportMessageEmail({ to: adminEmail, userEmail: thread.user_email, userName: thread.user_name, subject: 'Investor replied: ' + thread.subject, message, ticketUrl: 'https://teslawealths.org/admin' });
+      const mail = await sendSupportMessageEmail({ to: adminEmail, toAdmin: true, userEmail: thread.user_email, userName: thread.user_name, subject: 'Investor replied: ' + thread.subject, message, ticketUrl: 'https://teslawealths.org/admin' });
       return res.status(200).json({ success: true, emailSent: !!mail?.ok });
     }
 
