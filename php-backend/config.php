@@ -87,16 +87,16 @@ define('DB_HOST', tt_config_env('TT_DB_HOST', tt_config_env('DB_HOST', 'mysql-16
 define('DB_PORT', tt_config_env('TT_DB_PORT', tt_config_env('DB_PORT', '28487')));
 define('DB_NAME', tt_config_env('TT_DB_NAME', tt_config_env('DB_NAME', 'defaultdb')));
 define('DB_USER', tt_config_env('TT_DB_USER', tt_config_env('DB_USER', 'avnadmin')));
-define('DB_PASS', tt_config_env('TT_DB_PASS', tt_config_env('DB_PASSWORD', tt_config_env('DB_PASS', 'AVNS_eN3hQrUWcOL7PRQXP_i'))));
+define('DB_PASS', tt_config_env('TT_DB_PASS', tt_config_env('DB_PASSWORD', tt_config_env('DB_PASS', ''))));
 
 // --- Admin --------------------------------------------------
-define('ADMIN_PASSWORD', tt_config_env('TT_ADMIN_PASSWORD', tt_config_env('ADMIN_PASSWORD', 'Heartofwisdom101@$')));
+define('ADMIN_PASSWORD', tt_config_env('TT_ADMIN_PASSWORD', tt_config_env('ADMIN_PASSWORD', '')));
 define('ADMIN_TOKEN',    tt_config_env('TT_ADMIN_TOKEN', ''));
 define(
     'ADMIN_PASSWORD_SHA256',
     tt_config_env(
         'TT_ADMIN_PASSWORD_SHA256',
-        tt_config_env('ADMIN_PASSWORD_SHA256', '8b635c4a34e9f68da00bf7143bea3afc19ed67c29968888e9b60a2325c7b5401')
+        tt_config_env('ADMIN_PASSWORD_SHA256', '')
     )
 );
 
@@ -156,10 +156,8 @@ function tt_require_same_origin(): void {
 define('ADMIN_EMAIL', tt_config_env('TT_ADMIN_EMAIL', 'admin@teslawealths.org'));
 
 // --- Invitation signup gate --------------------------------
-// Change this deployment-level value before sharing invitation links. The
-// default keeps the feature usable on a fresh cPanel upload; the value is
-// never exposed by the API.
-define('INVITATION_CODE', tt_config_env('TT_INVITATION_CODE', 'INVITATIONCODE'));
+// Set this deployment-level value before accepting invitations. No public default is used.
+define('INVITATION_CODE', tt_config_env('TT_INVITATION_CODE', ''));
 
 function tt_invitation_code_matches(string $candidate): bool {
     $expected = strtoupper(trim((string)INVITATION_CODE));
