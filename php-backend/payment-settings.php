@@ -29,28 +29,24 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 $defaults = [
     'usdt' => [
         'network' => 'TRC-20',
-        'address' => defined('WALLET_USDT') && WALLET_USDT
-            ? WALLET_USDT : 'SAMPLE-USDT-ADDRESS-UPDATE-IN-ADMIN',
+        'address' => defined('WALLET_USDT') ? WALLET_USDT : '',
         'label' => 'Tether (USDT)',
     ],
     'eth' => [
         'network' => 'ERC-20',
-        'address' => defined('WALLET_ETH') && WALLET_ETH
-            ? WALLET_ETH : 'SAMPLE-ETH-ADDRESS-UPDATE-IN-ADMIN',
+        'address' => defined('WALLET_ETH') ? WALLET_ETH : '',
         'label' => 'Ethereum (ETH)',
     ],
     'btc' => [
         'network' => 'Bitcoin',
-        'address' => defined('WALLET_BTC') && WALLET_BTC
-            ? WALLET_BTC : 'SAMPLE-BTC-ADDRESS-UPDATE-IN-ADMIN',
+        'address' => defined('WALLET_BTC') ? WALLET_BTC : '',
         'label' => 'Bitcoin (BTC)',
     ],
     'bank' => [
-        'name' => defined('BANK_NAME') && BANK_NAME
-            ? BANK_NAME : 'Sample Bank (Replace in Admin)',
-        'account' => defined('BANK_ACCOUNT') && BANK_ACCOUNT ? BANK_ACCOUNT : '0000000000',
-        'routing' => defined('BANK_ROUTING') && BANK_ROUTING ? BANK_ROUTING : '000000000',
-        'swift' => defined('BANK_SWIFT') && BANK_SWIFT ? BANK_SWIFT : 'SAMPLEXXX',
+        'name' => defined('BANK_NAME') ? BANK_NAME : '',
+        'account' => defined('BANK_ACCOUNT') ? BANK_ACCOUNT : '',
+        'routing' => defined('BANK_ROUTING') ? BANK_ROUTING : '',
+        'swift' => defined('BANK_SWIFT') ? BANK_SWIFT : '',
         'label' => 'Bank Transfer',
     ],
 ];
