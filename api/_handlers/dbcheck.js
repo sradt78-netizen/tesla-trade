@@ -37,12 +37,49 @@ export default async function handler(req, res) {
     has_telegram_token: present(['TELEGRAM_BOT_TOKEN', 'TT_TELEGRAM_BOT_TOKEN'])
   };
 
+  // Optional, read-only schema check for the social registration queries.
+  // Invoke with /api/dbcheck?check=auth; this checks table/column availability
+  // without creating test users or changing investor data.
+  let authentication_schema = null;
+  if (connected && url.searchParams.get('check') === 'auth') {
+    let conn = null;
+    try {
+      conn = await getDbConnection();
+      const inspectColumns = async (table) => {
+        const [rows] = await conn.query('SHOW COLUMNS FROM `' + table + '`');
+        return rows.map((row) => String(row.Field || '').toLowerCase()).filter(Boolean);
+      };
+      const accountColumns = await inspectColumns('investor_accounts');
+      const investmentColumns = await inspectColumns('investments');
+      const accountRequired = ['email', 'name', 'onboarding_status'];
+      const investmentRequired = ['user_email', 'status'];
+      const accountMissing = accountRequired.filter((column) => !accountColumns.includes(column));
+      const investmentMissing = investmentRequired.filter((column) => !investmentColumns.includes(column));
+      authentication_schema = {
+        ok: accountMissing.length === 0 && investmentMissing.length === 0,
+        investor_accounts: { present: true, missing_required_columns: accountMissing },
+        investments: { present: true, missing_required_columns: investmentMissing }
+      };
+    } catch (error) {
+      const code = String(error?.code || error?.errno || 'DB_ERROR')
+        .replace(/[^A-Z0-9_]/gi, '')
+        .slice(0, 40);
+      authentication_schema = { ok: false, error_code: code };
+      console.error('[dbcheck] authentication schema inspection failed:', code, error?.message || error);
+    } finally {
+      if (conn) {
+        try { await conn.end(); } catch (closeError) {}
+      }
+    }
+  }
+
   const connected = health?.available === true;
   const rawError = health?.error || null;
   const errorCode = rawError && typeof rawError === 'object' ? rawError.code || null : null;
 
   return res.status(200).json({
     status: connected ? 'ok' : 'degraded',
+    ...(authentication_schema ? { authentication_schema } : {}),
     database: {
       connected,
       tables_count: connected ? Number(health.tablesCount || 0) : null,
