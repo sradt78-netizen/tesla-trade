@@ -19,6 +19,8 @@
   function labelForType(type) {
     return ({
       deposit: 'Deposit',
+      trade_debit: 'Trade debit',
+      trade_credit: 'Trade credit',
       bonus: 'Deposit bonus',
       withdrawal: 'Withdrawal',
       return: 'Investment return',
@@ -68,17 +70,17 @@
     var totalWithdrawals = items.filter(function (item) { return item.type === 'withdrawal'; })
       .reduce(function (sum, item) { return sum + Number(item.amount || 0); }, 0);
     var totalCredits = items.filter(function (item) {
-      return item.type === 'deposit' || item.type === 'return' || item.type === 'profit' || item.type === 'bonus';
+      return item.type === 'deposit' || item.type === 'return' || item.type === 'profit' || item.type === 'bonus' || item.type === 'trade_credit' || item.type === 'credit';
     }).reduce(function (sum, item) { return sum + Number(item.amount || 0); }, 0);
     var totalDebits = items.filter(function (item) {
-      return item.type === 'withdrawal' || item.type === 'loss' || item.type === 'fee';
+      return item.type === 'withdrawal' || item.type === 'loss' || item.type === 'fee' || item.type === 'trade_debit' || item.type === 'debit';
     }).reduce(function (sum, item) { return sum + Number(item.amount || 0); }, 0);
     var pending = items.filter(function (item) { return statusLabel(item.status) === 'Pending'; }).length;
 
     var content = items.length
       ? items.map(function (item) {
           var type = String(item.type || '').toLowerCase();
-          var positive = type === 'deposit' || type === 'return' || type === 'profit' || type === 'bonus';
+          var positive = type === 'deposit' || type === 'return' || type === 'profit' || type === 'bonus' || type === 'trade_credit' || type === 'credit';
           return (
             '<div style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1.1fr 1fr;align-items:center;gap:12px;padding:15px 16px;border-bottom:1px solid #171717;">' +
               '<div style="display:flex;align-items:center;gap:9px;color:#fff;font-size:13px;min-width:0;">' +

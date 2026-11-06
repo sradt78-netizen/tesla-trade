@@ -127,10 +127,11 @@ export async function getOrCreateInvestment(id, email) {
     return rowToInv(rows[0]);
   } finally { try { await conn.end(); } catch (closeError) {} }
 }
-async function saveInv(inv, fields) {
+async function saveInv(inv, fields, ledgerEntry, email) {
   const conn = await realConn();
   if (!conn) { const error = new Error('Trading changes could not be saved because the investor database is unavailable.'); error.statusCode = 503; throw error; }
   try {
+    await conn.beginTransaction();
     const [result] = await conn.query(
       "UPDATE investments SET total_current_value=?, earnings=?, trading_status=?, trading_amount=?, trading_started_at=" +
       (fields.startedAt ? 'FROM_UNIXTIME(?)' : 'NULL') +
@@ -140,22 +141,19 @@ async function saveInv(inv, fields) {
         : [inv.totalCurrentValue, Math.max(0, inv.totalCurrentValue - inv.total), inv.tradingStatus, inv.tradingAmount, inv.id]
     );
     if (!result || !result.affectedRows) { const error = new Error('The approved investment could not be updated. Refresh and retry.'); error.statusCode = 409; throw error; }
+    if (ledgerEntry) {
+      if (!email) { const error = new Error('Investor email is required to record this trade movement.'); error.statusCode = 400; throw error; }
+      const txId = 'tx_trade_' + ledgerEntry.type + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+      await conn.query(
+        "INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, reference_id, note, created_at) VALUES (?, ?, ?, ?, ?, 'processed', ?, ?, NOW())",
+        [txId, inv.id, email, ledgerEntry.type, Number(Number(ledgerEntry.amount || 0).toFixed(2)), txId, ledgerEntry.note]
+      );
+    }
+    await conn.commit();
     tradingInvestments[inv.id] = inv;
-  } finally { try { await conn.end(); } catch (closeError) {} }
-}
-async function recordTradeSettlement(inv, email, pnl) {
-  if (!email) return;
-  const amount = Number(Math.abs(Number(pnl || 0)).toFixed(2));
-  const type = Number(pnl || 0) < 0 ? 'loss' : 'profit';
-  const txId = 'tx_trade_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
-  const note = 'Simulated trade settled';
-  const conn = await realConn();
-  if (!conn) { const error = new Error('Trade history could not be saved because the investor database is unavailable.'); error.statusCode = 503; throw error; }
-  try {
-    await conn.query(
-      'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, ?, ?, "processed", ?, NOW())',
-      [txId, inv.id, email, type, amount, note]
-    );
+  } catch (error) {
+    try { await conn.rollback(); } catch (rollbackError) {}
+    throw error;
   } finally { try { await conn.end(); } catch (closeError) {} }
 }
 
@@ -207,7 +205,7 @@ export async function handleTradingStart(req, res, id, body) {
     inv.tradingStatus = 'active';
     inv.tradingAmount = amount;
     inv.tradingStartedAt = now;
-    await saveInv(inv, { startedAt: now });
+    await saveInv(inv, { startedAt: now }, { type: 'trade_debit', amount, note: 'Trade allocation started' }, qEmail(req, body));
 
     return res.status(200).json({ success: true, trade: withWallet(inv, computeTradeValue(inv, now)) });
   } catch (error) {
@@ -236,8 +234,7 @@ export async function handleTradingStop(req, res, id, body) {
     inv.tradingStatus = 'idle';
     inv.tradingAmount = 0;
     inv.tradingStartedAt = null;
-    await saveInv(inv, {});
-    await recordTradeSettlement(inv, email, active.pnl);
+    await saveInv(inv, {}, { type: 'trade_credit', amount: active.tradeValue, note: 'Trade allocation returned; realized P/L: ' + Number(active.pnl || 0).toFixed(2) }, email);
 
     return res.status(200).json({
       success: true,
