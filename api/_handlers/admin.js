@@ -351,7 +351,7 @@ const MARKETING_TEMPLATES = {
   }
 };
 
-async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subject, htmlBody) {
+async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subject, htmlBody, fromName, replyTo) {
   const sender = fromEmail || 'no-reply@teslawealths.org';
 
   if (!apiKey) return { ok: false, simulated: false, error: 'Resend API key is not configured. No email was sent.' };
@@ -364,10 +364,11 @@ async function sendMarketingViaResend(apiKey, fromEmail, toEmail, toName, subjec
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: `Tesla Trade Inc <${sender}>`,
+        from: `${fromName || 'Tesla Trade'} <${sender}>`,
         to: [toEmail],
         subject: subject,
-        html: htmlBody
+        html: htmlBody,
+        ...(replyTo ? { reply_to: [replyTo] } : {})
       })
     });
 
@@ -833,6 +834,8 @@ export default async function handler(req, res) {
 
       const resendApiKey = cleanString(process.env.RESEND_API_KEY || settings.resend_api_key);
       const fromEmail = cleanString(settings.resend_from_email || process.env.RESEND_FROM_EMAIL || 'no-reply@teslawealths.org');
+      const fromName = cleanString(settings.sender_name || process.env.TT_SENDER_NAME || 'Tesla Trade');
+      const replyTo = cleanString(settings.reply_to_email || process.env.TT_REPLY_TO_EMAIL || 'support@teslawealths.org');
       const defaultCode = invCodes.length > 0 ? invCodes[0].code : 'TT-2026-VIP';
 
       let targetList = [];
@@ -873,8 +876,9 @@ export default async function handler(req, res) {
           subject = customSubject || 'Important Announcement — Tesla Trade Inc';
           htmlBody = `
             <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;background:#0c0d10;color:#ffffff;border-radius:16px;border:1px solid #232730;padding:28px 24px;">
-              <h2 style="color:#ffffff;margin-top:0;">${subject}</h2>
-              <p style="color:#e2e8f0;font-size:14px;line-height:1.7;white-space:pre-wrap;">${customBody || 'Hello from Tesla Trade Inc administration.'}</p>
+              <div style="text-align:center;padding:22px 18px;background:linear-gradient(135deg,#1b2029,#090a0d);border-bottom:1px solid #303540;"><div style="display:inline-grid;place-items:center;width:42px;height:42px;line-height:42px;border-radius:12px;background:#e31937;color:#fff;font-size:23px;font-weight:900;">T</div><div style="margin-top:9px;font-size:18px;font-weight:850;letter-spacing:2px;color:#fff;">TESLA TRADE</div><div style="margin-top:4px;color:#9299a6;font-size:10px;letter-spacing:1.6px;text-transform:uppercase;">Investor communications</div></div>
+              <h2 style="color:#ffffff;margin-top:24px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:-.4px;">${escapeHtml(subject)}</h2>
+              <p style="color:#e2e8f0;font-size:14px;line-height:1.8;white-space:pre-wrap;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${escapeHtml(customBody || 'Hello from Tesla Trade administration.')}</p>
               <div style="margin-top:24px;text-align:center;">
                 <a href="https://teslawealths.org/overview" style="display:inline-block;background:#e31937;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;">Open Dashboard →</a>
               </div>
@@ -882,7 +886,7 @@ export default async function handler(req, res) {
           `;
         }
 
-        const resendRes = await sendMarketingViaResend(resendApiKey, fromEmail, target.email, target.name, subject, htmlBody);
+        const resendRes = await sendMarketingViaResend(resendApiKey, fromEmail, target.email, target.name, subject, htmlBody, fromName, replyTo);
 
         const newLog = {
           id: Date.now() + Math.floor(Math.random() * 1000),
