@@ -345,8 +345,8 @@ export default async function handler(req, res) {
         investmentId = existing[0].id;
         const currentAmt = amount > 0 ? amount : parseFloat(existing[0].total || '0');
         await conn.query(
-          'UPDATE investments SET total=?, total_current_value=?, payment_proof_path=?, payment_proof_name=?, payment_reference=?, status="pending_approval", payment_proof_uploaded_at=NOW(), payment_submitted_at=NOW() WHERE id=? AND LOWER(user_email)=? AND status NOT IN ("active","approved","completed")',
-          [currentAmt, currentAmt, proofDataUri || null, proofFileName || null, ref || null, investmentId, email]
+          'UPDATE investments SET total=?, total_current_value=?, payment_proof_path=?, payment_proof_name=?, payment_reference=?, status=?, payment_proof_uploaded_at=NOW(), payment_submitted_at=NOW() WHERE id=? AND LOWER(user_email)=? AND status NOT IN (?, ?, ?)',
+          [currentAmt, currentAmt, proofDataUri || null, proofFileName || null, ref || null, 'pending_approval', investmentId, email, 'active', 'approved', 'completed']
         );
       } else {
         await conn.query(
@@ -355,11 +355,12 @@ export default async function handler(req, res) {
             plan_id, plan_label, plan_name, total, total_current_value,
             method, payment_reference, payment_proof_path, payment_proof_name,
             payment_proof_uploaded_at, payment_submitted_at, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), "pending_approval", NOW())`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, NOW())`,
           [
             investmentId, txId, email, userName, email, portfolio,
             planId, planName, planName, amount, amount,
-            method, ref || null, proofDataUri || null, proofFileName || null
+            method, ref || null, proofDataUri || null, proofFileName || null,
+            'pending_approval'
           ]
         );
       }
@@ -375,8 +376,8 @@ export default async function handler(req, res) {
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         `);
         await conn.query(
-          'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_deposit", NOW()) ON DUPLICATE KEY UPDATE onboarding_status="pending_deposit", name=COALESCE(name, VALUES(name))',
-          [email, userName]
+          'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE onboarding_status=VALUES(onboarding_status), name=COALESCE(name, VALUES(name))',
+          [email, userName, 'pending_deposit']
         );
       } catch (e) {}
 
@@ -384,8 +385,8 @@ export default async function handler(req, res) {
       try {
         const txRecordId = 'act_' + Math.random().toString(36).substring(2, 9);
         await conn.query(
-          'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "pending", ?, NOW())',
-          [txRecordId, investmentId, email, amount, `Investment deposit (${planName}) pending approval`]
+          'INSERT INTO account_transactions (user_email, transaction_type, amount, status, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+          [email, 'deposit', amount, 'pending', `Investment deposit (${planName}) pending approval`]
         );
       } catch (e) {}
 
