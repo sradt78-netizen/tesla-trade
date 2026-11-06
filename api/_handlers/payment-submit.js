@@ -1,5 +1,10 @@
 import { getDbConnection } from './dbcheck.js';
 
+// Compatibility exports for older admin modules. Serverless file/memory stores are intentionally disabled.
+export const inMemoryDeposits = [];
+export function loadPersistentDeposits() { return []; }
+export function savePersistentDeposit() { return false; }
+
 function cleanString(val) {
   if (!val) return '';
   return String(val).trim().replace(/^["']|["']$/g, '');
@@ -278,6 +283,8 @@ export default async function handler(req, res) {
       proofDataUri = cleanString(fields.paymentProof || fields.paymentProofPath || fields.proof);
       proofFileName = fields.paymentProofName || 'payment-receipt.jpg';
     }
+
+    if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, error: 'Enter a valid deposit amount.' });
 
     if (!email) {
       return res.status(400).json({ success: false, error: 'User email is required' });
