@@ -1448,6 +1448,25 @@ export default async function handler(req, res) {
         });
       }
 
+      // Dispatch notifications only after MySQL confirms the status change.
+      try {
+        const [{ notifyPaymentStatusUpdate }, mailer] = await Promise.all([import('../telegram.js'), import('../mailer.js')]);
+        const investorName = body.name || body.user_name || effectiveEmail;
+        const payload = { user_email: effectiveEmail, user_name: investorName, total: approvedDepositAmount, plan_name: body.planName || body.plan_name || 'Investment Plan', status };
+        const notificationResults = await Promise.allSettled([
+          notifyPaymentStatusUpdate(payload),
+          status === 'active'
+            ? mailer.sendPaymentApprovedEmail(effectiveEmail, investorName, { amount: approvedDepositAmount, planName: payload.plan_name })
+            : mailer.sendPaymentDeclinedEmail(effectiveEmail, investorName, { amount: approvedDepositAmount, planName: payload.plan_name })
+        ]);
+        notificationResults.forEach(result => {
+          if (result.status === 'rejected') console.error('[admin approval] notification failed:', result.reason?.message || result.reason);
+          else if (result.value?.ok === false) console.error('[admin approval] notification not delivered:', result.value.error);
+        });
+      } catch (notificationError) {
+        console.error('[admin approval] notification dispatch failed:', notificationError.message);
+      }
+
       return res.status(200).json({
         success: true,
         message: status === 'active'
