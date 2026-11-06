@@ -291,11 +291,13 @@ export default async function handler(req, res) {
     const txId = 'TX' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
     const portfolio = (userName || 'Tesla') + ' · ' + planName;
     let dbSaved = false;
+    let failedStep = 'database_connection';
 
     try {
       const conn = await getDbConnection();
 
       // Ensure table exists with complete schema matching original DB
+      failedStep = 'schema_migration';
       try {
         await conn.query(`
           CREATE TABLE IF NOT EXISTS investments (
@@ -329,6 +331,7 @@ export default async function handler(req, res) {
       }
 
       // Check existing investments for this user
+      failedStep = 'existing_investment_lookup';
       const [existing] = await conn.query(
         'SELECT id, total, status FROM investments WHERE LOWER(user_email)=? ORDER BY created_at DESC LIMIT 1',
         [email]
@@ -346,6 +349,7 @@ export default async function handler(req, res) {
       }
 
       if (existing.length > 0) {
+        failedStep = 'receipt_update';
         investmentId = existing[0].id;
         const currentAmt = amount > 0 ? amount : parseFloat(existing[0].total || '0');
         await conn.query(
@@ -353,6 +357,7 @@ export default async function handler(req, res) {
           [currentAmt, currentAmt, proofDataUri || null, proofFileName || null, ref || null, 'pending_approval', investmentId, email, 'active', 'approved', 'completed']
         );
       } else {
+        failedStep = 'investment_insert';
         await conn.query(
           `INSERT INTO investments (
             id, tx_id, user_id, user_name, user_email, portfolio,
@@ -370,6 +375,7 @@ export default async function handler(req, res) {
       }
 
       // Ensure investor account exists and reflects pending deposit
+      failedStep = 'investor_account_upsert';
       try {
         await conn.query(`
           CREATE TABLE IF NOT EXISTS investor_accounts (
@@ -386,6 +392,7 @@ export default async function handler(req, res) {
       } catch (e) {}
 
       // Record in account_transactions
+      failedStep = 'transaction_ledger_insert';
       try {
         const txRecordId = 'act_' + Math.random().toString(36).substring(2, 9);
         await conn.query(
@@ -397,7 +404,15 @@ export default async function handler(req, res) {
       await conn.end();
       dbSaved = true;
     } catch (dbErr) {
-      console.error('DB payment submit failed:', dbErr.message);
+      const errorCode = String(dbErr?.code || dbErr?.errno || 'DB_ERROR').replace(/[^A-Z0-9_]/gi, '').slice(0, 40);
+      console.error('[payment-submit] failed at ' + failedStep + ':', { code: errorCode, message: dbErr?.message || 'Unknown database error' });
+      try { if (conn) await conn.end(); } catch (closeError) {}
+      return res.status(503).json({
+        success: false,
+        failedStep,
+        errorCode,
+        error: 'Payment receipt could not be saved during ' + failedStep + ' (' + errorCode + '). No pending or approved balance was created.'
+      });
     }
 
     if (!dbSaved) {
