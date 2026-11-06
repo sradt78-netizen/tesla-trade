@@ -37,6 +37,10 @@ export default async function handler(req, res) {
     has_telegram_token: present(['TELEGRAM_BOT_TOKEN', 'TT_TELEGRAM_BOT_TOKEN'])
   };
 
+  const connected = health?.available === true;
+  const rawError = health?.error || null;
+  const errorCode = rawError && typeof rawError === 'object' ? rawError.code || null : null;
+
   // Optional, read-only schema check for the social registration queries.
   // Invoke with /api/dbcheck?check=auth; this checks table/column availability
   // without creating test users or changing investor data.
@@ -72,10 +76,6 @@ export default async function handler(req, res) {
       }
     }
   }
-
-  const connected = health?.available === true;
-  const rawError = health?.error || null;
-  const errorCode = rawError && typeof rawError === 'object' ? rawError.code || null : null;
 
   return res.status(200).json({
     status: connected ? 'ok' : 'degraded',
