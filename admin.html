@@ -505,6 +505,7 @@
         <button class="nav-btn" onclick="switchTab('access')">
           <span>🔐 Invitation Codes</span> <span class="badge green" id="b-codes">0</span>
         </button>
+        <button class="nav-btn" onclick="switchTab('support')"><span>💬 Investor Support Inbox</span> <span class="badge amber" id="b-support">0</span></button>
         <button class="nav-btn" onclick="switchTab('marketing')">
           <span>📣 Marketing &amp; Emails</span> <span class="badge green" id="b-marketing">Autopilot</span>
         </button>
@@ -766,6 +767,8 @@
         </table>
       </div>
     </section>
+
+<section id="tab-support" style="display:none;"><div class="card"><h2>Investor Support Inbox</h2><p style="color:var(--muted);font-size:13px;">Read investor messages and reply from the admin dashboard.</p><button type="button" onclick="loadSupportInbox()">Refresh inbox</button></div><div style="display:grid;grid-template-columns:minmax(250px,.8fr) minmax(300px,1.4fr);gap:14px;margin-top:14px;"><div class="card"><div id="supportThreadList">Loading conversations…</div></div><div class="card"><div id="supportThreadHeader">Select a conversation</div><div id="supportMessageList" style="display:grid;gap:10px;margin:16px 0;"></div><div id="supportReplyBox" style="display:none;"><textarea id="supportReplyText" rows="5" maxlength="5000" placeholder="Write a reply…" style="width:100%;background:#090a0d;border:1px solid #333;border-radius:9px;padding:12px;color:#fff;"></textarea><button type="button" class="primary" onclick="sendSupportReply()">Send reply & email investor</button><button type="button" onclick="closeSupportThread()">Close conversation</button></div></div></div></section>
 
     <!-- TAB 8: MARKETING & EMAIL CAMPAIGNS (AUTOPILOT ENGINE) -->
     <section id="tab-marketing" style="display: none;">
@@ -1289,7 +1292,7 @@
       closeMobileSidebar();
       try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
 
-      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'marketing', 'trading', 'settings'];
+      var tabs = ['investors', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'support', 'marketing', 'trading', 'settings'];
       tabs.forEach(function(t) {
         var el = document.getElementById('tab-' + t);
         if (el) el.style.display = (t === tabId) ? 'block' : 'none';
@@ -1311,6 +1314,7 @@
         withdrawals: ['Withdrawal Requests', 'Review and process investor payout requests'],
         financing: ['Vehicle Financing Applications', 'Approve or decline customer financing applications'],
         access: ['Private Invitation Access', 'Manage active and revoked investor invitation tokens'],
+        support: ['Investor Support Inbox', 'Read and respond to investor support conversations'],
         marketing: ['Marketing & Click Analytics', 'Track domain clicks, referral sources, and campaigns'],
         trading: ['Trading Graph Engine & Control', 'Configure live profit and loss cycle intervals, gain/loss percentages, and graph dynamics on investors dashboard'],
         settings: ['System Settings & Environment', 'Database health, Vercel environment variables, and wallets']
@@ -1321,6 +1325,7 @@
         document.getElementById('panelDesc').textContent = titles[tabId][1];
       }
 
+      if (tabId === 'support') loadSupportInbox();
       if (tabId === 'trading') {
         initTradingSimCanvas();
       }
