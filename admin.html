@@ -1146,9 +1146,16 @@
               <input type="password" id="cfg-resend-key" placeholder="re_123456789..." />
             </div>
             <div class="form-group">
-              <label>Sender Email (From)</label>
+              <label>Sender Name (shown in inbox)</label>
+              <input type="text" id="cfg-sender-name" placeholder="Tesla Trade Investor Relations" />
+            </div>
+            <div class="form-group">
+              <label>Sender Email (From — verified in Resend)</label>
               <input type="text" id="cfg-resend-from" placeholder="onboarding@resend.dev or no-reply@yourdomain.com" />
             </div>
+            <div class="form-group"><label>Admin notification email</label><input type="email" id="cfg-admin-email" placeholder="admin@teslawealths.org" /></div>
+            <div class="form-group"><label>Reply-to / Support email</label><input type="email" id="cfg-reply-to" placeholder="support@teslawealths.org" /></div>
+            <button type="button" onclick="sendEmailTest()" style="margin-top:4px;">✉ Send test email</button>
           </div>
           <div>
             <h4 style="font-size: 13px; color: #93c5fd; margin-bottom: 10px;">Supabase (Social Google, X & Facebook Login)</h4>
@@ -1861,6 +1868,9 @@
       if (s.bank_swift && document.getElementById('cfg-bank-swift')) document.getElementById('cfg-bank-swift').value = s.bank_swift;
       if (s.resend_api_key && document.getElementById('cfg-resend-key')) document.getElementById('cfg-resend-key').value = s.resend_api_key;
       if (s.resend_from_email && document.getElementById('cfg-resend-from')) document.getElementById('cfg-resend-from').value = s.resend_from_email;
+      if (s.sender_name && document.getElementById('cfg-sender-name')) document.getElementById('cfg-sender-name').value = s.sender_name;
+      if (s.admin_email && document.getElementById('cfg-admin-email')) document.getElementById('cfg-admin-email').value = s.admin_email;
+      if (s.reply_to_email && document.getElementById('cfg-reply-to')) document.getElementById('cfg-reply-to').value = s.reply_to_email;
       if (s.supabase_url && document.getElementById('cfg-supabase-url')) document.getElementById('cfg-supabase-url').value = s.supabase_url;
       if (s.supabase_anon_key && document.getElementById('cfg-supabase-anon')) document.getElementById('cfg-supabase-anon').value = s.supabase_anon_key;
     }
@@ -2291,6 +2301,8 @@
       });
     }
 
+    function sendEmailTest(){var email=(document.getElementById('cfg-admin-email')?.value||'').trim();if(!email)email=prompt('Send a test email to which address?','');if(!email)return;adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send_test_email',email:email})}).then(function(r){return r.json();}).then(function(d){if(!d.success)throw new Error(d.error||'Test email failed');showToast(d.message||'Test email accepted by Resend.');}).catch(function(e){showToast(e.message);});}
+
     function saveSettings() {
       var s = {
         wallet_usdt: (document.getElementById('cfg-usdt')?.value || '').trim(),
@@ -2302,6 +2314,9 @@
         bank_swift: (document.getElementById('cfg-bank-swift')?.value || '').trim(),
         resend_api_key: (document.getElementById('cfg-resend-key')?.value || '').trim(),
         resend_from_email: (document.getElementById('cfg-resend-from')?.value || '').trim(),
+        sender_name: (document.getElementById('cfg-sender-name')?.value || '').trim(),
+        admin_email: (document.getElementById('cfg-admin-email')?.value || '').trim(),
+        reply_to_email: (document.getElementById('cfg-reply-to')?.value || '').trim(),
         supabase_url: (document.getElementById('cfg-supabase-url')?.value || '').trim(),
         supabase_anon_key: (document.getElementById('cfg-supabase-anon')?.value || '').trim()
       };
