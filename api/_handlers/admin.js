@@ -1622,17 +1622,18 @@ export default async function handler(req, res) {
     // ── 10. SETTINGS SAVE ──────────────────────────────────────────
     if (action === 'save_settings') {
       const s = body.settings || {};
-      if (isDbConnected && conn) {
-        try {
-          for (const [k, v] of Object.entries(s)) {
-            await conn.query('INSERT INTO app_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=?', [k, String(v), String(v)]);
-          }
-          await conn.end();
-        } catch (e) {}
-      } else {
-        Object.assign(mockStore.settings, s);
+      if (!isDbConnected || !conn) return res.status(503).json({success:false,error:'Settings require the live database. Nothing was saved.'});
+      try {
+        for (const [k, v] of Object.entries(s)) {
+          await conn.query('INSERT INTO app_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=?', [k, String(v), String(v)]);
+        }
+        await conn.end();
+        return res.status(200).json({ success: true, message: 'Settings saved successfully to the live database.' });
+      } catch (error) {
+        try { await conn.end(); } catch {}
+        console.error('[admin save settings] failed:',error.message);
+        return res.status(500).json({success:false,error:'Settings could not be saved to the live database: '+error.message});
       }
-      return res.status(200).json({ success: true, message: 'Settings saved successfully.' });
     }
 
     // ── 11. DELETE INVESTOR ─────────────────────────────────────────
