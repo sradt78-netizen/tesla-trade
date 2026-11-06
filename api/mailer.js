@@ -21,17 +21,23 @@ export async function getMailerConfig() {
     process.env.ADMIN_EMAIL || process.env.TT_ADMIN_EMAIL
   ) || 'admin@teslawealths.org';
 
+  let fromName = cleanString(process.env.TT_SENDER_NAME || process.env.RESEND_FROM_NAME) || 'Tesla Trade';
+  let replyTo = cleanString(process.env.TT_REPLY_TO_EMAIL || process.env.SUPPORT_EMAIL) || 'support@teslawealths.org';
   try {
-    const db = loadDatabase();
-    if (db && db.app_settings) {
-      if (!apiKey && db.app_settings.resend_api_key) apiKey = cleanString(db.app_settings.resend_api_key);
-      if (!fromEmail && db.app_settings.resend_from_email) fromEmail = cleanString(db.app_settings.resend_from_email);
-      if (db.app_settings.admin_email) adminEmail = cleanString(db.app_settings.admin_email);
-    }
-  } catch (e) {}
-
-  // Require a verified sender configured by the site owner; never silently use a test sender.
-return { apiKey, fromEmail, adminEmail };
+    const conn = await getDbConnection();
+    try {
+      const [rows] = await conn.query("SELECT `key`, `value` FROM app_settings WHERE `key` IN ('resend_api_key','resend_from_email','admin_email','sender_name','reply_to_email')");
+      const settings = Object.fromEntries(rows.map(row => [row.key, row.value]));
+      if (!apiKey && settings.resend_api_key) apiKey = cleanString(settings.resend_api_key);
+      if (!fromEmail && settings.resend_from_email) fromEmail = cleanString(settings.resend_from_email);
+      if (settings.admin_email) adminEmail = cleanString(settings.admin_email);
+      if (settings.sender_name) fromName = cleanString(settings.sender_name);
+      if (settings.reply_to_email) replyTo = cleanString(settings.reply_to_email);
+    } finally { try { await conn.end(); } catch {} }
+  } catch (e) {
+    try { const db = loadDatabase(); if (db && db.app_settings) { if (!apiKey && db.app_settings.resend_api_key) apiKey = cleanString(db.app_settings.resend_api_key); if (!fromEmail && db.app_settings.resend_from_email) fromEmail = cleanString(db.app_settings.resend_from_email); if (db.app_settings.admin_email) adminEmail = cleanString(db.app_settings.admin_email); } } catch {}
+  }
+  return { apiKey, fromEmail, adminEmail, fromName, replyTo };
 }
 
 /**
@@ -39,7 +45,7 @@ return { apiKey, fromEmail, adminEmail };
  * Logs all deliveries to the User Action Audit Log.
  */
 export async function sendEmail({ to, name, subject, html, replyTo, category = 'notification' }) {
-  const { apiKey, fromEmail } = await getMailerConfig();
+  const { apiKey, fromEmail, fromName, replyTo: configuredReplyTo } = await getMailerConfig();
   const safeName = name || 'Investor';
 
   if (!to || !to.includes('@')) {
@@ -73,11 +79,11 @@ export async function sendEmail({ to, name, subject, html, replyTo, category = '
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: `Tesla Trade Inc <${senderAddress}>`,
+        from: `${fromName || 'Tesla Trade'} <${senderAddress}>`,
         to: [to],
         subject,
         html,
-        ...(replyTo ? { reply_to: [replyTo] } : {})
+        ...((replyTo || configuredReplyTo) ? { reply_to: [replyTo || configuredReplyTo] } : {})
       })
     });
     const data = await res.json().catch(() => ({}));
