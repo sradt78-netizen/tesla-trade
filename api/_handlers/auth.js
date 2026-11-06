@@ -256,43 +256,80 @@ export default async function handler(req, res) {
       return res.status(401).json({ success: false, message: 'Social sign-in verification is not configured.' });
     }
 
-    // Upsert account, then resolve its actual persisted investment state.
+    // Persist the verified Supabase identity and read its durable onboarding state.
+    // Keep stages explicit so SQL/schema/permission failures aren't mislabeled as
+    // a database connection outage. No browser-provided email is trusted here.
     let investmentStatus = 'none';
     let profilePhone = '';
     let profileAge = 0;
     let onboardingStatus = 'registered';
+    let conn = null;
+    let failedStep = 'database_connection';
     try {
-      const conn = await getDbConnection();
+      conn = await getDbConnection();
+
+      // registered_at has a database default; omit it so older compatible
+      // investor_accounts schemas can also accept a new social identity.
+      failedStep = 'investor_account_write';
       await conn.query(
-        'INSERT INTO investor_accounts (email, name, onboarding_status, registered_at) VALUES (?, ?, "pending_approval", NOW()) ON DUPLICATE KEY UPDATE name=COALESCE(name, VALUES(name))',
+        'INSERT INTO investor_accounts (email, name, onboarding_status) VALUES (?, ?, "pending_approval") ON DUPLICATE KEY UPDATE email=VALUES(email)',
         [email, name]
       );
+
+      // Read only after the upsert so returning users and first-time users both
+      // receive the persisted profile. SELECT * tolerates optional profile
+      // columns added by different supported schema revisions.
+      failedStep = 'investor_profile_read';
       const [accountRows] = await conn.query(
-        'SELECT phone, age, onboarding_status FROM investor_accounts WHERE LOWER(email)=? LIMIT 1',
+        'SELECT * FROM investor_accounts WHERE LOWER(email)=? LIMIT 1',
         [email]
       );
       profilePhone = accountRows[0]?.phone || '';
       profileAge = Number(accountRows[0]?.age || 0);
       onboardingStatus = String(accountRows[0]?.onboarding_status || 'registered');
+
+      // Order is not needed to resolve status; avoid depending on a particular
+      // investment ID type or sort column in older database revisions.
+      failedStep = 'investment_status_read';
       const [rows] = await conn.query(
-        "SELECT status FROM investments WHERE LOWER(user_email)=? ORDER BY id DESC",
+        'SELECT status FROM investments WHERE LOWER(user_email)=?',
         [email]
       );
       const states = rows.map(row => String(row.status || '').toLowerCase());
-      const persistedOnboarding = String(accountRows[0]?.onboarding_status || 'none').toLowerCase();
       investmentStatus = states.some(s => ['active','approved','completed'].includes(s))
         ? 'active'
         : states.some(s => ['pending','pending_approval'].includes(s))
           ? 'pending_approval'
-  : 'none';
+          : 'none';
       onboardingStatus = investmentStatus;
-      await conn.end();
     } catch (e) {
-      console.error('[auth social-session] database lookup failed:', e.message);
+      const errorCode = String(e?.code || e?.errno || 'DB_ERROR')
+        .replace(/[^A-Z0-9_]/gi, '')
+        .slice(0, 40);
+      console.error('[auth social-session] failed at ' + failedStep + ':', {
+        code: errorCode,
+        message: e?.message || 'Unknown database error'
+      });
+      const stepLabels = {
+        database_connection: 'database connection',
+        investor_account_write: 'investor account save',
+        investor_profile_read: 'investor profile read',
+        investment_status_read: 'investment status read'
+      };
       return res.status(503).json({
         success: false,
-        message: 'Social sign-in is temporarily unavailable because the account database could not be reached. Please retry.'
+        failedStep,
+        errorCode,
+        message: 'Social sign-in could not complete during ' +
+          (stepLabels[failedStep] || 'account setup') +
+          ' (' + errorCode + '). Please retry.'
       });
+    } finally {
+      if (conn) {
+        try { await conn.end(); } catch (closeError) {
+          console.error('[auth social-session] database connection close failed:', closeError?.message || closeError);
+        }
+      }
     }
 
     return res.status(200).json({
