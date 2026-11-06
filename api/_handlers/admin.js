@@ -1367,7 +1367,7 @@ export default async function handler(req, res) {
       if (isDbConnected && conn) {
         try {
           let result = null;
-          // Comprehensive update: match by any variant of id or user_email
+          // Update only the exact pending investment row validated above.
           [result] = await conn.query(
             `UPDATE investments
              SET status=?, total=?, total_current_value=?, earnings=?, updated_at=NOW(), activated_at=NOW()
@@ -1387,12 +1387,12 @@ export default async function handler(req, res) {
           // Record the matched bonus once per approved investment so /api/my-status and wallet UI can read it.
           if (status === 'active' && bonusMatch > 0 && effectiveEmail) {
             const [bonusTxRows] = await conn.query(
-              'SELECT id FROM account_transactions WHERE LOWER(user_email)=? AND investment_id=? AND type='bonus' LIMIT 1',
+              `SELECT id FROM account_transactions WHERE LOWER(user_email)=? AND investment_id=? AND type='bonus' LIMIT 1`,
               [effectiveEmail, effectiveId]
             );
             if (!bonusTxRows.length) {
               await conn.query(
-                'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, 'bonus', ?, 'processed', '100% Deposit Match Bonus', NOW())',
+                `INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, 'bonus', ?, 'processed', '100% Deposit Match Bonus', NOW())`,
                 ['tx_bonus_' + Math.random().toString(36).substring(2, 10), effectiveId, effectiveEmail, bonusMatch]
               );
             }
@@ -1403,11 +1403,11 @@ export default async function handler(req, res) {
           dbSaved = !!(result && result.affectedRows);
 
           if (effectiveEmail && status === 'active') {
-            await conn.query('UPDATE investor_accounts SET onboarding_status='active', deposit_match_eligible=1, activated_at=NOW() WHERE LOWER(email)=?', [effectiveEmail]);
+            await conn.query(`UPDATE investor_accounts SET onboarding_status='active', deposit_match_eligible=1, activated_at=NOW() WHERE LOWER(email)=?`, [effectiveEmail]);
             // Idempotent deposit ledger write: retries must not create duplicate credits.
             try {
               const [depositTxRows] = await conn.query(
-                'SELECT id FROM account_transactions WHERE LOWER(user_email)=? AND investment_id=? AND type='deposit' ORDER BY created_at DESC LIMIT 1',
+                `SELECT id FROM account_transactions WHERE LOWER(user_email)=? AND investment_id=? AND type='deposit' ORDER BY created_at DESC LIMIT 1`,
                 [effectiveEmail, effectiveId]
               );
               if (depositTxRows.length) {
@@ -1418,7 +1418,7 @@ export default async function handler(req, res) {
               } else {
                 const txDepId = 'tx_' + Math.random().toString(36).substring(2, 9);
                 await conn.query(
-                  'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, reference_id, note, created_at) VALUES (?, ?, ?, 'deposit', ?, 'processed', ?, 'Investment deposit approved', NOW())',
+                  `INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, reference_id, note, created_at) VALUES (?, ?, ?, 'deposit', ?, 'processed', ?, 'Investment deposit approved', NOW())`,
                   [txDepId, effectiveId, effectiveEmail, approvedDepositAmount, authoritativeDeposit.tx_id || null]
                 );
               }
