@@ -192,10 +192,12 @@ export default async function handler(req, res) {
 
     // Notify the administrator only after the account is durably created.
     try {
-      const [{ notifySignup }, { sendWelcomeEmail }] = await Promise.all([import('../telegram.js'), import('../mailer.js')]);
+      const [{ notifySignup }, mailer, notifications] = await Promise.all([import('../telegram.js'), import('../mailer.js'), import('../notifications.js')]);
+      const mailConfig = await mailer.getMailerConfig();
       const alerts = await Promise.allSettled([
         notifySignup({ name: userName, email, ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '' }),
-        sendWelcomeEmail(email, userName)
+        mailer.sendWelcomeEmail(email, userName),
+        notifications.sendEventEmail({to:mailConfig.adminEmail,name:'Admin',event:'New investor signup',subject:'A new investor has registered',message:'A new investor account has been created. Review the registration and account status in the admin dashboard.',ctaLabel:'Open Admin Dashboard',ctaPath:'/admin',details:[{label:'Investor',value:userName},{label:'Email',value:email}]})
       ]);
       alerts.forEach(result => {
         if (result.status === 'rejected') console.error('[auth signup] notification failed:', result.reason?.message || result.reason);
@@ -263,6 +265,7 @@ export default async function handler(req, res) {
     let profilePhone = '';
     let profileAge = 0;
     let onboardingStatus = 'registered';
+    let isNewSocialAccount = false;
     let conn = null;
     let failedStep = 'database_connection';
     try {
@@ -271,10 +274,11 @@ export default async function handler(req, res) {
       // registered_at has a database default; omit it so older compatible
       // investor_accounts schemas can also accept a new social identity.
       failedStep = 'investor_account_write';
-      await conn.query(
+      const [accountWrite] = await conn.query(
         'INSERT INTO investor_accounts (email, name, onboarding_status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE email=VALUES(email)',
         [email, name, 'pending_approval']
       );
+      isNewSocialAccount = Number(accountWrite?.affectedRows || 0) === 1;
 
       // Read only after the upsert so returning users and first-time users both
       // receive the persisted profile. SELECT * tolerates optional profile
@@ -330,6 +334,19 @@ export default async function handler(req, res) {
           console.error('[auth social-session] database connection close failed:', closeError?.message || closeError);
         }
       }
+    }
+
+    if (isNewSocialAccount) {
+      try {
+        const mailer = await import('../mailer.js');
+        const notifications = await import('../notifications.js');
+        const cfg = await mailer.getMailerConfig();
+        const results = await Promise.allSettled([
+          mailer.sendWelcomeEmail(email,name),
+          notifications.sendEventEmail({to:cfg.adminEmail,name:'Admin',event:'New social signup',subject:'A new investor has registered',message:'A new investor account was created using '+provider+'. Review the account in the admin dashboard.',ctaLabel:'Open Admin Dashboard',ctaPath:'/admin',details:[{label:'Investor',value:name},{label:'Email',value:email}]})
+        ]);
+        results.forEach(x=>{if(x.status==='rejected')console.error('[social signup email] failed:',x.reason?.message||x.reason);else if(x.value?.ok===false)console.error('[social signup email] not delivered:',x.value.error);});
+      } catch (mailError) { console.error('[social signup email] dispatch failed:',mailError.message); }
     }
 
     return res.status(200).json({
