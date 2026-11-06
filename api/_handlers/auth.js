@@ -192,9 +192,15 @@ export default async function handler(req, res) {
 
     // Notify the administrator only after the account is durably created.
     try {
-      const [{ notifySignup }] = await Promise.all([import('../telegram.js')]);
-      const alert = await notifySignup({ name: userName, email, ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '' });
-      if (alert && alert.ok === false) console.error('[auth signup] Telegram alert not delivered:', alert.error);
+      const [{ notifySignup }, { sendWelcomeEmail }] = await Promise.all([import('../telegram.js'), import('../mailer.js')]);
+      const alerts = await Promise.allSettled([
+        notifySignup({ name: userName, email, ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '' }),
+        sendWelcomeEmail(email, userName)
+      ]);
+      alerts.forEach(result => {
+        if (result.status === 'rejected') console.error('[auth signup] notification failed:', result.reason?.message || result.reason);
+        else if (result.value?.ok === false) console.error('[auth signup] notification not delivered:', result.value.error);
+      });
     } catch (alertError) {
       console.error('[auth signup] Telegram alert failed:', alertError.message);
     }
