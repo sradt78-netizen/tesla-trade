@@ -12,6 +12,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ status: 'error', message: 'Method not allowed.' });
+  const requestUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
 
   // Use the exact same resolver and health probe used by authentication and
   // every other API handler. Never default a failed connection to "connected".
@@ -45,7 +46,7 @@ export default async function handler(req, res) {
   // Invoke with /api/dbcheck?check=auth; this checks table/column availability
   // without creating test users or changing investor data.
   let authentication_schema = null;
-  if (connected && url.searchParams.get('check') === 'auth') {
+  if (connected && requestUrl.searchParams.get('check') === 'auth') {
     let conn = null;
     try {
       conn = await getDbConnection();
