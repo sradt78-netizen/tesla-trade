@@ -181,11 +181,14 @@ export function resolveDatabaseConfig() {
     'DB_NAME', 'DB_DATABASE', 'MYSQL_DATABASE', 'MYSQLDATABASE', 'MYSQL_DB', 'TT_DB_NAME', 'AIVEN_DATABASE', 'VITE_DB_NAME'
   ].find(k => !!clean(process.env[k]));
 
-  const host = clean(hostKey ? process.env[hostKey] : '') || 'mysql-16d35e3c-sradt78-a386.a.aivencloud.com';
-  const port = parseInt(clean(portKey ? process.env[portKey] : '') || '28487', 10);
-  const user = clean(userKey ? process.env[userKey] : '') || 'avnadmin';
-  const password = clean(passKey ? process.env[passKey] : '') || 'AVNS_eN3hQrUWcOL7PRQXP_i';
-  const database = clean(dbKey ? process.env[dbKey] : '') || 'defaultdb';
+  // Never fall back to credentials embedded in source code. Production must
+  // provide a complete server-side connection configuration through Vercel.
+  const host = clean(hostKey ? process.env[hostKey] : '');
+  const portValue = clean(portKey ? process.env[portKey] : '');
+  const user = clean(userKey ? process.env[userKey] : '');
+  const password = clean(passKey ? process.env[passKey] : '');
+  const database = clean(dbKey ? process.env[dbKey] : '');
+  const port = portValue ? parseInt(portValue, 10) : 3306;
 
   return {
     host,
@@ -194,7 +197,7 @@ export function resolveDatabaseConfig() {
     password,
     database,
     ssl: { rejectUnauthorized: false },
-    source: hostKey ? `Environment (${hostKey})` : 'Default Cluster'
+    source: hostKey ? `Environment (${hostKey})` : 'Missing environment configuration'
   };
 }
 
@@ -213,6 +216,9 @@ export async function checkMySqlHealth(force = false) {
   mysqlStatus.lastTestedAt = now;
 
   try {
+    if (!cfg.host || !cfg.user || !cfg.password || !cfg.database || !Number.isInteger(cfg.port) || cfg.port < 1 || cfg.port > 65535) {
+      throw new Error('Database configuration is incomplete. Set DATABASE_URL or DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, and DB_NAME in the server environment.');
+    }
     const conn = await mysql.createConnection({
       host: cfg.host,
       port: cfg.port,
