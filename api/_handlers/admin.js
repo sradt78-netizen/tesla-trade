@@ -746,7 +746,7 @@ export default async function handler(req, res) {
       const accessToken = crypto.randomBytes(32).toString('hex');
       const tokenHash = crypto.createHash('sha256').update(accessToken).digest('hex');
       await conn.beginTransaction();
-      await conn.query('INSERT INTO support_messages (id,thread_id,sender_role,sender_name,message) VALUES (?,?,?,?,?)',['msg_'+crypto.randomUUID(),threadId,'admin','Tesla Trade Support',message]);
+      await conn.query('INSERT INTO support_messages (id,thread_id,sender_role,sender_name,message) VALUES (?,?,?,?,?)',[crypto.randomUUID(),threadId,'admin','Tesla Trade Support',message]);
       await conn.query("INSERT INTO support_thread_tokens (id,thread_id,token_hash) VALUES (?,?,?)",[crypto.randomUUID(),threadId,tokenHash]);
       await conn.query("UPDATE support_threads SET status='answered',updated_at=NOW() WHERE id=?",[threadId]);
       await conn.commit();
