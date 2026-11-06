@@ -107,6 +107,31 @@ export async function sendTelegramMessage(htmlContent, customConfig = null) {
   }
 }
 
+
+/** Send a real receipt image to the configured admin Telegram chat. */
+export async function sendTelegramPhoto(dataUri, caption) {
+  const config = getTelegramConfig();
+  if (!config.botToken || !config.chatId) return { ok: false, error: 'Telegram Bot Token or Chat ID not configured' };
+  if (!config.alertsEnabled) return { ok: false, error: 'Telegram alerts are disabled' };
+  const match = String(dataUri || '').match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return { ok: false, error: 'Receipt is not a supported image' };
+  try {
+    const bytes = Buffer.from(match[2], 'base64');
+    if (!bytes.length || bytes.length > 9 * 1024 * 1024) return { ok: false, error: 'Receipt image is empty or too large for Telegram' };
+    const form = new FormData();
+    form.append('chat_id', config.chatId);
+    form.append('caption', String(caption || '').slice(0, 1000));
+    form.append('parse_mode', 'HTML');
+    form.append('photo', new Blob([bytes], { type: match[1] }), 'payment-receipt.' + (match[1].split('/')[1] === 'jpeg' ? 'jpg' : match[1].split('/')[1]));
+    const response = await fetch(`https://api.telegram.org/bot${config.botToken}/sendPhoto`, { method: 'POST', body: form, signal: AbortSignal.timeout(10000) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) return { ok: false, error: data.description || 'Telegram receipt upload failed' };
+    return { ok: true, messageId: data.result?.message_id };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
 /**
  * Alert 1: New Investor Signup
  */
@@ -164,6 +189,11 @@ export async function notifyPaymentSubmission(deposit = {}) {
 👉 <a href="https://teslawealths.org/admin">Review & Approve Deposit</a>
 `.trim();
 
+  if (deposit.payment_proof_path || deposit.proofDataUri) {
+    const photoResult = await sendTelegramPhoto(deposit.payment_proof_path || deposit.proofDataUri, message);
+    if (photoResult.ok) return photoResult;
+    console.warn('[Telegram Bot] Receipt photo not delivered:', photoResult.error);
+  }
   return sendTelegramMessage(message);
 }
 
