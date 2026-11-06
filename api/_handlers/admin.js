@@ -712,6 +712,7 @@ export default async function handler(req, res) {
 
     // ── SUPPORT INBOX: THREADS, REPLIES, AND CLOSE ─────────────────
     if (action === 'send_test_email') {
+      if (conn) { try { await conn.end(); } catch {} conn = null; }
       const recipient = cleanString(body.email || body.to || '');
       if (!recipient.includes('@')) return res.status(400).json({success:false,error:'Enter a valid test recipient email.'});
       try {
