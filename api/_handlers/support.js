@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { getDbConnection } from './dbcheck.js';
-import { sendEmail, sendSupportMessageEmail } from '../mailer.js';
+import { sendSupportMessageEmail } from '../notifications.js';
 
 const clean = (v, max = 500) => String(v == null ? '' : v).trim().slice(0, max);
 const hashToken = token => crypto.createHash('sha256').update(String(token || '')).digest('hex');
@@ -20,6 +20,18 @@ export async function ensureSupportTables(conn) {
       INDEX idx_support_email (user_email),
       INDEX idx_support_status (status),
       INDEX idx_support_updated (updated_at)
+    )
+  `);
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS support_thread_tokens (
+      id VARCHAR(36) PRIMARY KEY,
+      thread_id VARCHAR(36) NOT NULL,
+      token_hash CHAR(64) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_support_token (token_hash),
+      INDEX idx_support_token_thread (thread_id),
+      CONSTRAINT fk_support_tokens_thread FOREIGN KEY (thread_id)
+        REFERENCES support_threads(id) ON DELETE CASCADE
     )
   `);
   await conn.query(`
@@ -88,6 +100,7 @@ export default async function handler(req, res) {
         'INSERT INTO support_messages (id,thread_id,sender_role,sender_name,message) VALUES (?,?,?,?,?)',
         [makeId(), id, 'investor', name, message]
       );
+      await conn.query('INSERT INTO support_thread_tokens (id,thread_id,token_hash) VALUES (?,?,?)', [makeId(), id, hashToken(accessToken)]);
       await conn.commit();
       await conn.end();
       const ticketUrl = 'https://teslawealths.org/support?ticket=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(accessToken);
@@ -103,9 +116,10 @@ export default async function handler(req, res) {
 
     if (req.method === 'GET' || (req.method === 'POST' && action === 'view')) {
       if (!ticketId || !token) { await conn.end(); return res.status(400).json({ success: false, error: 'A support ticket link is required.' }); }
-      const [threads] = await conn.query('SELECT id,user_name,subject,status,created_at,updated_at,token_hash FROM support_threads WHERE id=? LIMIT 1', [ticketId]);
+      const [threads] = await conn.query('SELECT id,user_name,subject,status,created_at,updated_at FROM support_threads WHERE id=? LIMIT 1', [ticketId]);
       const thread = threads[0];
-      if (!thread || thread.token_hash !== hashToken(token)) { await conn.end(); return res.status(404).json({ success: false, error: 'Support conversation not found. Check your private ticket link.' }); }
+      const [accessRows] = await conn.query('SELECT id FROM support_thread_tokens WHERE thread_id=? AND token_hash=? LIMIT 1', [ticketId, hashToken(token)]);
+      if (!thread || !accessRows.length) { await conn.end(); return res.status(404).json({ success: false, error: 'Support conversation not found. Check your private ticket link.' }); }
       const [messages] = await conn.query('SELECT sender_role,sender_name,message,created_at FROM support_messages WHERE thread_id=? ORDER BY created_at ASC', [ticketId]);
       await conn.query('UPDATE support_threads SET status=IF(status="answered","open",status) WHERE id=? AND status="answered"', [ticketId]);
       await conn.end();
@@ -115,9 +129,10 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && action === 'reply') {
       const message = clean(body.message, 5000);
       if (!ticketId || !token || message.length < 2) { await conn.end(); return res.status(400).json({ success: false, error: 'A valid ticket, private link, and reply are required.' }); }
-      const [threads] = await conn.query('SELECT id,user_email,user_name,subject,token_hash FROM support_threads WHERE id=? LIMIT 1', [ticketId]);
+      const [threads] = await conn.query('SELECT id,user_email,user_name,subject FROM support_threads WHERE id=? LIMIT 1', [ticketId]);
       const thread = threads[0];
-      if (!thread || thread.token_hash !== hashToken(token)) { await conn.end(); return res.status(404).json({ success: false, error: 'Support conversation not found.' }); }
+      const [accessRows] = await conn.query('SELECT id FROM support_thread_tokens WHERE thread_id=? AND token_hash=? LIMIT 1', [ticketId, hashToken(token)]);
+      if (!thread || !accessRows.length) { await conn.end(); return res.status(404).json({ success: false, error: 'Support conversation not found.' }); }
       await conn.beginTransaction();
       await conn.query('INSERT INTO support_messages (id,thread_id,sender_role,sender_name,message) VALUES (?,?,?,?,?)', [makeId(), ticketId, 'investor', thread.user_name, message]);
       await conn.query('UPDATE support_threads SET status="open",updated_at=NOW() WHERE id=?', [ticketId]);
