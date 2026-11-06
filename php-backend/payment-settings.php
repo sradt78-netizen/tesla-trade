@@ -53,31 +53,6 @@ $defaults = [
         'swift' => defined('BANK_SWIFT') && BANK_SWIFT ? BANK_SWIFT : 'SAMPLEXXX',
         'label' => 'Bank Transfer',
     ],
-    'venmo' => [
-        'handle' => defined('VENMO_HANDLE') && VENMO_HANDLE
-            ? VENMO_HANDLE : '@sample-venmo-update-in-admin',
-        'label' => 'Venmo',
-    ],
-    'cashapp' => [
-        'handle' => defined('CASHAPP_HANDLE') && CASHAPP_HANDLE
-            ? CASHAPP_HANDLE : '$sampleCashApp-update-in-admin',
-        'label' => 'Cash App',
-    ],
-    'paypal' => [
-        'handle' => defined('PAYPAL_HANDLE') && PAYPAL_HANDLE
-            ? PAYPAL_HANDLE : 'sample-paypal@update-in-admin.example',
-        'label' => 'PayPal',
-    ],
-    'alipay' => [
-        'account' => defined('ALIPAY_ACCOUNT') && ALIPAY_ACCOUNT
-            ? ALIPAY_ACCOUNT : 'sample-alipay-update-in-admin',
-        'label' => 'Alipay',
-    ],
-    'wechat' => [
-        'account' => defined('WECHAT_ACCOUNT') && WECHAT_ACCOUNT
-            ? WECHAT_ACCOUNT : 'sample-wechat-update-in-admin',
-        'label' => 'WeChat Pay',
-    ],
 ];
 
 $saved = [];
@@ -111,4 +86,4 @@ $bank['accountNumber'] = $bank['accountNumber'] ?? ($bank['account'] ?? '');
 $bank['swift'] = $bank['swift'] ?? ($bank['swiftCode'] ?? '');
 $result['bank'] = $bank;
 
-payment_settings_json($result);
+payment_settings_json(array_intersect_key($result, array_flip(['usdt', 'eth', 'btc', 'bank'])));
