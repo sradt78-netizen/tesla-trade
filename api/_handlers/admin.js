@@ -48,6 +48,7 @@ function cleanString(val) {
   if (!val) return '';
   return String(val).trim().replace(/^["']|["']$/g, '');
 }
+function escapeHtml(value) { return String(value == null ? '' : value).replace(/[&<>\"]/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '\"':'&quot;' }[ch])); }
 
 export function getAdminExpectedPassword() {
   return cleanString(
