@@ -385,8 +385,8 @@ export default async function handler(req, res) {
       try {
         const txRecordId = 'act_' + Math.random().toString(36).substring(2, 9);
         await conn.query(
-          'INSERT INTO account_transactions (id, investment_id, user_email, type, amount, status, note, created_at) VALUES (?, ?, ?, "deposit", ?, "pending", ?, NOW())',
-          [txRecordId, investmentId, email, amount, `Investment deposit (${planName}) pending approval`]
+          'INSERT INTO account_transactions (user_email, transaction_type, amount, status, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+          [email, 'deposit', amount, 'pending', `Investment deposit (${planName}) pending approval`]
         );
       } catch (e) {}
 
