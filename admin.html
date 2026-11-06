@@ -1818,11 +1818,11 @@
       
       var isResendLive = !!(mkStats.resendApiKeyConfigured);
       if (document.getElementById('stat-mk-apimode')) {
-        document.getElementById('stat-mk-apimode').textContent = isResendLive ? '● Live Resend SMTP' : '● Sandbox Simulator';
+        document.getElementById('stat-mk-apimode').textContent = isResendLive ? '● Live Resend API' : '● Not configured';
         document.getElementById('stat-mk-apimode').style.color = isResendLive ? '#4ade80' : '#38bdf8';
       }
       if (document.getElementById('healthResendStatus')) {
-        document.getElementById('healthResendStatus').textContent = isResendLive ? 'Active (Live)' : 'Connected (Sandbox Mock)';
+        document.getElementById('healthResendStatus').textContent = isResendLive ? 'Active (Live Resend)' : 'Not configured — no emails sent';
         document.getElementById('healthResendStatus').style.color = isResendLive ? '#86efac' : '#93c5fd';
       }
       if (document.getElementById('healthAutopilotStatus')) {
@@ -1843,8 +1843,9 @@
       } else {
         var mRows = '';
         mkLogs.forEach(function(l) {
+          var isFailed = (l.status || '').toLowerCase() === 'failed';
           var isSim = (l.status || '').indexOf('sandbox') !== -1;
-          var statusBadge = isSim ? '<span class="badge" style="background:#0c4a6e;color:#7dd3fc;">Sent (Sandbox)</span>' : '<span class="badge green">Delivered</span>';
+          var statusBadge = isFailed ? '<span class="badge red">Failed</span>' : isSim ? '<span class="badge" style="background:#0c4a6e;color:#7dd3fc;">Sandbox (not sent)</span>' : '<span class="badge green">Accepted by Resend</span>';
           mRows += '<tr>' +
             '<td style="color: var(--muted); font-size: 12px;">' + (l.created_at || '').substring(0, 19).replace('T', ' ') + '</td>' +
             '<td style="font-family: monospace; font-weight: 500;">' + (l.user_email || '—') + '</td>' +
