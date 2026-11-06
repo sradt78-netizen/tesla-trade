@@ -1332,7 +1332,7 @@
     }
 
     var activeSupportThread = '';
-    function supportEsc(v){return String(v==null?'':v).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];});}
+    function supportEsc(v){return String(v==null?'':v).replace(/[&<>"]/g,function(c){return c==='&'?'&amp;':c==='<'?'&lt;':c==='>'?'&gt;':'&quot;';});}
     function loadSupportInbox(){
       adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'support_list'})}).then(function(r){return r.json();}).then(function(d){
         if(!d.success)throw new Error(d.error||'Could not load support inbox');
