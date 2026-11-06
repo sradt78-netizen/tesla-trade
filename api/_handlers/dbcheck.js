@@ -1,4 +1,7 @@
-import { checkMySqlHealth, resolveDatabaseConfig } from '../db.js';
+import { getDbConnection, checkMySqlHealth, resolveDatabaseConfig } from '../db.js';
+
+// api/index.js imports this compatibility export for invitation validation.
+export { getDbConnection };
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
