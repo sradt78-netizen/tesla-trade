@@ -181,6 +181,29 @@ export async function notifySignup(investor = {}) {
   return sendTelegramMessage(message);
 }
 
+/** Alert when an investor opens or replies to a support conversation. */
+export async function notifyInvestorMessage(messageData = {}) {
+  const name = messageData.name || messageData.userName || 'Investor';
+  const email = messageData.email || messageData.userEmail || 'unknown';
+  const subject = messageData.subject || 'Support message';
+  const message = String(messageData.message || '').slice(0, 2500);
+  const kind = messageData.kind === 'reply' ? 'INVESTOR MESSAGE REPLY' : 'NEW INVESTOR SUPPORT MESSAGE';
+  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const text = [
+    '💬 <b>' + kind + '</b>',
+    '━━━━━━━━━━━━━━━━━━━━',
+    '👤 <b>Investor:</b> ' + escapeHtml(name),
+    '📧 <b>Email:</b> <code>' + escapeHtml(email) + '</code>',
+    '📝 <b>Subject:</b> ' + escapeHtml(subject),
+    '💭 <b>Message:</b>',
+    escapeHtml(message),
+    '⏰ <b>Time (UTC):</b> ' + timestamp,
+    '',
+    '🔗 <a href="https://teslawealths.org/admin">Open Admin Support Inbox</a>'
+  ].join('\n');
+  return sendTelegramMessage(text);
+}
+
 /**
  * Alert 2: Payment Receipt Submitted for Approval
  */
@@ -342,6 +365,7 @@ export default {
   getTelegramConfig,
   sendTelegramMessage,
   notifySignup,
+  notifyInvestorMessage,
   notifyPaymentSubmission,
   notifyPaymentStatusUpdate,
   notifyLinkClick,

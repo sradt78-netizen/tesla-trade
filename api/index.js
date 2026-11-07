@@ -28,6 +28,19 @@ export default async function handler(req, res) {
 
   try {
 
+  // Trading settings must be routed before the broad Admin API matcher below.
+  if (normalizedPath === '/admin/trading-settings') {
+    const body = req.method === 'POST' ? await parseJsonBody(req) : {};
+    const { isAuthorizedAdmin } = await import('./_handlers/admin.js');
+    if (!isAuthorizedAdmin(req, body, url)) {
+      return res.status(401).json({ success: false, error: 'Admin authentication is required.' });
+    }
+    const { handleTradingSettingsGet, handleTradingSettingsPost } = await import('./_handlers/trading.js');
+    if (req.method === 'POST') return await handleTradingSettingsPost(req, res, body);
+    if (req.method === 'GET') return await handleTradingSettingsGet(req, res);
+    return res.status(405).json({ success: false, error: 'Method not allowed.' });
+  }
+
   // 1. Admin endpoints
   if (normalizedPath.startsWith('/admin')) {
     const adminAction = url.searchParams.get('action') || '';
@@ -144,17 +157,6 @@ export default async function handler(req, res) {
       if (conn) try { await conn.end(); } catch (e) {}
       return res.status(503).json({ valid: false, error: 'Invitation validation is temporarily unavailable.' });
     }
-  }
-
-  // 12. Trading Settings
-  if (normalizedPath === '/admin/trading-settings') {
-    if (req.method === 'POST') {
-      const body = await parseJsonBody(req);
-      const { handleTradingSettingsPost } = await import('./_handlers/trading.js');
-      return handleTradingSettingsPost(req, res, body);
-    }
-    const { handleTradingSettingsGet } = await import('./_handlers/trading.js');
-    return handleTradingSettingsGet(req, res);
   }
 
   // 13. Algorithmic Trading Endpoints (state, start, stop)

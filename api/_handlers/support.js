@@ -104,10 +104,12 @@ export default async function handler(req, res) {
       await conn.commit();
       await conn.end();
       const ticketUrl = 'https://teslawealths.org/support?ticket=' + encodeURIComponent(id) + '&token=' + encodeURIComponent(accessToken);
-      const [adminMail, userMail] = await Promise.allSettled([
+      const [telegramAlert, adminMail, userMail] = await Promise.allSettled([
+        import('../telegram.js').then(({ notifyInvestorMessage }) => notifyInvestorMessage({ name, email, subject, message, kind: 'new' })),
         sendSupportMessageEmail({ toAdmin: true, userEmail: email, userName: name, subject, message, ticketUrl }),
         sendSupportMessageEmail({ to: email, userName: name, subject: 'We received your support request: ' + subject, message: 'Your message has been received. You can view replies and respond securely using your private support link.', ticketUrl })
       ]);
+      if (telegramAlert.status === 'rejected' || telegramAlert.value?.ok === false) console.error('[support] Telegram alert failed:', telegramAlert.reason?.message || telegramAlert.value?.error || 'not delivered');
       return res.status(201).json({
         success: true, ticketId: id, token: accessToken, ticketUrl,
         emailStatus: { admin: adminMail.status === 'fulfilled' && adminMail.value?.ok, investor: userMail.status === 'fulfilled' && userMail.value?.ok }
@@ -137,9 +139,13 @@ export default async function handler(req, res) {
       await conn.query('UPDATE support_threads SET status="open",updated_at=NOW() WHERE id=?', [ticketId]);
       await conn.commit();
       await conn.end();
-      const { adminEmail } = await (await import('../mailer.js')).getMailerConfig();
+      const [{ adminEmail }, telegramResult] = await Promise.all([
+        (await import('../mailer.js')).getMailerConfig(),
+        import('../telegram.js').then(({ notifyInvestorMessage }) => notifyInvestorMessage({ name: thread.user_name, email: thread.user_email, subject: thread.subject, message, kind: 'reply' }))
+      ]);
       const mail = await sendSupportMessageEmail({ to: adminEmail, toAdmin: true, userEmail: thread.user_email, userName: thread.user_name, subject: 'Investor replied: ' + thread.subject, message, ticketUrl: 'https://teslawealths.org/admin' });
-      return res.status(200).json({ success: true, emailSent: !!mail?.ok });
+      if (telegramResult?.ok === false) console.error('[support] Telegram reply alert failed:', telegramResult.error);
+      return res.status(200).json({ success: true, emailSent: !!mail?.ok, telegramSent: !!telegramResult?.ok });
     }
 
     if (conn) await conn.end();
