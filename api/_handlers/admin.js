@@ -557,6 +557,7 @@ export default async function handler(req, res) {
       let codes = mockStore.codes;
       let clicks = mockStore.clicks;
       let marketingLogs = mockStore.marketingLogs;
+      let referrals = [];
       let settings = { ...mockStore.settings };
 
       if (isDbConnected && conn) {
@@ -594,7 +595,7 @@ export default async function handler(req, res) {
        } catch (referralColumnError) {
          console.warn('[admin referrals] attribution column unavailable:', referralColumnError?.code || referralColumnError?.message);
        }
-       const referrals = await safeQuery(
+       referrals = await safeQuery(
          `SELECT
             a.email AS investor_email,
             COALESCE(NULLIF(a.name,''), i.investor_name, a.email) AS investor_name,
@@ -631,7 +632,23 @@ export default async function handler(req, res) {
         financing = await safeQuery('SELECT * FROM financing_applications ORDER BY created_at DESC', financing);
         codes = await safeQuery('SELECT * FROM invitation_codes ORDER BY created_at DESC', codes);
         clicks = await safeQuery('SELECT * FROM analytics_clicks ORDER BY id DESC LIMIT 50', clicks);
-        marketingLogs = await safeQuery('SELECT * FROM marketing_emails_log ORDER BY created_at DESC LIMIT 60', marketingLogs);
+        const marketingColumns = await safeQuery('SHOW COLUMNS FROM marketing_emails_log', []);
+        const marketingColumnNames = new Set((marketingColumns || []).map(row => String(row.Field || '').toLowerCase()));
+        if (marketingColumnNames.size) {
+          const emailColumn = marketingColumnNames.has('user_email') ? 'user_email' : (marketingColumnNames.has('email') ? 'email' : '');
+          const typeColumn = marketingColumnNames.has('campaign_type') ? 'campaign_type' : (marketingColumnNames.has('email_type') ? 'email_type' : '');
+          const dateColumn = marketingColumnNames.has('created_at') ? 'created_at' : (marketingColumnNames.has('sent_at') ? 'sent_at' : 'id');
+          const subjectExpr = marketingColumnNames.has('subject') ? 'subject' : "''";
+          const statusExpr = marketingColumnNames.has('status') ? 'status' : "'sent'";
+          const emailExpr = emailColumn ? '`' + emailColumn + '`' : "''";
+          const typeExpr = typeColumn ? '`' + typeColumn + '`' : "''";
+          marketingLogs = await safeQuery(
+            'SELECT *, ' + emailExpr + ' AS user_email, ' + typeExpr + ' AS campaign_type, ' +
+            subjectExpr + ' AS subject, ' + statusExpr + ' AS status, `' + dateColumn + '` AS created_at ' +
+            'FROM marketing_emails_log ORDER BY `' + dateColumn + '` DESC LIMIT 60',
+            marketingLogs
+          );
+        }
         Object.assign(settings, await readAppSettings(conn));
         await conn.end();
       }
