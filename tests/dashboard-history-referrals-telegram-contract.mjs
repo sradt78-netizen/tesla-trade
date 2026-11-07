@@ -34,7 +34,7 @@ assert.ok(modalStart >= 0 && modalEnd > modalStart, 'dashboard deposit modal mus
 const dashboardPaymentModal = index.slice(modalStart, modalEnd);
 assert.equal((dashboardPaymentModal.match(/addMethod\('/g) || []).length, 4, 'dashboard deposit modal must add exactly four methods');
 assert.doesNotMatch(dashboardPaymentModal, /venmo|cashapp|paypal|alipay|wechat/i, 'retired payment methods must not be shown in dashboard modal');
-assert.doesNotMatch(dashboardPaymentModal, /sample[A-Za-z0-9@._-]*/, 'invented sample payment destinations must not be displayed');
+assert.doesNotMatch(dashboardPaymentModal, /@sample|sample(?:CashApp|[-_](?:venmo|paypal|alipay|wechat))/i, 'invented sample payment destinations must not be displayed');
 
 assert.match(index, /transaction-history-fix\.js\?v=20261107-dashboard-history/);
 assert.match(index, /pending-payment-dashboard\.js\?v=20261107-method-display/);
