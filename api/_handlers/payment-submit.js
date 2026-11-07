@@ -266,6 +266,7 @@ export default async function handler(req, res) {
     const planId = fields.planId || fields.plan_id || 'standard';
     const planName = fields.planName || fields.plan_name || fields.portfolio || 'Explorer';
     const userName = fields.userName || fields.name || 'Investor';
+    const submittedReferralCode = cleanString(fields.referralCode || fields.referral_code).toUpperCase().slice(0, 16);
 
     // Extract receipt file or string
     let proofDataUri = '';
@@ -331,6 +332,19 @@ export default async function handler(req, res) {
         globalThis.__ttCols = true;
       }
 
+      // Accept only an existing referral code belonging to another investor.
+      // Referral attribution never changes the deposit amount or wallet balance.
+      let acceptedReferralCode = null;
+      if (/^[A-Z0-9]{4,16}$/.test(submittedReferralCode)) {
+        try {
+          const [refRows] = await conn.query('SELECT email FROM referral_codes WHERE UPPER(code)=? LIMIT 1', [submittedReferralCode]);
+          const referrerEmail = String(refRows[0]?.email || '').toLowerCase().trim();
+          if (referrerEmail && referrerEmail !== email) acceptedReferralCode = submittedReferralCode;
+        } catch (referralLookupError) {
+          console.warn('[payment-submit] referral attribution lookup skipped:', referralLookupError?.code || referralLookupError?.message);
+        }
+      }
+
       // Check existing investments for this user
       failedStep = 'existing_investment_lookup';
       const [existing] = await conn.query(
@@ -354,8 +368,8 @@ export default async function handler(req, res) {
         investmentId = existing[0].id;
         const currentAmt = amount > 0 ? amount : parseFloat(existing[0].total || '0');
         await conn.query(
-          'UPDATE investments SET total=?, total_current_value=?, payment_proof_path=?, payment_proof_name=?, payment_reference=?, status=?, payment_proof_uploaded_at=NOW(), payment_submitted_at=NOW() WHERE id=? AND LOWER(user_email)=? AND status NOT IN (?, ?, ?)',
-          [currentAmt, currentAmt, proofDataUri || null, proofFileName || null, ref || null, 'pending_approval', investmentId, email, 'active', 'approved', 'completed']
+          'UPDATE investments SET total=?, total_current_value=?, payment_proof_path=?, payment_proof_name=?, payment_reference=?, referral_code=COALESCE(referral_code,?), status=?, payment_proof_uploaded_at=NOW(), payment_submitted_at=NOW() WHERE id=? AND LOWER(user_email)=? AND status NOT IN (?, ?, ?)',
+          [currentAmt, currentAmt, proofDataUri || null, proofFileName || null, ref || null, acceptedReferralCode, 'pending_approval', investmentId, email, 'active', 'approved', 'completed']
         );
       } else {
         failedStep = 'investment_insert';
@@ -363,13 +377,13 @@ export default async function handler(req, res) {
           `INSERT INTO investments (
             id, tx_id, user_id, user_name, user_email, portfolio,
             plan_id, plan_label, plan_name, total, total_current_value,
-            method, payment_reference, payment_proof_path, payment_proof_name,
+            method, payment_reference, payment_proof_path, payment_proof_name, referral_code,
             payment_proof_uploaded_at, payment_submitted_at, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, NOW())`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, NOW())`,
           [
             investmentId, txId, email, userName, email, portfolio,
             planId, planName, planName, amount, amount,
-            method, ref || null, proofDataUri || null, proofFileName || null,
+            method, ref || null, proofDataUri || null, proofFileName || null, acceptedReferralCode,
             'pending_approval'
           ]
         );
@@ -438,6 +452,7 @@ export default async function handler(req, res) {
       payment_reference: ref,
       payment_proof_path: proofDataUri,
       payment_proof_name: proofFileName,
+      referral_code: acceptedReferralCode,
       status: 'pending_approval',
       created_at: new Date().toISOString()
     };
