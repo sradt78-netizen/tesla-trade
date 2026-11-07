@@ -80,18 +80,19 @@
     if (!isDashboardRoute()) return;
     var root = document.getElementById('root');
     if (!root) return;
-    var host = document.getElementById('ttinc-dashboard-addon-stack') || root;
     var card = document.getElementById(DASHBOARD_HISTORY_ID);
     if (!card) {
       card = document.createElement('section');
       card.id = DASHBOARD_HISTORY_ID;
       card.setAttribute('aria-label', 'Recent transaction history');
       card.style.cssText = 'box-sizing:border-box;width:100%;margin:18px 0;padding:16px;background:#111;border:1px solid #252525;border-radius:14px;color:#fff;font-family:Arial,sans-serif;';
-      if (host.id === 'ttinc-dashboard-addon-stack' && host.parentNode) {
-        host.parentNode.insertBefore(card, host.nextSibling);
-      } else {
-        host.appendChild(card);
-      }
+    }
+    // The portfolio and balance are rendered inside #root. Keep history outside
+    // React's managed tree, but place it immediately after the whole dashboard.
+    // The add-on stack is intentionally before #root and must not host history.
+    if (root.parentNode &&
+        (card.parentNode !== root.parentNode || card.previousElementSibling !== root)) {
+      root.parentNode.insertBefore(card, root.nextSibling);
     }
     var items = (Array.isArray(rows) ? rows : []).slice(0, 5);
     var list = items.length ? items.map(function (item) {

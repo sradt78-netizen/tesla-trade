@@ -43,6 +43,10 @@ assert.match(pendingUi, /escapeHtml\(det\.method\)/);
 assert.match(historyUi, /Recent history/);
 assert.match(historyUi, /\/api\/transactions\?email=/);
 assert.match(historyUi, /View all/);
+assert.match(historyUi, /root\.parentNode\.insertBefore\(card, root\.nextSibling\)/,
+  'dashboard history must sit immediately below the complete balance and portfolio dashboard');
+assert.doesNotMatch(historyUi, /host\.parentNode\.insertBefore\(card, host\.nextSibling\)/,
+  'history must not be injected into the add-on stack above the dashboard');
 
 // Referral attribution is validated against the real referral_codes table and set once.
 assert.match(accountsApi, /ensureReferralAttributionColumn/);
