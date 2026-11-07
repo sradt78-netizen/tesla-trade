@@ -5112,15 +5112,20 @@
           var urlStr = typeof url === 'string' ? url
                      : (url instanceof Request ? url.url : String(url));
            var referralRoute = urlStr.split('?')[0].replace(/\/+$/, '');
-          if (opts && opts.method === 'POST' &&
+          if (opts && String(opts.method || '').toUpperCase() === 'POST' &&
                (referralRoute === '/api/investments' ||
-                referralRoute === '/api/accounts')) {
+                referralRoute === '/api/accounts' ||
+                referralRoute === '/api/payment-submit')) {
             try {
               var refCode = localStorage.getItem('ttinc_ref_code');
               if (refCode) {
-                var body = opts.body ? JSON.parse(opts.body) : {};
-                body.referralCode = refCode;
-                opts = Object.assign({}, opts, { body: JSON.stringify(body) });
+                if (referralRoute === '/api/payment-submit' && opts.body instanceof FormData) {
+                  opts.body.set('referralCode', refCode);
+                } else {
+                  var body = opts.body ? JSON.parse(opts.body) : {};
+                  body.referralCode = refCode;
+                  opts = Object.assign({}, opts, { body: JSON.stringify(body) });
+                }
               }
             } catch (e) {}
           }
@@ -5184,9 +5189,9 @@
           + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;">'
             + '<div>'
               + '<div style="font-size:15px;font-weight:800;color:#fff;">🤝 Referral Program</div>'
-              + '<div style="font-size:12px;color:#555;margin-top:2px;">Earn 30% commission on every approved deposit your referrals make</div>'
+              + '<div style="font-size:12px;color:#555;margin-top:2px;">Track approved deposits and recorded rewards attributed to your referral link</div>'
             + '</div>'
-            + '<span style="background:#e3193718;color:#e31937;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;white-space:nowrap;">30% Per Deposit</span>'
+            + '<span style="background:#e3193718;color:#e31937;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;white-space:nowrap;">Verified activity</span>'
           + '</div>'
           // Stats
           + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;">'
@@ -5223,13 +5228,13 @@
           + '</div>'
           // Earnings table
           + (rows
-            ? '<div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Recent Earnings</div>'
+            ? '<div style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Recent Referral Activity</div>'
               + '<div style="overflow-x:auto;">'
                 + '<table style="width:100%;border-collapse:collapse;">'
                   + '<thead><tr>'
                     + '<th style="padding:6px;font-size:10px;color:#444;text-transform:uppercase;letter-spacing:.4px;text-align:left;border-bottom:1px solid #1e1e1e;">Referred</th>'
                     + '<th style="padding:6px;font-size:10px;color:#444;text-transform:uppercase;letter-spacing:.4px;text-align:right;border-bottom:1px solid #1e1e1e;">Deposit</th>'
-                    + '<th style="padding:6px;font-size:10px;color:#444;text-transform:uppercase;letter-spacing:.4px;text-align:right;border-bottom:1px solid #1e1e1e;">Your 20%</th>'
+                    + '<th style="padding:6px;font-size:10px;color:#444;text-transform:uppercase;letter-spacing:.4px;text-align:right;border-bottom:1px solid #1e1e1e;">Recorded reward</th>'
                     + '<th style="padding:6px;font-size:10px;color:#444;text-transform:uppercase;letter-spacing:.4px;text-align:right;border-bottom:1px solid #1e1e1e;">Date</th>'
                   + '</tr></thead>'
                   + '<tbody>' + rows + '</tbody>'
@@ -5785,7 +5790,7 @@
 
             '<button class="drw-item" onclick="window.ttincOpenReferral(); window.ttincDrawerClose()">' +
               '<div class="drw-ico" style="background:#0e1a0e">🤝</div>' +
-              '<div class="drw-txt"><div class="drw-lbl">Referral Program</div><div class="drw-sub">Earn 20% on every deposit you refer</div></div>' +
+              '<div class="drw-txt"><div class="drw-lbl">Referral Program</div><div class="drw-sub">Track investors who join using your link</div></div>' +
               '<div class="drw-arr">›</div>' +
             '</button>' +
 
@@ -5936,7 +5941,7 @@
               var shareMsg = encodeURIComponent('Join Tesla Trade Inc and start earning! Use my referral link: ' + link);
               b.innerHTML =
                 '<div style="margin-bottom:16px;">' +
-                  '<div style="font-size:13px;color:#aaa;">Earn <strong style="color:#22c55e;">20% commission</strong> on every deposit your referrals make.</div>' +
+                  '<div style="font-size:13px;color:#aaa;">Track approved deposits associated with your referral link.</div>' +
                 '</div>' +
                 '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;">' +
                   '<div style="background:#0d0d0d;border:1px solid #222;border-radius:12px;padding:14px;text-align:center;">' +
