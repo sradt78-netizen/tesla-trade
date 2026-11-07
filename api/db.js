@@ -936,7 +936,8 @@ export async function ensureTradingColumns(cfg) {
     "deposit_purpose VARCHAR(50) NOT NULL DEFAULT 'investment'",
     "deposit_parent_id VARCHAR(36) DEFAULT NULL",
     "payment_confirmed TINYINT(1) NOT NULL DEFAULT 0",
-    "can_withdraw TINYINT(1) NOT NULL DEFAULT 0"
+    "can_withdraw TINYINT(1) NOT NULL DEFAULT 0",
+    "referral_code VARCHAR(16) DEFAULT NULL"
   ];
   for (const c of cols) {
     try { await conn.query('ALTER TABLE investments ADD COLUMN ' + c); } catch (e) {}
