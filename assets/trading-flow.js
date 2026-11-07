@@ -650,14 +650,16 @@
     // Place the trade panel immediately before the KYC notice when present.
     // This is stable on the compact mobile dashboard as well as desktop.
     var kycCard = null;
+    var kycCardTextLength = Infinity;
     if (content.querySelectorAll) {
       Array.prototype.forEach.call(content.querySelectorAll('*'), function (node) {
-        if (kycCard) return;
-        var label = node.textContent || '';
+        var label = (node.textContent || '').trim();
         if (label.indexOf('Complete your KYC') !== -1 &&
             label.indexOf('Verify your identity') !== -1 &&
-            node.children && node.children.length > 0) {
+            node.children && node.children.length > 0 &&
+            label.length < kycCardTextLength) {
           kycCard = node;
+          kycCardTextLength = label.length;
         }
       });
     }
@@ -743,7 +745,27 @@
           }
         }, 1200);
       }
-    }).catch(function () { mountInProgress = false; });
+    }).catch(function (error) {
+      mountInProgress = false;
+      var root = document.getElementById('root');
+      if (!root) return;
+      var host = document.getElementById(stackId);
+      if (!host) {
+        host = document.createElement('div');
+        host.id = stackId;
+      }
+      if (!arrangeDashboard(root, host) || !host.isConnected) root.appendChild(host);
+      var shell = document.getElementById(shellId);
+      if (!shell) {
+        shell = document.createElement('section');
+        shell.id = shellId;
+        host.appendChild(shell);
+      }
+      if (!shell.querySelector('[data-trade-error]')) {
+        shell.innerHTML = '<div style="padding:18px 20px;border:1px solid #3b2630;border-radius:14px;background:#101116;color:#e2e8f0;"><div style="font-weight:800;margin-bottom:6px;">Trading Activity</div><div data-trade-error style="display:block;color:#fca5a5;font-size:13px;line-height:1.6;"></div></div>';
+      }
+      showError(error && error.message ? error.message : 'Trading status could not be loaded. Please retry.');
+    });
   }
 
   document.addEventListener('click', function (event) {
