@@ -338,10 +338,10 @@ export default async function handler(req, res) {
 
     if (isNewSocialAccount) {
       try {
-        const mailer = await import('../mailer.js');
-        const notifications = await import('../notifications.js');
+        const [{ notifySignup }, mailer, notifications] = await Promise.all([import('../telegram.js'), import('../mailer.js'), import('../notifications.js')]);
         const cfg = await mailer.getMailerConfig();
         const results = await Promise.allSettled([
+          notifySignup({ name, email, phone: profilePhone, ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '' }),
           mailer.sendWelcomeEmail(email,name),
           notifications.sendEventEmail({to:cfg.adminEmail,name:'Admin',event:'New social signup',subject:'A new investor has registered',message:'A new investor account was created using '+provider+'. Review the account in the admin dashboard.',ctaLabel:'Open Admin Dashboard',ctaPath:'/admin',details:[{label:'Investor',value:name},{label:'Email',value:email}]})
         ]);
