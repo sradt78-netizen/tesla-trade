@@ -118,10 +118,10 @@ export async function getOrCreateInvestment(id, email) {
   try {
     let rows = [];
     if (id && !String(id).startsWith('sim_')) {
-      [rows] = await conn.query("SELECT " + COLS + " FROM investments WHERE id=? AND LOWER(user_email)=? AND status IN ('active','approved') LIMIT 1", [id, lcEmail]);
+      [rows] = await conn.query("SELECT " + COLS + " FROM investments WHERE id=? AND LOWER(user_email)=? AND status IN ('active','approved','completed') LIMIT 1", [id, lcEmail]);
     }
     if (!rows.length) {
-      [rows] = await conn.query("SELECT " + COLS + " FROM investments WHERE LOWER(user_email)=? AND status IN ('active','approved') ORDER BY (deposit_parent_id IS NULL) DESC, created_at ASC LIMIT 1", [lcEmail]);
+      [rows] = await conn.query("SELECT " + COLS + " FROM investments WHERE LOWER(user_email)=? AND status IN ('active','approved','completed') ORDER BY (deposit_parent_id IS NULL) DESC, created_at ASC LIMIT 1", [lcEmail]);
     }
     if (!rows.length) { const error = new Error('Trading unlocks only after an administrator approves a deposit.'); error.statusCode = 403; throw error; }
     return rowToInv(rows[0]);
@@ -135,7 +135,7 @@ async function saveInv(inv, fields, ledgerEntry, email) {
     const [result] = await conn.query(
       "UPDATE investments SET total_current_value=?, earnings=?, trading_status=?, trading_amount=?, trading_started_at=" +
       (fields.startedAt ? 'FROM_UNIXTIME(?)' : 'NULL') +
-      ", trading_updated_at=NOW() WHERE id=? AND status IN ('active','approved')",
+      ", trading_updated_at=NOW() WHERE id=? AND status IN ('active','approved','completed')",
       fields.startedAt
         ? [inv.totalCurrentValue, Math.max(0, inv.totalCurrentValue - inv.total), inv.tradingStatus, inv.tradingAmount, fields.startedAt, inv.id]
         : [inv.totalCurrentValue, Math.max(0, inv.totalCurrentValue - inv.total), inv.tradingStatus, inv.tradingAmount, inv.id]
