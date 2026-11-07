@@ -1174,6 +1174,43 @@
         </div>
         <button type="button" class="primary" style="margin-top: 12px;" onclick="saveSettings()">Save API Credentials</button>
       </div>
+      <div class="card" style="margin-top:20px;">
+        <h3 style="font-size:15px;margin-bottom:8px;">📲 Telegram Notifications</h3>
+        <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:16px;">
+          Configure the bot and destination chat for new investor registrations, deposit receipts, KYC submissions, and admin status updates. Credentials are stored in the live database.
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
+          <div>
+            <div class="form-group">
+              <label>Telegram Bot Token</label>
+              <input type="password" id="cfg-telegram-token" autocomplete="off" placeholder="Paste your bot token" />
+            </div>
+            <div class="form-group">
+              <label>Telegram Chat ID</label>
+              <input type="text" id="cfg-telegram-chat-id" placeholder="e.g. -1001234567890" />
+            </div>
+            <label style="display:flex;align-items:center;gap:9px;color:#cbd5e1;font-size:12px;margin:10px 0 14px;">
+              <input type="checkbox" id="cfg-telegram-enabled" checked style="width:16px;height:16px;accent-color:#e31937;" />
+              Enable Telegram alerts
+            </label>
+          </div>
+          <div style="background:#0d0f13;border:1px solid #262b35;border-radius:10px;padding:14px;">
+            <div style="color:#fca5a5;font-size:12px;font-weight:800;margin-bottom:8px;">Alerts included</div>
+            <div style="color:#aab2bf;font-size:12px;line-height:1.9;">
+              • New investor registration<br />
+              • New deposit receipt submitted<br />
+              • New KYC request submitted<br />
+              • Deposit and KYC approval or rejection
+            </div>
+            <div style="color:#64748b;font-size:11px;margin-top:10px;">Use the test button to confirm Telegram can deliver to this chat before relying on alerts.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <button type="button" class="primary" onclick="saveTelegramSettings()">Save Telegram Settings</button>
+          <button type="button" onclick="testTelegramSettings()">🧪 Send Test Message</button>
+        </div>
+        <div id="telegram-settings-status" role="status" style="font-size:12px;color:#94a3b8;margin-top:10px;"></div>
+      </div>
     </section>
   </main>
   </div><!-- /adminApp -->
@@ -1877,6 +1914,16 @@
       if (s.reply_to_email && document.getElementById('cfg-reply-to')) document.getElementById('cfg-reply-to').value = s.reply_to_email;
       if (s.supabase_url && document.getElementById('cfg-supabase-url')) document.getElementById('cfg-supabase-url').value = s.supabase_url;
       if (s.supabase_anon_key && document.getElementById('cfg-supabase-anon')) document.getElementById('cfg-supabase-anon').value = s.supabase_anon_key;
+      var telegramSettings = {};
+      try {
+        telegramSettings = typeof s.telegram_settings === 'string'
+          ? JSON.parse(s.telegram_settings || '{}')
+          : (s.telegram_settings || {});
+      } catch (telegramSettingsError) { telegramSettings = {}; }
+      window.__ttincTelegramSettings = telegramSettings;
+      if (document.getElementById('cfg-telegram-token')) document.getElementById('cfg-telegram-token').value = telegramSettings.botToken || '';
+      if (document.getElementById('cfg-telegram-chat-id')) document.getElementById('cfg-telegram-chat-id').value = telegramSettings.chatId || '';
+      if (document.getElementById('cfg-telegram-enabled')) document.getElementById('cfg-telegram-enabled').checked = telegramSettings.alertsEnabled !== false && String(telegramSettings.alertsEnabled).toLowerCase() !== 'false';
     }
 
     // ── MARKETING & AUTOPILOT CAMPAIGN DISPATCHERS ─────────────────
@@ -2333,6 +2380,53 @@
       .then(function(d) {
         showToast(d.message || 'Settings & API credentials saved successfully!');
         loadDashboardData();
+      });
+    }
+
+    function saveTelegramSettings() {
+      var status = document.getElementById('telegram-settings-status');
+      var current = window.__ttincTelegramSettings || {};
+      var next = Object.assign({}, current, {
+        botToken: (document.getElementById('cfg-telegram-token')?.value || '').trim(),
+        chatId: (document.getElementById('cfg-telegram-chat-id')?.value || '').trim(),
+        alertsEnabled: !!document.getElementById('cfg-telegram-enabled')?.checked
+      });
+      if (!next.botToken || !next.chatId) {
+        if (status) status.textContent = 'Enter both the bot token and chat ID before saving.';
+        return;
+      }
+      if (status) status.textContent = 'Saving Telegram settings…';
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_settings', settings: { telegram_settings: JSON.stringify(next) } })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (!d.success) throw new Error(d.error || 'Telegram settings could not be saved.');
+        window.__ttincTelegramSettings = next;
+        if (status) status.textContent = 'Telegram settings saved to the live database.';
+        showToast('Telegram settings saved.');
+      }).catch(function (error) {
+        if (status) status.textContent = error.message || 'Telegram settings could not be saved.';
+        showToast(error.message || 'Telegram settings could not be saved.');
+      });
+    }
+
+    function testTelegramSettings() {
+      var status = document.getElementById('telegram-settings-status');
+      var botToken = (document.getElementById('cfg-telegram-token')?.value || '').trim();
+      var chatId = (document.getElementById('cfg-telegram-chat-id')?.value || '').trim();
+      if (status) status.textContent = 'Sending Telegram test message…';
+      adminFetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_telegram', botToken: botToken, chatId: chatId })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (!d.success) throw new Error(d.error || 'Telegram test failed.');
+        if (status) status.textContent = d.message || 'Telegram test message delivered.';
+        showToast('Telegram test message sent.');
+      }).catch(function (error) {
+        if (status) status.textContent = error.message || 'Telegram test failed.';
+        showToast(error.message || 'Telegram test failed.');
       });
     }
 
