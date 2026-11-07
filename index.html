@@ -2726,9 +2726,9 @@
     <script src="/assets/portfolio-route-fix.js?v=20260920-language-portfolio-fix"></script>
     <script src="/assets/withdrawal-request-fix.js?v=20260917-dashboard-withdraw-route"></script>
     <script src="/assets/payment-method-guard.js?v=20260919-retire-payment-method"></script>
-    <script src="/assets/transaction-history-fix.js?v=20260808"></script>
+    <script src="/assets/transaction-history-fix.js?v=20261107-dashboard-history"></script>
     <script src="/assets/trading-flow.js?v=20261107-trading-state-errors"></script>
-  <script src="/assets/pending-payment-dashboard.js?v=20260922-returning-investor"></script>
+  <script src="/assets/pending-payment-dashboard.js?v=20261107-method-display"></script>
 
     <!-- Social signup bridge for the compiled /register screen. The existing
          email/OTP registration form stays intact; these buttons use the same
@@ -7640,49 +7640,29 @@
           body.innerHTML = '';
           var methodsAdded = 0;
 
-          // Always show the complete payment catalog; sample details keep
-          // methods visible until an admin replaces them.
-          function addMethod(icon, label, detail, copyVal, fallback) {
-            var row = buildMethodRow(icon, label, detail, copyVal, fallback);
+          // Keep the dashboard deposit modal aligned with the four methods managed in Admin.
+          // Blank destinations are shown as pending setup; no sample wallet details are invented.
+          function addMethod(icon, label, detail, copyVal) {
+            var row = buildMethodRow(icon, label, detail, copyVal, 'Not configured — contact support');
             if (row) { body.appendChild(row); methodsAdded++; }
           }
 
-          var usdt   = ps.usdt   || {};
-          var eth    = ps.eth    || {};
-          var btc    = ps.btc    || {};
-          var bank   = ps.bank   || {};
-          var venmo  = ps.venmo  || {};
-          var cashapp = ps.cashapp || {};
-          var paypal = ps.paypal || {};
-          var alipay = ps.alipay || {};
-          var wechat = ps.wechat || {};
+          var usdt = ps.usdt || {};
+          var eth = ps.eth || {};
+          var btc = ps.btc || {};
+          var bank = ps.bank || {};
 
-          addMethod('🪙', (usdt.label || 'USDT') + ' · ' + (usdt.network || 'TRC-20'),
-                    usdt.address, usdt.address,
-                    'Sample details — update in Admin');
-          addMethod('⬡', (eth.label || 'Ethereum (ETH)') + ' · ' + (eth.network || 'ERC-20'),
-                    eth.address, eth.address,
-                    'Sample details — update in Admin');
-          addMethod('₿', btc.label || 'Bitcoin (BTC)',
-                    btc.address, btc.address,
-                    'Sample details — update in Admin');
+          addMethod('🪙', usdt.label || 'USDT (TRC-20)', usdt.address || '', usdt.address || '');
+          addMethod('⬡', eth.label || 'Ethereum (ERC-20)', eth.address || '', eth.address || '');
+          addMethod('₿', btc.label || 'Bitcoin (BTC)', btc.address || '', btc.address || '');
 
-          var bankDetail = '';
-          if (bank.account || bank.name) {
-            bankDetail = [
-              bank.name    ? 'Bank: '    + bank.name    : '',
-              bank.account ? 'Account: ' + bank.account : '',
-              bank.routing ? 'Routing: ' + bank.routing : '',
-              bank.swift   ? 'SWIFT: '   + bank.swift   : '',
-            ].filter(Boolean).join('  |  ');
-          }
-          addMethod('🏦', bank.label || 'Bank Transfer', bankDetail, bank.account,
-                    'Sample details — update in Admin');
-          addMethod('📱', venmo.label  || 'Venmo',      venmo.handle,   venmo.handle,  '@sample-venmo-update-in-admin');
-          addMethod('💵', cashapp.label || 'Cash App',  cashapp.handle, cashapp.handle, '$sampleCashApp-update-in-admin');
-          addMethod('🅿️', paypal.label || 'PayPal',     paypal.handle,  paypal.handle, 'sample-paypal@update-in-admin.example');
-          addMethod('🔷', alipay.label || 'Alipay',     alipay.account, alipay.account, 'sample-alipay-update-in-admin');
-          addMethod('💬', wechat.label || 'WeChat Pay', wechat.account, wechat.account, 'sample-wechat-update-in-admin');
+          var bankDetail = [
+            bank.name ? 'Bank: ' + bank.name : '',
+            bank.account ? 'Account: ' + bank.account : '',
+            bank.routing ? 'Routing: ' + bank.routing : '',
+            bank.swift ? 'SWIFT: ' + bank.swift : ''
+          ].filter(Boolean).join(' | ');
+          addMethod('🏦', bank.label || 'Bank Transfer', bankDetail, bank.account || '');
         });
       }
 
@@ -9607,15 +9587,10 @@
            { id: 'dogecoin_reserve', name: 'Dogecoin Reserve Fund', roi: 140, roiLabel: '60%–140%', term: '90 days', min: 1000, max: 25000, range: '$1,000 – $25,000' }
       ];
       var TT_PAYMENT_METHODS = [
-        { key: 'usdt', label: 'Tether (USDT)' },
-        { key: 'eth', label: 'Ethereum (ETH)' },
+        { key: 'usdt', label: 'USDT (TRC-20)' },
+        { key: 'eth', label: 'Ethereum (ERC-20)' },
         { key: 'btc', label: 'Bitcoin (BTC)' },
-        { key: 'bank', label: 'Bank Transfer' },
-        { key: 'venmo', label: 'Venmo' },
-        { key: 'cashapp', label: 'Cash App' },
-        { key: 'paypal', label: 'PayPal' },
-        { key: 'alipay', label: 'Alipay' },
-        { key: 'wechat', label: 'WeChat Pay' }
+        { key: 'bank', label: 'Bank Transfer' }
       ];
       var PLAN_OV_ID = 'ttinc-investment-plan-flow';
 
