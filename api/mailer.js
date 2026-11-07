@@ -15,29 +15,77 @@ export async function getMailerConfig() {
     process.env.RESEND_API_KEY || process.env.TT_RESEND_API_KEY || process.env.VITE_RESEND_API_KEY
   );
   let fromEmail = cleanString(
-    process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM || process.env.RESEND_SENDER_EMAIL
-  ) || '';
+    process.env.RESEND_FROM_EMAIL ||
+    process.env.TT_RESEND_FROM_EMAIL ||
+    process.env.RESEND_FROM ||
+    process.env.RESEND_SENDER_EMAIL
+  );
   let adminEmail = cleanString(
     process.env.ADMIN_EMAIL || process.env.TT_ADMIN_EMAIL
   ) || 'admin@teslawealths.org';
 
   let fromName = cleanString(process.env.TT_SENDER_NAME || process.env.RESEND_FROM_NAME) || 'Tesla Trade';
   let replyTo = cleanString(process.env.TT_REPLY_TO_EMAIL || process.env.SUPPORT_EMAIL) || 'support@teslawealths.org';
+
+  // The deployed schema uses key_name/value_data; older installations may
+  // still have key/value. Detect the real columns rather than assuming one
+  // schema revision, so email settings remain readable without migrations.
   try {
     const conn = await getDbConnection();
     try {
-      const [rows] = await conn.query("SELECT `key`, `value` FROM app_settings WHERE `key` IN ('resend_api_key','resend_from_email','admin_email','sender_name','reply_to_email')");
-      const settings = Object.fromEntries(rows.map(row => [row.key, row.value]));
+      const [columns] = await conn.query('SHOW COLUMNS FROM app_settings');
+      const names = new Set((columns || []).map(row => String(row.Field || '').toLowerCase()));
+      const keyColumn = names.has('key_name') ? 'key_name' : (names.has('key') ? 'key' : '');
+      const valueColumn = names.has('value_data') ? 'value_data' : (names.has('value') ? 'value' : '');
+      if (keyColumn && valueColumn) {
+        const sql =
+          'SELECT `' + keyColumn + '` AS setting_key, `' + valueColumn + '` AS setting_value ' +
+          'FROM app_settings WHERE `' + keyColumn + '` IN (?, ?, ?, ?, ?)';
+        const [rows] = await conn.query(sql, [
+          'resend_api_key',
+          'resend_from_email',
+          'admin_email',
+          'sender_name',
+          'reply_to_email'
+        ]);
+        const settings = Object.fromEntries((rows || []).map(row => [
+          String(row.setting_key || ''),
+          row.setting_value
+        ]));
+        if (!apiKey && settings.resend_api_key) apiKey = cleanString(settings.resend_api_key);
+        if (!fromEmail && settings.resend_from_email) fromEmail = cleanString(settings.resend_from_email);
+        if (settings.admin_email) adminEmail = cleanString(settings.admin_email);
+        if (settings.sender_name) fromName = cleanString(settings.sender_name);
+        if (settings.reply_to_email) replyTo = cleanString(settings.reply_to_email);
+      } else {
+        console.warn('[Mailer] app_settings table has no recognized key/value columns.');
+      }
+    } finally {
+      try { await conn.end(); } catch (closeError) {}
+    }
+  } catch (error) {
+    console.warn('[Mailer] Database email-settings lookup unavailable:', error?.code || error?.message || error);
+    // Preserve compatibility with the local persistent settings store.
+    try {
+      const db = loadDatabase();
+      const settings = db && db.app_settings ? db.app_settings : {};
       if (!apiKey && settings.resend_api_key) apiKey = cleanString(settings.resend_api_key);
       if (!fromEmail && settings.resend_from_email) fromEmail = cleanString(settings.resend_from_email);
       if (settings.admin_email) adminEmail = cleanString(settings.admin_email);
       if (settings.sender_name) fromName = cleanString(settings.sender_name);
       if (settings.reply_to_email) replyTo = cleanString(settings.reply_to_email);
-    } finally { try { await conn.end(); } catch {} }
-  } catch (e) {
-    try { const db = loadDatabase(); if (db && db.app_settings) { if (!apiKey && db.app_settings.resend_api_key) apiKey = cleanString(db.app_settings.resend_api_key); if (!fromEmail && db.app_settings.resend_from_email) fromEmail = cleanString(db.app_settings.resend_from_email); if (db.app_settings.admin_email) adminEmail = cleanString(db.app_settings.admin_email); } } catch {}
+    } catch (fallbackError) {}
   }
   return { apiKey, fromEmail, adminEmail, fromName, replyTo };
+}
+
+async function safeLogUserAction(entry) {
+  try {
+    await logUserAction(entry);
+  } catch (error) {
+    // A logging outage must not turn a provider-accepted email into a failed send.
+    console.error('[Mailer] Email audit logging failed:', error?.message || error);
+  }
 }
 
 /**
@@ -49,7 +97,7 @@ export async function sendEmail({ to, name, subject, html, replyTo, category = '
   const safeName = name || 'Investor';
 
   if (!to || !to.includes('@')) {
-    await logUserAction({
+    await safeLogUserAction({
       user_email: to || 'unknown',
       action_type: 'email.failed',
       description: `Email dispatch failed: Invalid recipient address (${to})`,
@@ -61,7 +109,7 @@ export async function sendEmail({ to, name, subject, html, replyTo, category = '
 
   if (!apiKey || !fromEmail) {
     const error = !apiKey ? 'RESEND_API_KEY is not configured' : 'RESEND_FROM_EMAIL is not configured';
-    await logUserAction({
+    await safeLogUserAction({
       user_email: to,
       action_type: 'email.failed',
       description: `Email not sent to ${to}: ${error}`,
@@ -95,7 +143,7 @@ export async function sendEmail({ to, name, subject, html, replyTo, category = '
 
     if (result.ok && result.data?.id) {
       console.log(`[Mailer] Email sent successfully to ${to} (id: ${result.data.id}): "${subject}"`);
-      await logUserAction({
+      await safeLogUserAction({
         user_email: to,
         action_type: 'email.sent',
         description: `Email delivered to ${to}: "${subject}"`,
@@ -107,7 +155,7 @@ export async function sendEmail({ to, name, subject, html, replyTo, category = '
 
     const errorMsg = result.data?.message || `HTTP ${result.status}`;
     console.warn(`[Mailer] Resend rejected email to ${to}:`, errorMsg);
-    await logUserAction({
+    await safeLogUserAction({
       user_email: to,
       action_type: 'email.failed',
       description: `Resend email rejected for ${to}: ${errorMsg}`,
@@ -117,7 +165,7 @@ export async function sendEmail({ to, name, subject, html, replyTo, category = '
     return { ok: false, error: errorMsg };
   } catch (err) {
     console.error(`[Mailer] Network exception sending email to ${to}:`, err.message);
-    await logUserAction({
+    await safeLogUserAction({
       user_email: to,
       action_type: 'email.failed',
       description: `Network exception sending email to ${to}: ${err.message}`,
