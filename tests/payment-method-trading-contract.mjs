@@ -16,12 +16,24 @@ const catalogMatch = paymentUi.match(/var PAYMENT_METHODS = \[([\s\S]*?)\n  \];/
 assert.ok(catalogMatch, 'investor payment catalog must exist');
 const keys = Array.from(catalogMatch[1].matchAll(/key:\s*'([^']+)'/g), match => match[1]);
 assert.deepEqual(keys, ['usdt', 'btc', 'eth', 'bank'], 'investors must see only the three crypto methods and one bank transfer');
-assert.match(paymentUi, /state\.settings\[method\.key\]\.enabled === true/, 'payment UI must only render methods enabled by Admin');
+assert.match(paymentUi, /list\.innerHTML = PAYMENT_METHODS\.map\(function \(method\)/, 'investor UI must always display the four allowed method labels');
+assert.match(paymentUi, /data-enabled="true"/, 'only configured payment methods may be interactive');
+assert.match(paymentUi, /querySelectorAll\('\[data-method\]\[data-enabled="true"\]'\)/, 'unconfigured methods must not be selectable');
+assert.match(paymentUi, /nextButton\.disabled = !canContinue/, 'payment continuation must remain disabled until a destination is configured');
+assert.match(paymentUi, /selectedPaymentMethod\.enabled !== true/, 'the payment step must reject unconfigured destinations');
+assert.match(paymentUi, /Not configured — contact support/, 'unconfigured payment methods must be clearly marked');
+assert.doesNotMatch(paymentUi, /No payment methods are currently enabled/, 'the UI must still list the four permitted methods when none is configured');
 assert.doesNotMatch(paymentUi, /paypal|cashapp|venmo|alipay|wechat/i, 'retired payment methods must not remain in investor catalog');
 const publicCatalogMatch = paymentUiPublic.match(/var PAYMENT_METHODS = \[([\s\S]*?)\n  \];/);
 assert.ok(publicCatalogMatch, 'public investor payment catalog must exist');
 assert.deepEqual(Array.from(publicCatalogMatch[1].matchAll(/key:\s*'([^']+)'/g), match => match[1]), keys, 'public investor payment catalog must expose the same four methods');
-assert.match(paymentUiPublic, /state\.settings\[method\.key\]\.enabled === true/);
+assert.match(paymentUiPublic, /list\.innerHTML = PAYMENT_METHODS\.map\(function \(method\)/);
+assert.match(paymentUiPublic, /data-enabled="true"/);
+assert.match(paymentUiPublic, /querySelectorAll\('\[data-method\]\[data-enabled="true"\]'\)/);
+assert.match(paymentUiPublic, /nextButton\.disabled = !canContinue/);
+assert.match(paymentUiPublic, /selectedPaymentMethod\.enabled !== true/);
+assert.match(paymentUiPublic, /Not configured — contact support/);
+assert.doesNotMatch(paymentUiPublic, /No payment methods are currently enabled/);
 
 assert.match(paymentSettings, /SHOW COLUMNS FROM app_settings/, 'payment settings must inspect the deployed settings schema');
 assert.match(paymentSettings, /key_name/);
@@ -34,7 +46,7 @@ assert.match(tradingApi, /status IN \('active','approved','completed'\)/, 'tradi
 assert.match(tradingApi, /WHERE id=\? AND status IN \('active','approved','completed'\)/, 'trade persistence must use the same eligible statuses');
 assert.match(tradingUi, /showError\(error && error\.message/, 'trading state failures must be visible instead of leaving an empty card');
 assert.match(tradingUiPublic, /showError\(error && error\.message/, 'public trading asset must display state errors');
-assert.match(html, /investment-flow\.js\?v=20261107-admin-payment-methods/);
+assert.match(html, /investment-flow\.js\?v=20261107-four-methods-safe/);
 assert.match(html, /trading-flow\.js\?v=20261107-trading-state-errors/);
 
 console.log('PASS: investor payment options are limited to the four Admin-enabled methods.');
