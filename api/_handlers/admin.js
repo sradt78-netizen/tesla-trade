@@ -810,19 +810,22 @@ export default async function handler(req, res) {
         const [threads] = await conn.query(
           "SELECT t.id,t.user_email,t.user_name,t.subject,t.status,t.created_at,t.updated_at,(SELECT COUNT(*) FROM support_messages m WHERE m.thread_id=t.id) AS message_count,(SELECT m.message FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,(SELECT m.sender_role FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender FROM support_threads t ORDER BY t.updated_at DESC LIMIT 200"
         );
+        if (conn) { await conn.end(); conn = null; }
         return res.status(200).json({success:true,threads});
       }
       const threadId = cleanString(body.threadId || body.id);
-      if (!threadId) return res.status(400).json({success:false,error:'Support ticket ID is required.'});
+      if (!threadId) { if (conn) { await conn.end(); conn = null; } return res.status(400).json({success:false,error:'Support ticket ID is required.'}); }
       const [threadRows] = await conn.query('SELECT id,user_email,user_name,subject,status,created_at,updated_at FROM support_threads WHERE id=? LIMIT 1',[threadId]);
       const thread = threadRows[0];
-      if (!thread) return res.status(404).json({success:false,error:'Support ticket not found.'});
+      if (!thread) { if (conn) { await conn.end(); conn = null; } return res.status(404).json({success:false,error:'Support ticket not found.'}); }
       if (action === 'support_thread') {
         const [messages] = await conn.query('SELECT sender_role,sender_name,message,created_at FROM support_messages WHERE thread_id=? ORDER BY created_at ASC',[threadId]);
+        if (conn) { await conn.end(); conn = null; }
         return res.status(200).json({success:true,thread,messages});
       }
       if (action === 'support_close') {
         await conn.query("UPDATE support_threads SET status='closed',updated_at=NOW() WHERE id=?",[threadId]);
+        if (conn) { await conn.end(); conn = null; }
         return res.status(200).json({success:true,message:'Support conversation closed.'});
       }
       const message = String(body.message || '').trim().slice(0,5000);
@@ -834,6 +837,7 @@ export default async function handler(req, res) {
       await conn.query("INSERT INTO support_thread_tokens (id,thread_id,token_hash) VALUES (?,?,?)",[crypto.randomUUID(),threadId,tokenHash]);
       await conn.query("UPDATE support_threads SET status='answered',updated_at=NOW() WHERE id=?",[threadId]);
       await conn.commit();
+      if (conn) { await conn.end(); conn = null; }
       const ticketUrl = 'https://teslawealths.org/support?ticket='+encodeURIComponent(threadId)+'&token='+encodeURIComponent(accessToken);
       try {
         const { sendSupportMessageEmail } = await import('../notifications.js');
