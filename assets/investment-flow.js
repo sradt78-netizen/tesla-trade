@@ -85,16 +85,13 @@
     { symbol: 'TBC', name: 'The Boring Company', exchange: 'Private', price: 12.80, private: true }
   ];
 
+  // Investor deposits may use only the four methods managed in Admin:
+  // USDT, Bitcoin, Ethereum, and one bank transfer.
   var PAYMENT_METHODS = [
     { key: 'usdt', label: 'USDT (TRC-20)', field: 'address', icon: '₮' },
-    { key: 'bank', label: 'Bank transfer', field: 'account', icon: '⌂' },
     { key: 'btc', label: 'Bitcoin (BTC)', field: 'address', icon: '₿' },
     { key: 'eth', label: 'Ethereum (ERC-20)', field: 'address', icon: '◆' },
-    { key: 'paypal', label: 'PayPal', field: 'handle', icon: 'P' },
-    { key: 'cashapp', label: 'Cash App', field: 'handle', icon: '$' },
-    { key: 'venmo', label: 'Venmo', field: 'handle', icon: 'V' },
-    { key: 'alipay', label: 'Alipay', field: 'account', icon: 'A' },
-    { key: 'wechat', label: 'WeChat Pay', field: 'account', icon: 'W' }
+    { key: 'bank', label: 'Bank transfer', field: 'account', icon: '⌂' }
   ];
 
   var state = {
@@ -418,7 +415,23 @@
   function renderMethods(root) {
     var list = root.querySelector('#ttif-method-list');
     if (!list) return;
-    list.innerHTML = PAYMENT_METHODS.map(function (method) {
+    if (state.settings === null) {
+      list.innerHTML = '<div class="ttif-small">Loading payment methods…</div>';
+      return;
+    }
+    var availableMethods = PAYMENT_METHODS.filter(function (method) {
+      return !!(state.settings[method.key] && state.settings[method.key].enabled === true);
+    });
+    if (!availableMethods.length) {
+      state.method = '';
+      list.innerHTML = '<div class="ttif-small">No payment methods are currently enabled. Please contact support.</div>';
+      return;
+    }
+    if (!availableMethods.some(function (method) { return method.key === state.method; })) {
+      state.method = availableMethods[0].key;
+      persistState();
+    }
+    list.innerHTML = availableMethods.map(function (method) {
       var selected = method.key === state.method;
       var detail = methodDetail(state.settings, method);
       var copyValue = method.label + ': ' + detail;

@@ -258,10 +258,21 @@ export default async function handler(req, res) {
 
     const email = cleanString(fields.email || fields.userEmail || fields.userId || fields.user_email).toLowerCase();
     const amount = parseFloat(fields.amount || fields.total || '0');
-    const rawMethod = String(fields.method || fields.paymentMethod || fields.payment_method || 'crypto').trim().toLowerCase().replace(/[ -]+/g, '_');
-    const methodAliases = { crypto: 'crypto', usdt: 'usdt', usdt_trc20: 'usdt', eth: 'eth', ethereum: 'eth', btc: 'btc', bitcoin: 'btc', bank: 'bank', bank_transfer: 'bank' };
+    const rawMethod = String(fields.method || fields.paymentMethod || fields.payment_method || '').trim().toLowerCase().replace(/[ -]+/g, '_');
+    const methodAliases = { usdt: 'usdt', usdt_trc20: 'usdt', eth: 'eth', ethereum: 'eth', btc: 'btc', bitcoin: 'btc', bank: 'bank', bank_transfer: 'bank' };
     const method = methodAliases[rawMethod];
-    if (!method) return res.status(400).json({ success: false, error: 'Only cryptocurrency or bank transfer payments are accepted.' });
+    if (!method) return res.status(400).json({ success: false, error: 'Choose one of the enabled crypto wallets or the enabled bank transfer option.' });
+    const { getActivePaymentMethodKeys } = await import('./payment-settings.js');
+    let enabledPaymentMethods = [];
+    try {
+      enabledPaymentMethods = await getActivePaymentMethodKeys();
+    } catch (settingsError) {
+      console.error('[payment-submit] active payment settings unavailable:', settingsError?.code || settingsError?.message || settingsError);
+      return res.status(503).json({ success: false, error: 'Payment methods could not be verified against Admin settings. Please retry.' });
+    }
+    if (!enabledPaymentMethods.includes(method)) {
+      return res.status(400).json({ success: false, error: 'This payment method is currently disabled by the administrator. Choose an enabled method.' });
+    }
     const ref = fields.paymentReference || fields.reference || fields.tx_id || '';
     const planId = fields.planId || fields.plan_id || 'standard';
     const planName = fields.planName || fields.plan_name || fields.portfolio || 'Explorer';
