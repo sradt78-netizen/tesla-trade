@@ -23,6 +23,12 @@
     }
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+      return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch];
+    });
+  }
+
   function money(value) {
     return '$' + Number(value || 0).toLocaleString('en-US', {
       minimumFractionDigits: 2,
@@ -180,7 +186,14 @@
             '<span style="color:#ffffff;font-weight:700;font-size:13px;">' + det.plan + '</span>' +
           '</div>' +
 
-          '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1a1e28;">' +
+            '<span style="color:#94a3b8;font-size:13px;">Payment Method</span>' +
+            '<span style="color:#ffffff;font-weight:700;font-size:13px;text-align:right;max-width:58%;overflow-wrap:anywhere;">' +
+              escapeHtml(det.method) +
+            '</span>' +
+          '</div>' +
+
+'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;">' +
             '<span style="color:#94a3b8;font-size:13px;">Payment Proof</span>' +
             '<span style="color:#38bdf8;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:4px;">' +
               '<span>✓</span> Receipt Uploaded &amp; Queued' +
