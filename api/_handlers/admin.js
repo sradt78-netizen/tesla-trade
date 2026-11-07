@@ -49,6 +49,28 @@ function cleanString(val) {
 }
 function escapeHtml(value) { return String(value == null ? '' : value).replace(/[&<>\"]/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '\"':'&quot;' }[ch])); }
 
+async function getAppSettingsColumns(conn) {
+  const [columns] = await conn.query('SHOW COLUMNS FROM app_settings');
+  const names = new Set((columns || []).map(row => String(row.Field || '').toLowerCase()));
+  const keyColumn = names.has('key_name') ? 'key_name' : (names.has('key') ? 'key' : '');
+  const valueColumn = names.has('value_data') ? 'value_data' : (names.has('value') ? 'value' : '');
+  if (!keyColumn || !valueColumn) throw new Error('app_settings has no supported key/value columns.');
+  return { keyColumn, valueColumn };
+}
+
+async function readAppSettings(conn) {
+  const { keyColumn, valueColumn } = await getAppSettingsColumns(conn);
+  const sql = 'SELECT `' + keyColumn + '` AS setting_key, `' + valueColumn + '` AS setting_value FROM app_settings';
+  const [rows] = await conn.query(sql);
+  return Object.fromEntries((rows || []).map(row => [String(row.setting_key || ''), row.setting_value]));
+}
+
+async function writeAppSettings(conn, entries) {
+  const { keyColumn, valueColumn } = await getAppSettingsColumns(conn);
+  const sql = 'INSERT INTO app_settings (`' + keyColumn + '`, `' + valueColumn + '`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `' + valueColumn + '`=VALUES(`' + valueColumn + '`)';
+  for (const [key, value] of entries) await conn.query(sql, [String(key), String(value == null ? '' : value)]);
+}
+
 export function getAdminExpectedPassword() {
   return cleanString(
     process.env.ADMIN_PASSWORD ||
@@ -567,8 +589,7 @@ export default async function handler(req, res) {
         codes = await safeQuery('SELECT * FROM invitation_codes ORDER BY created_at DESC', codes);
         clicks = await safeQuery('SELECT * FROM analytics_clicks ORDER BY id DESC LIMIT 50', clicks);
         marketingLogs = await safeQuery('SELECT * FROM marketing_emails_log ORDER BY created_at DESC LIMIT 60', marketingLogs);
-        const sRows = await safeQuery('SELECT `key`, `value` FROM app_settings', []);
-        for (const row of sRows) settings[row.key] = row.value;
+        Object.assign(settings, await readAppSettings(conn));
         await conn.end();
       }
 
@@ -822,8 +843,7 @@ export default async function handler(req, res) {
 
       if (isDbConnected && conn) {
         try {
-          const [sRows] = await conn.query('SELECT `key`, `value` FROM app_settings');
-          for (const row of sRows) settings[row.key] = row.value;
+          Object.assign(settings, await readAppSettings(conn));
           const [inv] = await conn.query('SELECT * FROM investor_accounts');
           const [inments] = await conn.query('SELECT * FROM investments');
           const [cd] = await conn.query('SELECT * FROM invitation_codes WHERE status="active"');
@@ -915,9 +935,7 @@ export default async function handler(req, res) {
 
       if (isDbConnected && conn) {
         try {
-          await conn.query(
-            'INSERT INTO app_settings (`key`, `value`) VALUES ("marketing_last_run", NOW()) ON DUPLICATE KEY UPDATE `value`=NOW()'
-          );
+          await writeAppSettings(conn, [['marketing_last_run', new Date().toISOString().slice(0, 19).replace('T', ' ')] ]);
           await conn.end();
         } catch (e) {}
       }
@@ -953,8 +971,7 @@ export default async function handler(req, res) {
       const interval = body.interval || '24h';
       if (isDbConnected && conn) {
         try {
-          await conn.query('INSERT INTO app_settings (`key`, `value`) VALUES ("autopilot_marketing_enabled", ?) ON DUPLICATE KEY UPDATE `value`=?', [enabled, enabled]);
-          await conn.query('INSERT INTO app_settings (`key`, `value`) VALUES ("autopilot_interval", ?) ON DUPLICATE KEY UPDATE `value`=?', [interval, interval]);
+          await writeAppSettings(conn, [['autopilot_marketing_enabled', enabled], ['autopilot_interval', interval]]);
           await conn.end();
         } catch (e) {}
       } else {
@@ -1634,9 +1651,7 @@ export default async function handler(req, res) {
       const s = body.settings || {};
       if (!isDbConnected || !conn) return res.status(503).json({success:false,error:'Settings require the live database. Nothing was saved.'});
       try {
-        for (const [k, v] of Object.entries(s)) {
-          await conn.query('INSERT INTO app_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value`=?', [k, String(v), String(v)]);
-        }
+        await writeAppSettings(conn, Object.entries(s));
         await conn.end();
         return res.status(200).json({ success: true, message: 'Settings saved successfully to the live database.' });
       } catch (error) {
@@ -1737,7 +1752,7 @@ export default async function handler(req, res) {
       };
       if (isDbConnected && conn) {
         try {
-          await conn.query('INSERT INTO app_settings (`key`, `value`) VALUES ("trading_settings", ?) ON DUPLICATE KEY UPDATE `value`=?', [JSON.stringify(mockStore.tradingSettings), JSON.stringify(mockStore.tradingSettings)]);
+          await writeAppSettings(conn, [['trading_settings', JSON.stringify(mockStore.tradingSettings)]]);
           await conn.end();
         } catch (e) {}
       }

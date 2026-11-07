@@ -69,6 +69,12 @@ export default async function handler(req, res) {
     return await authHandler(req, res);
   }
 
+  // Investor referral dashboard (read-only totals and referral-link management).
+  if (normalizedPath === '/referral/dashboard' || normalizedPath === '/referral/code') {
+    const { default: referralHandler } = await import('./_handlers/referral.js');
+    return await referralHandler(req, res);
+  }
+
   // Investor support tickets (public ticket links use high-entropy access tokens).
   if (normalizedPath === '/support') {
     const { default: supportHandler } = await import('./_handlers/support.js');

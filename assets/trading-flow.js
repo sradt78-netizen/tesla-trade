@@ -55,7 +55,7 @@
     return api('/api/investments?email=' + encodeURIComponent(currentUser.email))
       .then(function (rows) {
         var active = Array.isArray(rows)
-          ? rows.filter(function (row) { return row.status === 'active'; })
+          ? rows.filter(function (row) { return ['active', 'approved', 'completed'].includes(String(row.status || '').toLowerCase()); })
           : [];
         active.sort(function (a, b) {
           var aPrimary = !a.depositParentId;
@@ -613,25 +613,30 @@
   }
 
   function arrangeDashboard(root, host) {
-    var shell = root && root.firstElementChild;
-    if (!shell || !shell.classList.contains('min-h-screen')) return false;
+    if (!root || !host) return false;
 
+    // Dashboard markup has changed between releases. Prefer the original
+    // layout container, but do not abandon the trading panel if its classes
+    // differ from the old min-h-screen/flex-1 structure.
+    var shell = root.firstElementChild || root;
     var content = null;
     for (var i = 0; i < shell.children.length; i += 1) {
-      if (shell.children[i].classList.contains('flex-1')) {
+      if (shell.children[i].classList && shell.children[i].classList.contains('flex-1')) {
         content = shell.children[i];
         break;
       }
     }
-    if (!content) return false;
+    if (!content) content = root.querySelector('main') || shell || root;
 
-    Array.prototype.forEach.call(shell.querySelectorAll('aside'), function (aside) {
-      if (aside.classList.contains('md:flex')) {
-        aside.style.display = 'none';
-      }
-    });
+    // Preserve the established desktop/mobile layout adjustments only when
+    // the expected dashboard shell is present.
+    if (shell.classList && shell.classList.contains('min-h-screen')) {
+      Array.prototype.forEach.call(shell.querySelectorAll('aside'), function (aside) {
+        if (aside.classList.contains('md:flex')) aside.style.display = 'none';
+      });
+    }
 
-    var mobileHeader = content.querySelector('[class~="md:hidden"]');
+    var mobileHeader = content.querySelector && content.querySelector('[class~="md:hidden"]');
     if (mobileHeader) {
       var menuButton = mobileHeader.querySelector('button');
       var logo = mobileHeader.querySelector('h1');
@@ -642,21 +647,41 @@
       }
     }
 
-    var main = null;
-    for (var j = 0; j < content.children.length; j += 1) {
-      var child = content.children[j];
-      if (child !== host && (
-        (child.className && String(child.className).indexOf('max-w-') !== -1) ||
-        (child.textContent || '').indexOf('Complete your KYC') !== -1
-      )) {
-        main = child;
-        break;
+    // Place the trade panel immediately before the KYC notice when present.
+    // This is stable on the compact mobile dashboard as well as desktop.
+    var kycCard = null;
+    var kycCardTextLength = Infinity;
+    if (content.querySelectorAll) {
+      Array.prototype.forEach.call(content.querySelectorAll('*'), function (node) {
+        var label = (node.textContent || '').trim();
+        if (label.indexOf('Complete your KYC') !== -1 &&
+            label.indexOf('Verify your identity') !== -1 &&
+            node.children && node.children.length > 0 &&
+            label.length < kycCardTextLength) {
+          kycCard = node;
+          kycCardTextLength = label.length;
+        }
+      });
+    }
+
+    var main = kycCard;
+    if (!main) {
+      for (var j = 0; j < content.children.length; j += 1) {
+        var child = content.children[j];
+        if (child !== host && (
+          (child.className && String(child.className).indexOf('max-w-') !== -1) ||
+          (child.textContent || '').indexOf('Complete your KYC') !== -1
+        )) {
+          main = child;
+          break;
+        }
       }
     }
-    if (main) content.insertBefore(host, main);
-    else if (host.parentElement !== content) content.appendChild(host);
 
-    return true;
+    if (main && main.parentElement) main.parentElement.insertBefore(host, main);
+    else content.appendChild(host);
+
+    return !!host.isConnected;
   }
 
   function moveMobileMenuToRight(root) {
@@ -694,7 +719,12 @@
         host = document.createElement('div');
         host.id = stackId;
       }
-      arrangeDashboard(root, host);
+      var arranged = arrangeDashboard(root, host);
+      if (!arranged || !host.isConnected) {
+        // Last-resort attachment: a disconnected widget is invisible even
+        // though its state and buttons have rendered successfully.
+        root.appendChild(host);
+      }
       moveMobileMenuToRight(root);
       if (typeof window.ttincRemoveLoader === 'function') window.ttincRemoveLoader();
       var ldr = document.getElementById('ttinc-initial-loader');
@@ -706,7 +736,7 @@
         host.appendChild(shell);
       }
       loadState(lastInvestmentId).catch(function (err) { showError(err.message); });
-      mounted = true;
+      mounted = !!host.isConnected;
       mountInProgress = false;
       if (!pollTimer) {
         pollTimer = setInterval(function () {
@@ -715,7 +745,27 @@
           }
         }, 1200);
       }
-    }).catch(function () { mountInProgress = false; });
+    }).catch(function (error) {
+      mountInProgress = false;
+      var root = document.getElementById('root');
+      if (!root) return;
+      var host = document.getElementById(stackId);
+      if (!host) {
+        host = document.createElement('div');
+        host.id = stackId;
+      }
+      if (!arrangeDashboard(root, host) || !host.isConnected) root.appendChild(host);
+      var shell = document.getElementById(shellId);
+      if (!shell) {
+        shell = document.createElement('section');
+        shell.id = shellId;
+        host.appendChild(shell);
+      }
+      if (!shell.querySelector('[data-trade-error]')) {
+        shell.innerHTML = '<div style="padding:18px 20px;border:1px solid #3b2630;border-radius:14px;background:#101116;color:#e2e8f0;"><div style="font-weight:800;margin-bottom:6px;">Trading Activity</div><div data-trade-error style="display:block;color:#fca5a5;font-size:13px;line-height:1.6;"></div></div>';
+      }
+      showError(error && error.message ? error.message : 'Trading status could not be loaded. Please retry.');
+    });
   }
 
   document.addEventListener('click', function (event) {
