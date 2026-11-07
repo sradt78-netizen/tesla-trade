@@ -489,8 +489,19 @@
   }
 
   function showError(message) {
-    var box = document.querySelector('#' + shellId + ' [data-trade-error]');
-    if (box) { box.textContent = message; box.style.display = 'block'; }
+    var shell = document.getElementById(shellId);
+    if (!shell) return;
+    var box = shell.querySelector('[data-trade-error]');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'ttinc-trade-error';
+      box.setAttribute('data-trade-error', '');
+      box.setAttribute('role', 'status');
+      box.setAttribute('aria-live', 'polite');
+      shell.appendChild(box);
+    }
+    box.textContent = message || 'Trading status could not be loaded. Please retry.';
+    box.style.display = 'block';
   }
 
   function showToast(title, detail) {
@@ -518,8 +529,10 @@
         if (shell) render(shell, data);
         return data;
       })
-      .catch(function () {
-        // Preserve the last good UI on transient API errors.
+      .catch(function (error) {
+        // A silent failure left an empty rounded card on mobile. Keep the
+        // dashboard intact, but show the actual trading-service failure.
+        showError(error && error.message ? error.message : 'Trading status could not be loaded. Please retry.');
         return null;
       })
       .finally(function () { pollInFlight = false; });
