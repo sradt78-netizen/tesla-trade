@@ -1646,6 +1646,22 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, created: customCode, codes: mockStore.codes });
     }
 
+    if (action === 'test_telegram') {
+      if (conn) { try { await conn.end(); } catch {} conn = null; }
+      try {
+        const { testTelegramConnection } = await import('../telegram.js');
+        const result = await testTelegramConnection(
+          cleanString(body.botToken || ''),
+          cleanString(body.chatId || '')
+        );
+        if (!result.success) return res.status(502).json({ success: false, error: result.error || 'Telegram test failed.' });
+        return res.status(200).json({ success: true, message: result.message || 'Telegram test message delivered.' });
+      } catch (error) {
+        console.error('[admin Telegram test] failed:', error?.message || error);
+        return res.status(502).json({ success: false, error: error?.message || 'Telegram test failed.' });
+      }
+    }
+
     // ── 10. SETTINGS SAVE ──────────────────────────────────────────
     if (action === 'save_settings') {
       const s = body.settings || {};
