@@ -2,6 +2,7 @@
 import { loadPersistentDeposits } from './payment-submit.js';
 import { loadDatabaseSync, checkMySqlHealth } from '../db.js';
 import mysql from 'mysql2/promise';
+import { getDbConnection } from './dbcheck.js';
 
 export const tradingInvestments = {};
 
@@ -11,6 +12,65 @@ export let tradingSettings = {
   profitRatePercent: 2,
   lossRatePercent: 1
 };
+
+const DEFAULT_TRADING_SETTINGS = {
+  profitIntervalSeconds: 3,
+  lossIntervalSeconds: 2,
+  profitRatePercent: 2,
+  lossRatePercent: 1
+};
+
+function normalizeTradingSettings(input = {}) {
+  const p = input || {};
+  const numberOr = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+  return {
+    profitIntervalSeconds: Math.max(1, Math.min(86400, Math.floor(numberOr(p.profitIntervalSeconds, DEFAULT_TRADING_SETTINGS.profitIntervalSeconds)))),
+    lossIntervalSeconds: Math.max(1, Math.min(86400, Math.floor(numberOr(p.lossIntervalSeconds, DEFAULT_TRADING_SETTINGS.lossIntervalSeconds)))),
+    profitRatePercent: Math.max(0, Math.min(100, numberOr(p.profitRatePercent, DEFAULT_TRADING_SETTINGS.profitRatePercent))),
+    lossRatePercent: Math.max(0, Math.min(100, numberOr(p.lossRatePercent, DEFAULT_TRADING_SETTINGS.lossRatePercent)))
+  };
+}
+
+async function getTradingSettingsFromDatabase() {
+  const conn = await getDbConnection();
+  try {
+    const [columns] = await conn.query('SHOW COLUMNS FROM app_settings');
+    const names = new Set((columns || []).map(row => String(row.Field || '').toLowerCase()));
+    const keyColumn = names.has('key_name') ? 'key_name' : (names.has('key') ? 'key' : '');
+    const valueColumn = names.has('value_data') ? 'value_data' : (names.has('value') ? 'value' : '');
+    if (!keyColumn || !valueColumn) throw new Error('Trading settings storage columns are unavailable.');
+    const [rows] = await conn.query('SELECT `' + valueColumn + '` AS setting_value FROM app_settings WHERE `' + keyColumn + '`=? LIMIT 1', ['trading_settings']);
+    if (!rows.length || rows[0].setting_value == null) return { ...DEFAULT_TRADING_SETTINGS };
+    const raw = rows[0].setting_value;
+    const saved = raw && typeof raw === 'object' ? raw : JSON.parse(String(raw));
+    return normalizeTradingSettings(saved);
+  } finally {
+    try { await conn.end(); } catch (closeError) {}
+  }
+}
+
+async function persistTradingSettings(input) {
+  const settings = normalizeTradingSettings(input);
+  const conn = await getDbConnection();
+  try {
+    const [columns] = await conn.query('SHOW COLUMNS FROM app_settings');
+    const names = new Set((columns || []).map(row => String(row.Field || '').toLowerCase()));
+    const keyColumn = names.has('key_name') ? 'key_name' : (names.has('key') ? 'key' : '');
+    const valueColumn = names.has('value_data') ? 'value_data' : (names.has('value') ? 'value' : '');
+    if (!keyColumn || !valueColumn) throw new Error('Trading settings storage columns are unavailable.');
+    const sql = 'INSERT INTO app_settings (`' + keyColumn + '`, `' + valueColumn + '`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `' + valueColumn + '`=VALUES(`' + valueColumn + '`)';
+    await conn.query(sql, ['trading_settings', JSON.stringify(settings)]);
+    tradingSettings = settings;
+    return settings;
+  } finally {
+    try { await conn.end(); } catch (closeError) {}
+  }
+}
+
+async function refreshTradingSettings() {
+  tradingSettings = await getTradingSettingsFromDatabase();
+  return tradingSettings;
+}
 
 export function computeTradeValue(inv, now) {
   const tot = Number(inv.total || 0);
@@ -175,6 +235,7 @@ export async function handleTradingState(req, res, id) {
   res.setHeader('Cache-Control', 'no-store');
   const now = Math.floor(Date.now() / 1000);
   try {
+    await refreshTradingSettings();
     const inv = await getOrCreateInvestment(id, qEmail(req));
     return res.status(200).json({
       investmentId: inv.id,
@@ -188,6 +249,7 @@ export async function handleTradingStart(req, res, id, body) {
   res.setHeader('Cache-Control', 'no-store');
   const now = Math.floor(Date.now() / 1000);
   try {
+    await refreshTradingSettings();
     const inv = await getOrCreateInvestment(id, qEmail(req, body));
     const amount = Number(body.amount || 0);
     const available = Number(inv.totalCurrentValue != null ? inv.totalCurrentValue : inv.total || 0);
@@ -218,6 +280,7 @@ export async function handleTradingStop(req, res, id, body) {
   const now = Math.floor(Date.now() / 1000);
   const email = qEmail(req, body);
   try {
+    await refreshTradingSettings();
     const inv = await getOrCreateInvestment(id, email);
     if (inv.tradingStatus !== 'active') {
       return res.status(200).json({
@@ -249,17 +312,24 @@ export async function handleTradingStop(req, res, id, body) {
     return res.status(error.statusCode || 503).json({ error: error.message || 'Trading could not be stopped.' });
   }
 }
-export function handleTradingSettingsGet(req, res) {
-  return res.status(200).json({ settings: tradingSettings });
+export async function handleTradingSettingsGet(req, res) {
+  try {
+    const settings = await refreshTradingSettings();
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ success: true, settings });
+  } catch (error) {
+    console.error('[trading settings] database read failed:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'Saved trading settings could not be loaded from the database.' });
+  }
 }
 
-export function handleTradingSettingsPost(req, res, body) {
-  const p = body || {};
-  tradingSettings = {
-    profitIntervalSeconds: Math.max(1, Math.min(86400, Number(p.profitIntervalSeconds || 3))),
-    lossIntervalSeconds: Math.max(1, Math.min(86400, Number(p.lossIntervalSeconds || 2))),
-    profitRatePercent: Math.max(0, Math.min(100, Number(p.profitRatePercent || 2))),
-    lossRatePercent: Math.max(0, Math.min(100, Number(p.lossRatePercent || 1)))
-  };
-  return res.status(200).json({ success: true, settings: tradingSettings });
+export async function handleTradingSettingsPost(req, res, body) {
+  try {
+    const settings = await persistTradingSettings(body || {});
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ success: true, settings });
+  } catch (error) {
+    console.error('[trading settings] database save failed:', error?.message || error);
+    return res.status(503).json({ success: false, error: 'Trading settings were not saved. Please retry.' });
+  }
 }
