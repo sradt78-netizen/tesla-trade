@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "prebuild": "node --check api/_handlers/trading.js && node tests/payment-method-trading-contract.mjs"
+    "prebuild": "node --check api/_handlers/accounts.js && node --check api/_handlers/admin.js && node --check api/telegram.js && node --check api/index.js && node --check api/_handlers/trading.js && node tests/payment-method-trading-contract.mjs && node tests/dashboard-history-referrals-telegram-contract.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
