@@ -206,7 +206,7 @@ export async function handleTradingStart(req, res, id, body) {
     inv.tradingAmount = amount;
     inv.tradingStartedAt = now;
     await saveInv(inv, { startedAt: now }, { type: 'trade_debit', amount, note: 'Trade allocation started' }, qEmail(req, body));
-    try { const { sendEventEmail } = await import('../notifications.js'); await sendEventEmail({ to:qEmail(req,body), name:body.userName || 'Investor', event:'Trading started', subject:'Your trade has started', message:'Your trade allocation has started. Review the live trade value, available balance, and activity in your trading dashboard.', ctaLabel:'View Live Trading', ctaPath:'/overview?tab=trading', details:[{label:'Allocated amount',value:'
+
 
     return res.status(200).json({ success: true, trade: withWallet(inv, computeTradeValue(inv, now)) });
   } catch (error) {
@@ -236,7 +236,7 @@ export async function handleTradingStop(req, res, id, body) {
     inv.tradingAmount = 0;
     inv.tradingStartedAt = null;
     await saveInv(inv, {}, { type: 'trade_credit', amount: active.tradeValue, note: 'Trade allocation returned; realized P/L: ' + Number(active.pnl || 0).toFixed(2) }, email);
-    try { const { sendEventEmail } = await import('../notifications.js'); await sendEventEmail({ to:email, name:body.userName || 'Investor', event:'Trading stopped', subject:'Your trade has stopped', message:'Your trade has been stopped and the returned trade value has been added back to your portfolio balance. Review the completed trade and transaction history in your dashboard.', ctaLabel:'View Transaction History', ctaPath:'/transactions', details:[{label:'Returned value',value:'
+
 
     return res.status(200).json({
       success: true,
