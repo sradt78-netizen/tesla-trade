@@ -1,21 +1,3 @@
-import dbcheckHandler, { getDbConnection } from './_handlers/dbcheck.js';
-import paymentSettingsHandler from './_handlers/payment-settings.js';
-import paymentSubmitHandler from './_handlers/payment-submit.js';
-import trackHandler from './_handlers/track.js';
-import analyticsDataHandler from './_handlers/analytics-data.js';
-import otpHandler from './_handlers/otp.js';
-import authHandler from './_handlers/auth.js';
-import supabaseConfigHandler from './_handlers/supabase-config.js';
-import accountsHandler from './_handlers/accounts.js';
-import stocksHandler from './_handlers/stocks.js';
-import supportHandler from './_handlers/support.js';
-import {
-  handleTradingState,
-  handleTradingStart,
-  handleTradingStop,
-  handleTradingSettingsGet,
-  handleTradingSettingsPost
-} from './_handlers/trading.js';
 
 function parseJsonBody(req) {
   return new Promise((resolve) => {
@@ -44,6 +26,8 @@ export default async function handler(req, res) {
   // Normalize path without .php extension for routing
   const normalizedPath = pathname.replace(/\.php$/, '');
 
+  try {
+
   // 1. Admin endpoints
   if (normalizedPath.startsWith('/admin')) {
     const adminAction = url.searchParams.get('action') || '';
@@ -59,11 +43,13 @@ export default async function handler(req, res) {
 
   // 2. Database diagnostics and healthcheck
   if (normalizedPath === '/dbcheck' || normalizedPath === '/healthz') {
+    const { default: dbcheckHandler } = await import('./_handlers/dbcheck.js');
     return await dbcheckHandler(req, res);
   }
 
   // 3. Supabase configuration proxy
   if (normalizedPath === '/supabase-config') {
+    const { default: supabaseConfigHandler } = await import('./_handlers/supabase-config.js');
     return await supabaseConfigHandler(req, res);
   }
 
@@ -73,16 +59,19 @@ export default async function handler(req, res) {
     normalizedPath === '/otp-send' ||
     normalizedPath === '/otp-verify'
   ) {
+    const { default: otpHandler } = await import('./_handlers/otp.js');
     return await otpHandler(req, res);
   }
 
   // 5. Authentication (Login, Set-Password, Supabase Social-Session)
   if (normalizedPath.startsWith('/auth/')) {
+    const { default: authHandler } = await import('./_handlers/auth.js');
     return await authHandler(req, res);
   }
 
   // Investor support tickets (public ticket links use high-entropy access tokens).
   if (normalizedPath === '/support') {
+    const { default: supportHandler } = await import('./_handlers/support.js');
     return await supportHandler(req, res);
   }
 
@@ -94,11 +83,13 @@ export default async function handler(req, res) {
     normalizedPath === '/account-status' ||
     normalizedPath === '/transactions'
   ) {
+    const { default: accountsHandler } = await import('./_handlers/accounts.js');
     return await accountsHandler(req, res);
   }
 
   // 7. Payment settings (wallets & bank)
   if (normalizedPath === '/payment-settings') {
+    const { default: paymentSettingsHandler } = await import('./_handlers/payment-settings.js');
     return await paymentSettingsHandler(req, res);
   }
 
@@ -112,19 +103,23 @@ export default async function handler(req, res) {
     // further down, so only a single id segment is handled here.
     /^\/investments\/[^/]+$/.test(normalizedPath)
   ) {
+    const { default: paymentSubmitHandler } = await import('./_handlers/payment-submit.js');
     return await paymentSubmitHandler(req, res);
   }
 
   // 9. Analytics & tracking
   if (normalizedPath === '/track') {
+    const { default: trackHandler } = await import('./_handlers/track.js');
     return await trackHandler(req, res);
   }
   if (normalizedPath === '/analytics-data') {
+    const { default: analyticsDataHandler } = await import('./_handlers/analytics-data.js');
     return await analyticsDataHandler(req, res);
   }
 
   // 10. Stock quotes & Live Market Desk
   if (normalizedPath === '/stocks' || normalizedPath.startsWith('/stocks/')) {
+    const { default: stocksHandler } = await import('./_handlers/stocks.js');
     return await stocksHandler(req, res);
   }
 
@@ -134,6 +129,7 @@ export default async function handler(req, res) {
     if (!code || code.length > 64) return res.status(400).json({ valid: false, error: 'A valid invitation code is required.' });
     let conn;
     try {
+      const { getDbConnection } = await import('./_handlers/dbcheck.js');
       conn = await getDbConnection();
       const [rows] = await conn.query('SELECT code FROM invitation_codes WHERE UPPER(code)=? AND status="active" LIMIT 1', [code]);
       await conn.end();
@@ -148,8 +144,10 @@ export default async function handler(req, res) {
   if (normalizedPath === '/admin/trading-settings') {
     if (req.method === 'POST') {
       const body = await parseJsonBody(req);
+      const { handleTradingSettingsPost } = await import('./_handlers/trading.js');
       return handleTradingSettingsPost(req, res, body);
     }
+    const { handleTradingSettingsGet } = await import('./_handlers/trading.js');
     return handleTradingSettingsGet(req, res);
   }
 
@@ -159,17 +157,35 @@ export default async function handler(req, res) {
     const invId = decodeURIComponent(tradingMatch[1]);
     const action = tradingMatch[2];
     if (action === 'trading-state') {
+      const { handleTradingState } = await import('./_handlers/trading.js');
       return await handleTradingState(req, res, invId);
     }
     if (action === 'trading/start') {
       const body = await parseJsonBody(req);
+      const { handleTradingStart } = await import('./_handlers/trading.js');
       return await handleTradingStart(req, res, invId, body);
     }
     if (action === 'trading/stop') {
       const stopBody = req.method === 'POST' ? await parseJsonBody(req) : {};
+      const { handleTradingStop } = await import('./_handlers/trading.js');
       return await handleTradingStop(req, res, invId, stopBody);
     }
   }
 
   return res.status(200).json({ ok: true, path: pathname });
+  } catch (error) {
+    const requestId = 'api_' + Date.now().toString(36);
+    console.error('[api router] request failed', {
+      requestId,
+      path: pathname,
+      error: error?.message || String(error),
+      stack: error?.stack
+    });
+    if (res.headersSent) return;
+    return res.status(500).json({
+      success: false,
+      error: 'The requested service could not be started. Please retry.',
+      requestId
+    });
+  }
 }
