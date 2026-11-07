@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "prebuild": "node tests/payment-method-trading-contract.mjs"
+    "prebuild": "node --check api/_handlers/trading.js && node tests/payment-method-trading-contract.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
