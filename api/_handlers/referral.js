@@ -78,12 +78,16 @@ export default async function referralHandler(req, res) {
 
     const code = await getOrCreateCode(conn, email);
     const [totals] = await conn.query(
-      'SELECT COALESCE(SUM(commission),0) AS total_earned, COUNT(*) AS total_deposits, COUNT(DISTINCT referred_email) AS unique_referrals FROM referral_earnings WHERE LOWER(referrer_email)=?',
+      'SELECT COALESCE(SUM(commission),0) AS total_earned FROM referral_earnings WHERE LOWER(referrer_email)=?',
       [email]
     );
+    const [referralStats] = await conn.query(
+      "SELECT COUNT(*) AS total_deposits, COUNT(DISTINCT LOWER(user_email)) AS unique_referrals FROM investments WHERE UPPER(referral_code)=? AND LOWER(status) IN ('active','approved','completed')",
+      [code]
+    );
     const [earningRows] = await conn.query(
-      'SELECT re.referred_email, re.deposit_amount, re.commission, re.note, re.created_at, i.user_name AS referred_name FROM referral_earnings re LEFT JOIN investments i ON i.id=re.investment_id WHERE LOWER(re.referrer_email)=? ORDER BY re.created_at DESC LIMIT 30',
-      [email]
+      "SELECT i.user_email AS referred_email, i.user_name AS referred_name, SUM(i.total) AS deposit_amount, COALESCE(SUM(re.commission),0) AS commission, MAX(i.created_at) AS created_at FROM investments i LEFT JOIN referral_earnings re ON re.investment_id=i.id WHERE UPPER(i.referral_code)=? AND LOWER(i.status) IN ('active','approved','completed') GROUP BY i.user_email,i.user_name ORDER BY MAX(i.created_at) DESC LIMIT 30",
+      [code]
     );
 
     let myBonus = null;
@@ -110,8 +114,8 @@ export default async function referralHandler(req, res) {
       code,
       link: 'https://teslawealths.org/?ref=' + encodeURIComponent(code),
       total_earned: Number(totals[0]?.total_earned || 0),
-      total_deposits: Number(totals[0]?.total_deposits || 0),
-      unique_referrals: Number(totals[0]?.unique_referrals || 0),
+      total_deposits: Number(referralStats[0]?.total_deposits || 0),
+      unique_referrals: Number(referralStats[0]?.unique_referrals || 0),
       earnings: earningRows.map(row => ({
         referred_name: row.referred_name || maskEmail(row.referred_email),
         deposit_amount: Number(row.deposit_amount || 0),
