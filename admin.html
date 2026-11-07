@@ -1432,13 +1432,21 @@
     var activeSupportThread = '';
     function supportEsc(v){return String(v==null?'':v).replace(/[&<>"]/g,function(c){return c==='&'?'&amp;':c==='<'?'&lt;':c==='>'?'&gt;':'&quot;';});}
     function loadSupportInbox(){
+      if (window.__ttSupportInboxLoading) return;
+      window.__ttSupportInboxLoading = true;
+      if (!window.__ttSupportInboxPoll) {
+        window.__ttSupportInboxPoll = setInterval(function(){
+          var panel = document.getElementById('tab-support');
+          if (panel && panel.style.display !== 'none') loadSupportInbox();
+        }, 15000);
+      }
       adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'support_list'})}).then(function(r){return r.json();}).then(function(d){
         if(!d.success)throw new Error(d.error||'Could not load support inbox');
         var threads=d.threads||[],list=document.getElementById('supportThreadList');
         document.getElementById('b-support').textContent=threads.filter(function(t){return t.status==='open';}).length;
         if(!threads.length){list.innerHTML='<p style=\"color:var(--muted);font-size:12px;\">No investor messages yet.</p>';return;}
         list.innerHTML=threads.map(function(t){return '<button type=\"button\" data-support-id=\"'+supportEsc(t.id)+'\" onclick=\"openSupportThread(this.dataset.supportId)\" style=\"display:block;width:100%;text-align:left;padding:12px;margin-bottom:8px;background:#0c0e13;border:1px solid var(--card-border);border-radius:9px;\"><strong style=\"font-size:12px;\">'+supportEsc(t.user_name)+'</strong><span class=\"badge\" style=\"float:right;\">'+supportEsc(t.status)+'</span><div style=\"font-size:11px;color:#aab2bf;margin-top:5px;\">'+supportEsc(t.subject)+'</div><div style=\"font-size:10px;color:#707987;margin-top:5px;\">'+supportEsc(t.user_email)+' · '+Number(t.message_count||0)+' messages</div><div style=\"font-size:11px;color:#8993a2;margin-top:6px;\">'+supportEsc(t.last_message||'')+'</div></button>';}).join('');
-      }).catch(function(e){document.getElementById('supportThreadList').textContent=e.message;});
+      }).catch(function(e){document.getElementById('supportThreadList').textContent=e.message;}).finally(function(){window.__ttSupportInboxLoading=false;});
     }
     function openSupportThread(id){activeSupportThread=id;adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'support_thread',threadId:id})}).then(function(r){return r.json();}).then(function(d){
       if(!d.success)throw new Error(d.error||'Could not open conversation');var t=d.thread;
