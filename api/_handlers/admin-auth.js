@@ -35,7 +35,7 @@ export default async function adminAuthHandler(req, res) {
   const expected = clean(process.env.ADMIN_PASSWORD || process.env.TT_ADMIN_PASSWORD);
   const provided = clean(
     req.headers?.['x-admin-password'] ||
-    (req.headers?.authorization || '').replace(/^Bearer\\s+/i, '') ||
+    (req.headers?.authorization || '').replace(/^Bearer\s+/i, '') ||
     body.password ||
     body.admin_password ||
     ''
