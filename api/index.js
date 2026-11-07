@@ -1,4 +1,3 @@
-import adminHandler from './_handlers/admin.js';
 import dbcheckHandler, { getDbConnection } from './_handlers/dbcheck.js';
 import paymentSettingsHandler from './_handlers/payment-settings.js';
 import paymentSubmitHandler from './_handlers/payment-submit.js';
@@ -47,6 +46,14 @@ export default async function handler(req, res) {
 
   // 1. Admin endpoints
   if (normalizedPath.startsWith('/admin')) {
+    const adminAction = url.searchParams.get('action') || '';
+    // Keep password verification independent from the full admin dashboard
+    // module and its optional email/support/deposit dependencies.
+    if (adminAction === 'verify_auth' || adminAction === 'login') {
+      const { default: adminAuthHandler } = await import('./_handlers/admin-auth.js');
+      return await adminAuthHandler(req, res);
+    }
+    const { default: adminHandler } = await import('./_handlers/admin.js');
     return await adminHandler(req, res);
   }
 
