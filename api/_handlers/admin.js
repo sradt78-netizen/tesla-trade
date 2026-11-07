@@ -1816,24 +1816,27 @@ export default async function handler(req, res) {
 
     // ── 12. GET / UPDATE TRADING GRAPH SETTINGS ─────────────────────
     if (action === 'get_trading_settings') {
-      return res.status(200).json({ success: true, settings: mockStore.tradingSettings });
+      if (!isDbConnected || !conn) return res.status(503).json({ success: false, error: 'Trading settings require the live database.' });
+      const savedSettings = await readAppSettings(conn);
+      let parsedSettings = mockStore.tradingSettings;
+      try { parsedSettings = savedSettings.trading_settings ? JSON.parse(String(savedSettings.trading_settings)) : mockStore.tradingSettings; } catch (e) {}
+      return res.status(200).json({ success: true, settings: parsedSettings });
     }
 
     if (action === 'update_trading_settings') {
+      if (!isDbConnected || !conn) return res.status(503).json({ success: false, error: 'Trading settings were not saved because the live database is unavailable.' });
       const p = body.settings || body;
-      mockStore.tradingSettings = {
-        profitIntervalSeconds: Math.max(1, Math.min(86400, Number(p.profitIntervalSeconds || mockStore.tradingSettings.profitIntervalSeconds || 3))),
-        lossIntervalSeconds: Math.max(1, Math.min(86400, Number(p.lossIntervalSeconds || mockStore.tradingSettings.lossIntervalSeconds || 2))),
-        profitRatePercent: Math.max(0, Math.min(100, Number(p.profitRatePercent != null ? p.profitRatePercent : mockStore.tradingSettings.profitRatePercent || 2))),
-        lossRatePercent: Math.max(0, Math.min(100, Number(p.lossRatePercent != null ? p.lossRatePercent : mockStore.tradingSettings.lossRatePercent || 1)))
+      const nextSettings = {
+        profitIntervalSeconds: Math.max(1, Math.min(86400, Number(p.profitIntervalSeconds ?? mockStore.tradingSettings.profitIntervalSeconds ?? 3))),
+        lossIntervalSeconds: Math.max(1, Math.min(86400, Number(p.lossIntervalSeconds ?? mockStore.tradingSettings.lossIntervalSeconds ?? 2))),
+        profitRatePercent: Math.max(0, Math.min(100, Number(p.profitRatePercent ?? mockStore.tradingSettings.profitRatePercent ?? 2))),
+        lossRatePercent: Math.max(0, Math.min(100, Number(p.lossRatePercent ?? mockStore.tradingSettings.lossRatePercent ?? 1)))
       };
-      if (isDbConnected && conn) {
-        try {
-          await writeAppSettings(conn, [['trading_settings', JSON.stringify(mockStore.tradingSettings)]]);
-          await conn.end();
-        } catch (e) {}
-      }
-      return res.status(200).json({ success: true, message: 'Trading graph settings saved.', settings: mockStore.tradingSettings });
+      await writeAppSettings(conn, [['trading_settings', JSON.stringify(nextSettings)]]);
+      mockStore.tradingSettings = nextSettings;
+      await conn.end();
+      conn = null;
+      return res.status(200).json({ success: true, message: 'Trading graph settings saved to the database.', settings: nextSettings });
     }
 
     if (conn) try { await conn.end(); } catch (e) {}
