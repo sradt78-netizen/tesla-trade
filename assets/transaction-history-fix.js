@@ -61,6 +61,102 @@
       '</div>';
   }
 
+  var DASHBOARD_HISTORY_ID = 'ttinc-dashboard-history';
+
+  function dashboardAuth() {
+    try { return JSON.parse(localStorage.getItem('ttinc_auth') || 'null'); }
+    catch (error) { return null; }
+  }
+
+  function isDashboardRoute() {
+    var path = String(window.location.pathname || '').toLowerCase();
+    if (path === '/overview' || path === '/dashboard' ||
+        path.indexOf('/overview/') === 0 || path.indexOf('/dashboard/') === 0 ||
+        path.indexOf('/portfolio') === 0) return true;
+    return path === '/' && !!document.getElementById('ttinc-dashboard-addon-stack');
+  }
+
+  function renderDashboardHistory(rows, email) {
+    if (!isDashboardRoute()) return;
+    var root = document.getElementById('root');
+    if (!root) return;
+    var host = document.getElementById('ttinc-dashboard-addon-stack') || root;
+    var card = document.getElementById(DASHBOARD_HISTORY_ID);
+    if (!card) {
+      card = document.createElement('section');
+      card.id = DASHBOARD_HISTORY_ID;
+      card.setAttribute('aria-label', 'Recent transaction history');
+      card.style.cssText = 'box-sizing:border-box;width:100%;margin:18px 0;padding:16px;background:#111;border:1px solid #252525;border-radius:14px;color:#fff;font-family:Arial,sans-serif;';
+      if (host.id === 'ttinc-dashboard-addon-stack' && host.parentNode) {
+        host.parentNode.insertBefore(card, host.nextSibling);
+      } else {
+        host.appendChild(card);
+      }
+    }
+    var items = (Array.isArray(rows) ? rows : []).slice(0, 5);
+    var list = items.length ? items.map(function (item) {
+      var type = String(item.type || '').toLowerCase();
+      var positive = ['deposit','return','profit','bonus','trade_credit','credit'].indexOf(type) !== -1;
+      return '<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:11px 0;border-bottom:1px solid #202020;">' +
+        '<div style="min-width:0;"><div style="font-size:13px;color:#f3f4f6;font-weight:700;">' + escapeHtml(labelForType(type)) + '</div>' +
+        '<div style="font-size:11px;color:#78808e;margin-top:4px;">' + escapeHtml(formatDate(item.createdAt || item.created_at)) +
+        (item.method ? ' · ' + escapeHtml(item.method) : '') + '</div></div>' +
+        '<div style="text-align:right;white-space:nowrap;"><div style="font-size:13px;font-weight:800;color:' + (positive ? '#34d399' : '#f87171') + ';">' +
+        (positive ? '+' : '−') + money(item.amount) + '</div><div style="font-size:10px;color:#94a3b8;margin-top:4px;">' + escapeHtml(statusLabel(item.status)) + '</div></div></div>';
+    }).join('') : '<div style="padding:18px 0;color:#78808e;font-size:12px;">No transaction records yet.</div>';
+    card.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px;">' +
+      '<div><div style="font-size:14px;font-weight:800;letter-spacing:.02em;">Recent history</div>' +
+      '<div style="font-size:11px;color:#78808e;margin-top:4px;">Latest account activity from your transaction ledger</div></div>' +
+      '<a href="/transactions" style="color:#f05a6e;text-decoration:none;font-size:11px;font-weight:800;white-space:nowrap;">View all →</a></div>' +
+      list;
+    card.setAttribute('data-email', email);
+  }
+
+  var dashboardHistoryInFlight = false;
+  var dashboardHistoryLastEmail = '';
+  var dashboardHistoryLastFetch = 0;
+  function loadDashboardHistory(force) {
+    if (!isDashboardRoute()) {
+      var old = document.getElementById(DASHBOARD_HISTORY_ID);
+      if (old) old.remove();
+      dashboardHistoryLastEmail = '';
+      return;
+    }
+    var root = document.getElementById('root');
+    var auth = dashboardAuth();
+    if (!root || !auth || !auth.email || dashboardHistoryInFlight) return;
+    var email = String(auth.email).toLowerCase();
+    var now = Date.now();
+    if (!force && email === dashboardHistoryLastEmail && now - dashboardHistoryLastFetch < 20000 &&
+        document.getElementById(DASHBOARD_HISTORY_ID)) return;
+    dashboardHistoryInFlight = true;
+    dashboardHistoryLastEmail = email;
+    dashboardHistoryLastFetch = now;
+    fetch('/api/transactions?email=' + encodeURIComponent(email), {
+      credentials: 'same-origin',
+      cache: 'no-store'
+    }).then(function (response) {
+      if (!response.ok) throw new Error('History temporarily unavailable');
+      return response.json();
+    }).then(function (rows) {
+      var currentAuth = dashboardAuth();
+      if (isDashboardRoute() && currentAuth && String(currentAuth.email || '').toLowerCase() === email) {
+        renderDashboardHistory(rows, email);
+      }
+    }).catch(function () {
+      // Leave the existing dashboard and portfolio untouched if the ledger is unavailable.
+    }).finally(function () { dashboardHistoryInFlight = false; });
+  }
+
+  setTimeout(function () { loadDashboardHistory(true); }, 900);
+  setInterval(function () { loadDashboardHistory(false); }, 5000);
+  if (typeof MutationObserver !== 'undefined' && document.body) {
+    var dashboardHistoryObserver = new MutationObserver(function () {
+      if (isDashboardRoute() && !document.getElementById(DASHBOARD_HISTORY_ID)) loadDashboardHistory(true);
+    });
+    dashboardHistoryObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
   function renderTransactions(rows) {
     var root = document.getElementById('root');
     if (!root || window.location.pathname !== '/transactions') return;

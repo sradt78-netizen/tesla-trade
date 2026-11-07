@@ -10,59 +10,83 @@ import { loadDatabase, saveDatabase } from './db.js';
  * 5. Connection Test & Verification Pings
  */
 
-// Retrieve effective Telegram credentials from process.env or persistent store
-export function getTelegramConfig() {
+// Read Telegram settings from the same MySQL app_settings record that Admin edits.
+// Environment variables remain a fallback for installations that have not configured
+// Telegram in Admin yet. A saved blank value is an intentional disable.
+export async function getTelegramConfig() {
   let dbSettings = {};
+  let fileSettings = {};
   try {
-    const db = loadDatabase();
-    dbSettings = db.app_settings || {};
-  } catch (e) {
-    dbSettings = {};
+    fileSettings = loadDatabase()?.app_settings || {};
+  } catch (e) {}
+
+  let conn = null;
+  try {
+    const { getDbConnection } = await import('./_handlers/dbcheck.js');
+    conn = await getDbConnection();
+    const [columns] = await conn.query('SHOW COLUMNS FROM app_settings');
+    const names = new Set((columns || []).map(row => String(row.Field || '').toLowerCase()));
+    const keyColumn = names.has('key_name') ? 'key_name' : (names.has('key') ? 'key' : '');
+    const valueColumn = names.has('value_data') ? 'value_data' : (names.has('value') ? 'value' : '');
+    if (!keyColumn || !valueColumn) throw new Error('Telegram settings columns are unavailable.');
+    const keys = ['telegram_settings', 'telegram_bot_token', 'telegram_chat_id', 'telegram_alerts_enabled', 'telegram_notify_clicks'];
+    const sql = 'SELECT `' + keyColumn + '` AS setting_key, `' + valueColumn + '` AS setting_value FROM app_settings WHERE `' + keyColumn + '` IN (' + keys.map(() => '?').join(',') + ')';
+    const [rows] = await conn.query(sql, keys);
+    for (const row of rows || []) dbSettings[String(row.setting_key || '')] = row.setting_value;
+  } catch (error) {
+    console.warn('[Telegram Bot] Could not read MySQL notification settings:', error?.code || error?.message || error);
+  } finally {
+    if (conn) { try { await conn.end(); } catch (closeError) {} }
   }
 
-  const botToken = (
-    process.env.TELEGRAM_BOT_TOKEN ||
-    process.env.TT_TELEGRAM_BOT_TOKEN ||
-    dbSettings.telegram_bot_token ||
-    ''
+  const hasSavedJson = Object.prototype.hasOwnProperty.call(dbSettings, 'telegram_settings');
+  let savedTelegram = {};
+  if (hasSavedJson) {
+    const raw = dbSettings.telegram_settings;
+    try {
+      savedTelegram = raw && typeof raw === 'object' ? raw : JSON.parse(String(raw || '{}'));
+    } catch (error) {
+      savedTelegram = {};
+    }
+  } else {
+    const raw = fileSettings.telegram_settings;
+    try {
+      savedTelegram = raw && typeof raw === 'object' ? raw : JSON.parse(String(raw || '{}'));
+    } catch (error) {
+      savedTelegram = {};
+    }
+  }
+
+  const hasBotToken = hasSavedJson && Object.prototype.hasOwnProperty.call(savedTelegram, 'botToken');
+  const hasChatId = hasSavedJson && Object.prototype.hasOwnProperty.call(savedTelegram, 'chatId');
+  const botToken = String(
+    hasBotToken ? savedTelegram.botToken : (
+      dbSettings.telegram_bot_token ?? fileSettings.telegram_bot_token ??
+      process.env.TELEGRAM_BOT_TOKEN ?? process.env.TT_TELEGRAM_BOT_TOKEN ?? savedTelegram.botToken ?? ''
+    )
+  ).trim();
+  const chatId = String(
+    hasChatId ? savedTelegram.chatId : (
+      dbSettings.telegram_chat_id ?? fileSettings.telegram_chat_id ??
+      process.env.TELEGRAM_CHAT_ID ?? process.env.TT_TELEGRAM_CHAT_ID ?? savedTelegram.chatId ?? ''
+    )
   ).trim();
 
-  const chatId = (
-    process.env.TELEGRAM_CHAT_ID ||
-    process.env.TT_TELEGRAM_CHAT_ID ||
-    dbSettings.telegram_chat_id ||
-    ''
-  ).trim();
+  const alertsRaw = savedTelegram.alertsEnabled ?? dbSettings.telegram_alerts_enabled ??
+    fileSettings.telegram_alerts_enabled ?? process.env.TELEGRAM_ALERTS_ENABLED ?? 'true';
+  const clicksRaw = savedTelegram.notifyClicks ?? dbSettings.telegram_notify_clicks ??
+    fileSettings.telegram_notify_clicks ?? process.env.TELEGRAM_NOTIFY_CLICKS ?? 'false';
+  const alertsEnabled = ['true', '1', 'yes', 'on'].includes(String(alertsRaw).toLowerCase());
+  const notifyClicks = ['true', '1', 'yes', 'on'].includes(String(clicksRaw).toLowerCase());
 
-  const alertsEnabledRaw = (
-    process.env.TELEGRAM_ALERTS_ENABLED ||
-    dbSettings.telegram_alerts_enabled ||
-    'true'
-  ).toString().toLowerCase();
-
-  const notifyClicksRaw = (
-    process.env.TELEGRAM_NOTIFY_CLICKS ||
-    dbSettings.telegram_notify_clicks ||
-    'false'
-  ).toString().toLowerCase();
-
-  const alertsEnabled = alertsEnabledRaw === 'true' || alertsEnabledRaw === '1' || alertsEnabledRaw === 'yes';
-  const notifyClicks = notifyClicksRaw === 'true' || notifyClicksRaw === '1' || notifyClicksRaw === 'yes';
-
-  return {
-    botToken,
-    chatId,
-    alertsEnabled,
-    notifyClicks,
-    isConfigured: !!(botToken && chatId)
-  };
+  return { botToken, chatId, alertsEnabled, notifyClicks, isConfigured: !!(botToken && chatId) };
 }
 
 /**
  * Low-level dispatch to Telegram Bot API sendMessage endpoint
  */
 export async function sendTelegramMessage(htmlContent, customConfig = null) {
-  const config = customConfig || getTelegramConfig();
+  const config = customConfig || await getTelegramConfig();
 
   if (!config.botToken || !config.chatId) {
     console.log('[Telegram Bot] Skipped (Token or Chat ID not configured)');
@@ -110,7 +134,7 @@ export async function sendTelegramMessage(htmlContent, customConfig = null) {
 
 /** Send a real receipt image to the configured admin Telegram chat. */
 export async function sendTelegramPhoto(dataUri, caption) {
-  const config = getTelegramConfig();
+  const config = await getTelegramConfig();
   if (!config.botToken || !config.chatId) return { ok: false, error: 'Telegram Bot Token or Chat ID not configured' };
   if (!config.alertsEnabled) return { ok: false, error: 'Telegram alerts are disabled' };
   const match = String(dataUri || '').match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
@@ -234,7 +258,7 @@ ${icon} <b>DEPOSIT ${statusText}</b>
  * Alert 4: Ad / Link Click Traffic (Optional toggle)
  */
 export async function notifyLinkClick(click = {}) {
-  const config = getTelegramConfig();
+  const config = await getTelegramConfig();
   if (!config.notifyClicks) return { ok: false, skipped: true };
 
   const source = click.campaign_source || click.source || 'direct';
@@ -260,7 +284,7 @@ export async function notifyLinkClick(click = {}) {
  * Alert 5: Test Connection Ping
  */
 export async function testTelegramConnection(customToken = '', customChatId = '') {
-  const config = getTelegramConfig();
+  const config = await getTelegramConfig();
   const token = (customToken || config.botToken || '').trim();
   const chatId = (customChatId || config.chatId || '').trim();
 

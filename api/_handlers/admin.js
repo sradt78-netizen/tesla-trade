@@ -582,7 +582,50 @@ export default async function handler(req, res) {
             error: 'Investor records could not be loaded from MySQL. Cached or mock investor data was not substituted.'
           });
         }
-        kyc = await safeQuery('SELECT * FROM kyc_submissions ORDER BY created_at DESC', kyc);
+        // Referral attribution is read-only in this report. Ensure the
+       // account column exists for new registrations; older investments retain
+       // their referral_code and remain reportable through the fallback join.
+       try {
+         const [accountColumns] = await conn.query('SHOW COLUMNS FROM investor_accounts');
+         const columnNames = new Set((accountColumns || []).map(row => String(row.Field || '').toLowerCase()));
+         if (!columnNames.has('referral_code')) {
+           await conn.query('ALTER TABLE investor_accounts ADD COLUMN referral_code VARCHAR(16) DEFAULT NULL');
+         }
+       } catch (referralColumnError) {
+         console.warn('[admin referrals] attribution column unavailable:', referralColumnError?.code || referralColumnError?.message);
+       }
+       const referrals = await safeQuery(
+         `SELECT
+            a.email AS investor_email,
+            COALESCE(NULLIF(a.name,''), i.investor_name, a.email) AS investor_name,
+            a.registered_at,
+            COALESCE(NULLIF(a.referral_code,''), i.referral_code) AS referral_code,
+            rc.email AS referrer_email,
+            COALESCE(NULLIF(ref.name,''), rc.email) AS referrer_name,
+            COALESCE(i.approved_amount,0) AS approved_investment_amount,
+            COALESCE(i.pending_amount,0) AS pending_investment_amount,
+            COALESCE(i.approved_count,0) AS approved_investments
+          FROM investor_accounts a
+          LEFT JOIN (
+            SELECT
+              LOWER(user_email) AS user_email,
+              MAX(NULLIF(referral_code,'')) AS referral_code,
+              MAX(user_name) AS investor_name,
+              SUM(CASE WHEN LOWER(status) IN ('active','approved','completed') THEN total ELSE 0 END) AS approved_amount,
+              SUM(CASE WHEN LOWER(status) IN ('pending','pending_approval') THEN total ELSE 0 END) AS pending_amount,
+              COUNT(DISTINCT CASE WHEN LOWER(status) IN ('active','approved','completed') THEN id END) AS approved_count
+            FROM investments
+            GROUP BY LOWER(user_email)
+          ) i ON i.user_email=LOWER(a.email)
+          LEFT JOIN referral_codes rc
+            ON UPPER(rc.code)=UPPER(COALESCE(NULLIF(a.referral_code,''), i.referral_code))
+          LEFT JOIN investor_accounts ref ON LOWER(ref.email)=LOWER(rc.email)
+          WHERE COALESCE(NULLIF(a.referral_code,''), i.referral_code) IS NOT NULL
+          ORDER BY a.registered_at DESC
+          LIMIT 500`,
+         []
+       );
+       kyc = await safeQuery('SELECT * FROM kyc_submissions ORDER BY created_at DESC', kyc);
         orders = await safeQuery('SELECT * FROM ev_orders ORDER BY created_at DESC LIMIT 100', orders);
         withdrawals = await safeQuery('SELECT * FROM withdrawals ORDER BY created_at DESC', withdrawals);
         financing = await safeQuery('SELECT * FROM financing_applications ORDER BY created_at DESC', financing);
@@ -710,6 +753,7 @@ export default async function handler(req, res) {
         isDbConnected,
         investors,
         investments,
+        referrals,
         kyc,
         orders,
         withdrawals,
@@ -1644,6 +1688,22 @@ export default async function handler(req, res) {
       }
       mockStore.codes.unshift({ id: Date.now(), code: customCode, status: 'active', source: 'admin', created_at: new Date().toISOString() });
       return res.status(200).json({ success: true, created: customCode, codes: mockStore.codes });
+    }
+
+    if (action === 'test_telegram') {
+      if (conn) { try { await conn.end(); } catch {} conn = null; }
+      try {
+        const { testTelegramConnection } = await import('../telegram.js');
+        const result = await testTelegramConnection(
+          cleanString(body.botToken || ''),
+          cleanString(body.chatId || '')
+        );
+        if (!result.success) return res.status(502).json({ success: false, error: result.error || 'Telegram test failed.' });
+        return res.status(200).json({ success: true, message: result.message || 'Telegram test message delivered.' });
+      } catch (error) {
+        console.error('[admin Telegram test] failed:', error?.message || error);
+        return res.status(502).json({ success: false, error: error?.message || 'Telegram test failed.' });
+      }
     }
 
     // ── 10. SETTINGS SAVE ──────────────────────────────────────────
