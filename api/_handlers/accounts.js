@@ -5,6 +5,26 @@ function cleanString(val) {
   return String(val).trim().replace(/^["']|["']$/g, '');
 }
 
+async function ensureReferralAttributionColumn(conn) {
+  const [columns] = await conn.query('SHOW COLUMNS FROM investor_accounts');
+  const names = new Set((columns || []).map(row => String(row.Field || '').toLowerCase()));
+  if (!names.has('referral_code')) {
+    await conn.query('ALTER TABLE investor_accounts ADD COLUMN referral_code VARCHAR(16) DEFAULT NULL');
+  }
+}
+
+async function resolveReferralCode(conn, rawCode, investorEmail) {
+  const code = cleanString(rawCode).toUpperCase();
+  if (!/^[A-Z0-9]{4,16}$/.test(code)) return null;
+  const [rows] = await conn.query(
+    'SELECT email FROM referral_codes WHERE UPPER(code)=? LIMIT 1',
+    [code]
+  );
+  const referrerEmail = String(rows[0]?.email || '').toLowerCase().trim();
+  if (!referrerEmail || referrerEmail === String(investorEmail || '').toLowerCase().trim()) return null;
+  return code;
+}
+
 function parseJsonBody(req) {
   return new Promise((resolve) => {
     if (req.body && typeof req.body === 'object') return resolve(req.body);
@@ -324,15 +344,20 @@ export default async function handler(req, res) {
       let persistedStatus = 'plan_selection';
       try {
         const conn = await getDbConnection();
+        await ensureReferralAttributionColumn(conn);
+        // Save referral attribution once, at account creation. Repeated profile
+        // updates cannot replace an existing referrer or alter financial data.
+        const acceptedReferralCode = await resolveReferralCode(conn, body.referralCode, email);
         await conn.query(
-          `INSERT INTO investor_accounts (email, name, phone, age, onboarding_status, registered_at)
-           VALUES (?, ?, ?, ?, 'plan_selection', NOW())
+          `INSERT INTO investor_accounts (email, name, phone, age, onboarding_status, referral_code, registered_at)
+           VALUES (?, ?, ?, ?, 'plan_selection', ?, NOW())
            ON DUPLICATE KEY UPDATE name=VALUES(name),
              phone=IF(VALUES(phone)='', phone, VALUES(phone)),
              age=IF(VALUES(age)=0, age, VALUES(age)),
+             referral_code=IF(referral_code IS NULL OR referral_code='', VALUES(referral_code), referral_code),
              onboarding_status=IF(onboarding_status IN ('active','approved','completed','pending_approval','pending_deposit'), onboarding_status, VALUES(onboarding_status)),
              updated_at=NOW()`,
-          [email, name, phone, age]
+          [email, name, phone, age, acceptedReferralCode]
         );
         // A profile's onboarding flag is not proof of payment approval.
         // Only an investment row explicitly approved by an admin can unlock access.
