@@ -238,6 +238,8 @@
       '#' + FLOW_ID + ' .ttif-summary-value{font-size:18px;font-weight:900;line-height:1.25;margin-top:4px;overflow-wrap:anywhere;}' +
       '#' + FLOW_ID + ' .ttif-method{display:flex;align-items:center;gap:11px;width:100%;border:1px solid #292929;background:#0d0d0d;border-radius:11px;padding:12px;text-align:left;color:#fff;cursor:pointer;font:inherit;margin-bottom:8px;}' +
       '#' + FLOW_ID + ' .ttif-method.selected{border-color:#d4af37;background:#191706;}' +
+      '#' + FLOW_ID + ' .ttif-method.is-disabled{opacity:.58;cursor:not-allowed;}' +
+      '#' + FLOW_ID + ' .ttif-unavailable{flex:none;color:#777;font-size:10px;font-weight:800;}' +
       '#' + FLOW_ID + ' .ttif-method-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#24200e;color:#d4af37;font-weight:900;flex:none;}' +
       '#' + FLOW_ID + ' .ttif-method-copy{min-width:0;flex:1;}' +
       '#' + FLOW_ID + ' .ttif-method-name{font-size:13px;font-weight:800;}' +
@@ -415,37 +417,48 @@
   function renderMethods(root) {
     var list = root.querySelector('#ttif-method-list');
     if (!list) return;
+    var nextButton = root.querySelector('[data-action="made-payment"]');
     if (state.settings === null) {
       list.innerHTML = '<div class="ttif-small">Loading payment methods…</div>';
+      if (nextButton) nextButton.disabled = true;
       return;
     }
+
     var availableMethods = PAYMENT_METHODS.filter(function (method) {
       return !!(state.settings[method.key] && state.settings[method.key].enabled === true);
     });
-    if (!availableMethods.length) {
-      state.method = '';
-      list.innerHTML = '<div class="ttif-small">No payment methods are currently enabled. Please contact support.</div>';
-      return;
-    }
     if (!availableMethods.some(function (method) { return method.key === state.method; })) {
-      state.method = availableMethods[0].key;
+      state.method = availableMethods.length ? availableMethods[0].key : '';
       persistState();
     }
-    list.innerHTML = availableMethods.map(function (method) {
-      var selected = method.key === state.method;
-      var detail = methodDetail(state.settings, method);
+
+    var selectedPaymentMethod = state.settings[state.method];
+    var canContinue = !!(selectedPaymentMethod && selectedPaymentMethod.enabled === true);
+    if (nextButton) nextButton.disabled = !canContinue;
+
+    list.innerHTML = PAYMENT_METHODS.map(function (method) {
+      var configured = !!(state.settings[method.key] && state.settings[method.key].enabled === true);
+      var selected = configured && method.key === state.method;
+      var detail = configured ? methodDetail(state.settings, method) : 'Not configured — contact support';
       var copyValue = method.label + ': ' + detail;
-      return '<div class="ttif-method ' + (selected ? 'selected' : '') + '" data-method="' + method.key + '" role="button" tabindex="0" aria-pressed="' + (selected ? 'true' : 'false') + '">' +
+      var interactionAttributes = configured
+        ? ' data-method="' + method.key + '" data-enabled="true" role="button" tabindex="0" aria-pressed="' + (selected ? 'true' : 'false') + '"'
+        : ' aria-disabled="true"';
+      var copyControl = configured
+        ? '<button type="button" class="ttif-copy" data-copy-value="' + esc(copyValue) + '" aria-label="Copy payment information">Copy</button>'
+        : '<span class="ttif-unavailable">Unavailable</span>';
+      return '<div class="ttif-method ' + (selected ? 'selected' : '') + (configured ? '' : ' is-disabled') + '"' + interactionAttributes + '>' +
         '<span class="ttif-method-icon">' + esc(method.icon) + '</span>' +
         '<span class="ttif-method-copy"><span class="ttif-method-name">' + esc(method.label) + '</span>' +
         '<span class="ttif-method-detail">' + esc(detail) + '</span></span>' +
-        '<button type="button" class="ttif-copy" data-copy-value="' + esc(copyValue) + '" aria-label="Copy payment information">Copy</button>' +
+        copyControl +
         '<span class="ttif-check">' + (selected ? '✓' : '') + '</span>' +
       '</div>';
     }).join('');
-    list.querySelectorAll('[data-method]').forEach(function (button) {
+
+    list.querySelectorAll('[data-method][data-enabled="true"]').forEach(function (button) {
       function selectMethod() {
-        state.method = button.getAttribute('data-method') || 'usdt';
+        state.method = button.getAttribute('data-method') || '';
         persistState();
         renderMethods(root);
       }
@@ -464,6 +477,12 @@
         copyPaymentText(button.getAttribute('data-copy-value'), button);
       });
     });
+    if (!availableMethods.length) {
+      var notice = document.createElement('div');
+      notice.className = 'ttif-small';
+      notice.textContent = 'Payment destinations are not configured yet. Please contact support before making a payment.';
+      list.appendChild(notice);
+    }
   }
 
   function loadPaymentSettings(root) {
@@ -498,7 +517,7 @@
       '</div>' +
       '<div class="ttif-card"><div class="ttif-field">Choose where to send payment</div><div id="ttif-method-list"><div class="ttif-small">Loading payment methods…</div></div></div>' +
       '<div id="ttif-error" class="ttif-error"></div>' +
-      '<div class="ttif-actions"><button type="button" class="ttif-button secondary" data-action="back-plan">Back</button><button type="button" class="ttif-button" data-action="made-payment">I’ve made payment →</button></div>'
+      '<div class="ttif-actions"><button type="button" class="ttif-button secondary" data-action="back-plan">Back</button><button type="button" class="ttif-button" data-action="made-payment" disabled>I’ve made payment →</button></div>'
     );
     renderMethods(root);
     loadPaymentSettings(root);
@@ -508,6 +527,11 @@
       setError('');
     });
     root.querySelector('[data-action="made-payment"]').addEventListener('click', function () {
+      var selectedPaymentMethod = state.settings && state.settings[state.method];
+      if (!selectedPaymentMethod || selectedPaymentMethod.enabled !== true) {
+        setError('The selected payment destination is not configured. Please contact support before making a payment.');
+        return;
+      }
       var amount = Number(root.querySelector('#ttif-amount').value || 0);
       if (!Number.isFinite(amount) || amount < plan.min || amount > plan.max) {
         setError('Enter an amount from ' + money(plan.min) + ' to ' + money(plan.max) + ' for the ' + plan.name + ' plan.');
