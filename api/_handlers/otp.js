@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getDbConnection, resolveDatabaseConfig } from './dbcheck.js';
+import { getOtpTokenSecret } from '../otp-token.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -144,8 +145,8 @@ export default async function handler(req, res) {
       });
     }
 
-    const secret = process.env.OTP_TOKEN_SECRET || process.env.TT_OTP_TOKEN_SECRET;
-    if (!secret) return res.status(503).json({ success: false, error: 'Email verification is not configured.' });
+    const secret = await getOtpTokenSecret();
+    if (!secret) return res.status(503).json({ success: false, error: 'Email verification is unavailable because the Resend signing configuration could not be read.' });
     const payloadPart = Buffer.from(JSON.stringify({ email, exp: Date.now() + 10 * 60 * 1000 })).toString('base64url');
     const signature = crypto.createHmac('sha256', secret).update(payloadPart).digest('hex');
     const verificationToken = `${payloadPart}.${signature}`;
