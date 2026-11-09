@@ -2,6 +2,7 @@ import bcryptjs from 'bcryptjs';
 import crypto from 'crypto';
 import { getDbConnection } from './dbcheck.js';
 import { resolveSupabaseCredentials } from './supabase-config.js';
+import { getOtpTokenSecret } from '../otp-token.js';
 
 function cleanString(val) {
   if (!val) return '';
@@ -136,7 +137,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.' });
     }
 
-    const secret = process.env.OTP_TOKEN_SECRET || process.env.TT_OTP_TOKEN_SECRET;
+    const secret = await getOtpTokenSecret();
     if (!secret || !verificationToken) return res.status(401).json({ success: false, message: 'Verify your email before setting a password.' });
     try {
       const [payloadPart, signature] = verificationToken.split('.');
