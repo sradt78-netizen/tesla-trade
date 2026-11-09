@@ -807,14 +807,57 @@ export default async function handler(req, res) {
       if (!isDbConnected || !conn) return res.status(503).json({ success:false, error:'Support inbox requires the live database.' });
       await ensureSupportTables(conn);
       if (action === 'support_list') {
-        const [threads] = await conn.query(
-          "SELECT t.id,t.user_email,t.user_name,t.subject,t.status,t.created_at,t.updated_at,(SELECT COUNT(*) FROM support_messages m WHERE m.thread_id=t.id) AS message_count,(SELECT m.message FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,(SELECT m.sender_role FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender FROM support_threads t ORDER BY t.updated_at DESC LIMIT 200"
+        const [ticketRows] = await conn.query(
+          "SELECT t.id,t.user_email,t.user_name,t.subject,t.status,t.created_at,t.updated_at,(SELECT COUNT(*) FROM support_messages m WHERE m.thread_id=t.id) AS message_count,(SELECT m.message FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,(SELECT m.sender_role FROM support_messages m WHERE m.thread_id=t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender,'ticket' AS source,0 AS unread_admin FROM support_threads t ORDER BY t.updated_at DESC LIMIT 200"
         );
+        let chatRows = [];
+        try {
+          const [rows] = await conn.query(
+            "SELECT s.id,s.user_email,s.user_name,'Live chat' AS subject,s.status,s.created_at,s.updated_at,(SELECT COUNT(*) FROM chat_messages m WHERE m.session_id=s.id) AS message_count,(SELECT m.message FROM chat_messages m WHERE m.session_id=s.id ORDER BY m.id DESC LIMIT 1) AS last_message,(SELECT m.sender FROM chat_messages m WHERE m.session_id=s.id ORDER BY m.id DESC LIMIT 1) AS last_sender,'chat' AS source,s.unread_admin FROM chat_sessions s ORDER BY s.updated_at DESC LIMIT 200"
+          );
+          chatRows = rows || [];
+        } catch (chatError) {
+          console.warn('[admin support inbox] live chat lookup failed:', chatError.message);
+        }
+        const threads = [...(ticketRows || []), ...chatRows].sort((left, right) =>
+          new Date(right.updated_at || 0).getTime() - new Date(left.updated_at || 0).getTime()
+        ).slice(0, 200);
         if (conn) { await conn.end(); conn = null; }
         return res.status(200).json({success:true,threads});
       }
       const threadId = cleanString(body.threadId || body.id);
+      const source = body.source === 'chat' ? 'chat' : 'ticket';
       if (!threadId) { if (conn) { await conn.end(); conn = null; } return res.status(400).json({success:false,error:'Support ticket ID is required.'}); }
+      if (source === 'chat') {
+        const [chatRows] = await conn.query('SELECT id,user_email,user_name,status,created_at,updated_at FROM chat_sessions WHERE id=? LIMIT 1',[threadId]);
+        const chat = chatRows[0];
+        if (!chat) { if (conn) { await conn.end(); conn = null; } return res.status(404).json({success:false,error:'Live chat conversation not found.'}); }
+        if (action === 'support_thread') {
+          const [messageRows] = await conn.query("SELECT m.sender AS sender_role,m.message,m.created_at FROM chat_messages m WHERE m.session_id=? ORDER BY m.id ASC",[threadId]);
+          const messages = (messageRows || []).map(message => ({
+            ...message,
+            sender_name: message.sender_role === 'admin' ? 'Tesla Trade Support' : chat.user_name
+          }));
+          await conn.query('UPDATE chat_sessions SET unread_admin=0 WHERE id=?',[threadId]);
+          if (conn) { await conn.end(); conn = null; }
+          return res.status(200).json({success:true,thread:{...chat,subject:'Live chat'},messages});
+        }
+        if (action === 'support_reply') {
+          const message = String(body.message || '').trim().slice(0,5000);
+          if (message.length < 2) { if (conn) { await conn.end(); conn = null; } return res.status(400).json({success:false,error:'Write a reply before sending.'}); }
+          await conn.beginTransaction();
+          await conn.query("INSERT INTO chat_messages (session_id,sender,message) VALUES (?,?,?)",[threadId,'admin',message]);
+          await conn.query('UPDATE chat_sessions SET updated_at=NOW() WHERE id=?',[threadId]);
+          await conn.commit();
+          if (conn) { await conn.end(); conn = null; }
+          return res.status(200).json({success:true,message:'Reply sent to the investor.'});
+        }
+        if (action === 'support_close') {
+          await conn.query("UPDATE chat_sessions SET status='closed',updated_at=NOW() WHERE id=?",[threadId]);
+          if (conn) { await conn.end(); conn = null; }
+          return res.status(200).json({success:true,message:'Live chat conversation closed.'});
+        }
+      }
       const [threadRows] = await conn.query('SELECT id,user_email,user_name,subject,status,created_at,updated_at FROM support_threads WHERE id=? LIMIT 1',[threadId]);
       const thread = threadRows[0];
       if (!thread) { if (conn) { await conn.end(); conn = null; } return res.status(404).json({success:false,error:'Support ticket not found.'}); }
