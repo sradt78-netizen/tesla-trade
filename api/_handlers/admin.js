@@ -833,7 +833,11 @@ export default async function handler(req, res) {
         const chat = chatRows[0];
         if (!chat) { if (conn) { await conn.end(); conn = null; } return res.status(404).json({success:false,error:'Live chat conversation not found.'}); }
         if (action === 'support_thread') {
-          const [messages] = await conn.query("SELECT m.sender AS sender_role,CASE WHEN m.sender='admin' THEN 'Tesla Trade Support' ELSE chat.user_name END AS sender_name,m.message,m.created_at FROM chat_messages m WHERE m.session_id=? ORDER BY m.id ASC",[threadId]);
+          const [messageRows] = await conn.query("SELECT m.sender AS sender_role,m.message,m.created_at FROM chat_messages m WHERE m.session_id=? ORDER BY m.id ASC",[threadId]);
+          const messages = (messageRows || []).map(message => ({
+            ...message,
+            sender_name: message.sender_role === 'admin' ? 'Tesla Trade Support' : chat.user_name
+          }));
           await conn.query('UPDATE chat_sessions SET unread_admin=0 WHERE id=?',[threadId]);
           if (conn) { await conn.end(); conn = null; }
           return res.status(200).json({success:true,thread:{...chat,subject:'Live chat'},messages});
