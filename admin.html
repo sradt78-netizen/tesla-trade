@@ -1429,7 +1429,7 @@
     }
     function buildCustomCampaignPreview() {
       var message = (document.getElementById('customCampaignMessage').value || '').trim();
-      var safeMessage = customCampaignEscape(message).split('\\n').join('<br>');
+      var safeMessage = customCampaignEscape(message).split('\n').join('<br>');
       var year = new Date().getFullYear();
       var logo = 'https://teslawealths.org/assets/social-share-logo.png';
       var plans = [['Explorer','70%','$30–$1,000','30 days'],['Pioneer','100%','$1,000–$10,000','60 days'],['Visionary','140%','$10,000–$25,000','90 days'],['Pioneer Plus','200%','$25,000–$55,000','180 days'],['Dogecoin Reserve','60%–140%','$1,000–$25,000','90 days']];
