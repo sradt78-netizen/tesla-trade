@@ -556,7 +556,7 @@ export default async function handler(req, res) {
         results.push({email:recipient,status:sent.ok?'accepted_by_resend':'failed',resendId:sent.id || '',error:sent.ok?'Accepted by Resend; recipient-server delivery has not yet been confirmed.':(sent.error || 'Resend rejected the email')});
       }
       if (conn) { try { await conn.end(); } catch {} conn = null; }
-      const sentCount = results.filter(item => item.status === 'sent').length;
+      const sentCount = results.filter(item => item.status === 'accepted_by_resend').length;
       return res.status(200).json({success:true,sent:sentCount,failed:results.length-sentCount,total:results.length,results,message:sentCount+' email(s) accepted by Resend. This does not confirm inbox delivery.'});
     }
 
