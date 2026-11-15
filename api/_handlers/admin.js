@@ -500,50 +500,43 @@ export default async function handler(req, res) {
       const safeSubject = subject.replace(/[\r\n]+/g,' ').trim();
       const safeMessage = escapeHtml(message).replace(/\r?\n/g,'<br>');
       const signupUrl = 'https://teslawealths.org/';
-      const logoUrl = 'https://teslawealths.org/assets/social-share-logo.png?v=20260930';
-      const emailHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-      <body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;color:#172033;">
-        <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">Explore Tesla Wealths, review the information and decide whether an opportunity is right for you.</div>
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f2f4f7;padding:28px 12px;"><tr><td align="center">
-          <table role="presentation" width="620" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:620px;background:#ffffff;border:1px solid #e5e9f0;border-radius:18px;overflow:hidden;">
-            <tr><td align="center" style="padding:30px 28px 24px;background:#101827;border-bottom:4px solid #e31937;">
-              <img src="${logoUrl}" width="230" alt="Tesla Wealths" style="display:block;width:230px;max-width:80%;height:auto;margin:0 auto 18px;border:0;outline:none;text-decoration:none;">
-              <div style="font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:#c6cfdd;font-weight:700;">Investment information &amp; opportunities</div>
+      const logoUrl = 'https://teslawealths.org/assets/social-share-logo.png';
+      const currentYear = new Date().getFullYear();
+      const emailHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>
+        @keyframes twGlow { 0%,100% { opacity:.72; } 50% { opacity:1; } }
+        @media only screen and (max-width:620px) { .tw-wrap{padding:12px 6px!important}.tw-pad{padding-left:20px!important;padding-right:20px!important}.tw-title{font-size:26px!important}.tw-plans th,.tw-plans td{padding:8px 4px!important;font-size:10px!important} }
+        @media (prefers-reduced-motion:reduce) { .tw-glow{animation:none!important} }
+      </style></head><body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">Explore the Tesla Wealths platform, review the available plans and make an informed decision.</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f3f4f6;"><tr><td class="tw-wrap" align="center" style="padding:30px 12px;">
+          <table role="presentation" width="620" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:620px;background:#fff;border:1px solid #e6e8ec;border-radius:18px;overflow:hidden;box-shadow:0 18px 50px rgba(16,24,40,.10);">
+            <tr><td align="center" style="padding:30px 26px 25px;background:#090a0d;border-bottom:4px solid #e31937;">
+              <img src="${logoUrl}" width="220" alt="Tesla Wealths logo" style="display:block;width:220px;max-width:85%;height:auto;margin:0 auto 14px;border:0;filter:drop-shadow(0 7px 12px rgba(227,25,55,.28));">
+              <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#e6e7eb;font-weight:700;">TESLA WEALTHS</div>
+              <div class="tw-glow" style="height:2px;width:64px;margin:16px auto 0;background:linear-gradient(90deg,transparent,#e31937,transparent);animation:twGlow 2.8s ease-in-out infinite;"></div>
             </td></tr>
-            <tr><td style="padding:34px 36px 14px;">
-              <div style="font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:#e31937;font-weight:800;">A closer look at Tesla Wealths</div>
-              <h1 style="margin:10px 0 14px;font-size:30px;line-height:1.2;letter-spacing:-.6px;color:#111827;">Explore your next investment decision with clarity.</h1>
-              <p style="margin:0;color:#64748b;font-size:15px;line-height:1.8;">Hello,</p>
-              <div style="margin-top:14px;color:#344054;font-size:15px;line-height:1.85;">${safeMessage}</div>
+            <tr><td class="tw-pad" style="padding:34px 38px 12px;"><div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b42336;font-weight:800;">Investment plan overview</div>
+              <h1 class="tw-title" style="margin:10px 0 14px;font-family:Georgia,'Times New Roman',serif;font-size:32px;line-height:1.18;font-weight:500;color:#151923;">A clearer view of your next step.</h1>
+              <p style="margin:0 0 16px;color:#475467;font-size:15px;line-height:1.75;">Hello,</p><div style="color:#344054;font-size:15px;line-height:1.8;">${safeMessage}</div>
             </td></tr>
-            <tr><td style="padding:12px 36px 8px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f8fafc;border:1px solid #e6eaf0;border-radius:12px;">
-                <tr><td style="padding:20px 22px;">
-                  <div style="font-size:12px;color:#e31937;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;">Getting started</div>
-                  <div style="font-size:14px;line-height:1.9;color:#344054;margin-top:8px;">01 &nbsp; Explore the Tesla Wealths website and available information.<br>02 &nbsp; Create an account using your email address.<br>03 &nbsp; Review the applicable terms, fees and risk information before making any decision.</div>
-                </td></tr>
+            <tr><td class="tw-pad" style="padding:18px 38px 10px;"><div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#b42336;font-weight:800;margin-bottom:10px;">Plans currently displayed on our website</div>
+              <table class="tw-plans" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e7e9ee;border-radius:12px;border-collapse:separate;border-spacing:0;overflow:hidden;">
+                <tr style="background:#f7f8fa;"><th align="left" style="padding:11px 8px;font-size:10px;color:#667085;">Plan</th><th align="right" style="padding:11px 8px;font-size:10px;color:#667085;">Projection</th><th align="right" style="padding:11px 8px;font-size:10px;color:#667085;">Allocation</th><th align="right" style="padding:11px 8px;font-size:10px;color:#667085;">Term</th></tr>
+                ${"<tr><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\">Explorer</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\">70%</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">$30–$1,000</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">30 days</td></tr><tr><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\">Pioneer</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\">100%</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">$1,000–$10,000</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">60 days</td></tr><tr><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\">Visionary</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\">140%</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">$10,000–$25,000</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">90 days</td></tr><tr><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\">Pioneer Plus</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\">200%</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">$25,000–$55,000</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">180 days</td></tr><tr><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\">Dogecoin Reserve</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\">60%–140%</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">$1,000–$25,000</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">90 days</td></tr>"}
               </table>
+              <p style="margin:10px 0 0;color:#667085;font-size:11px;line-height:1.65;">These figures reproduce the website's stated projected returns. They are not guaranteed, independently verified performance, or forecasts of Tesla (TSLA) share-price returns. The plan descriptions do not establish that a plan purchases Tesla shares.</p>
             </td></tr>
-            <tr><td align="center" style="padding:26px 36px 28px;">
-              <a href="${signupUrl}" style="display:inline-block;background:#e31937;color:#ffffff;text-decoration:none;font-size:15px;font-weight:800;padding:16px 34px;border-radius:8px;letter-spacing:.2px;">Create Your Account&nbsp; &#8594;</a>
-              <div style="margin-top:12px;font-size:12px;color:#667085;">Visit <a href="${signupUrl}" style="color:#e31937;text-decoration:underline;">teslawealths.org</a> to get started.</div>
-            </td></tr>
-            <tr><td style="padding:0 36px 28px;">
-              <div style="border-top:1px solid #e8ecf2;padding-top:20px;font-size:12px;line-height:1.75;color:#667085;">Investing involves risk. The value of investments can rise or fall and you may lose some or all of the amount invested. Past performance is not a reliable indicator of future results. This email is for general information only and is not personalized investment advice or a recommendation to buy or sell any security. Please review all applicable product information and legal disclosures before making an investment decision.</div>
-            </td></tr>
-            <tr><td align="center" style="padding:22px 28px;background:#101827;color:#aab5c5;">
-              <div style="font-size:12px;font-weight:700;color:#ffffff;letter-spacing:1px;">TESLA WEALTHS</div>
-              <div style="font-size:11px;line-height:1.7;margin-top:8px;">You are receiving this message because you opted in to receive marketing communications from Tesla Wealths.</div>
-              <div style="font-size:11px;line-height:1.7;margin-top:8px;">To unsubscribe, reply to this email with “Unsubscribe” or email <a href="mailto:unsubscribe@teslawealths.org?subject=Unsubscribe" style="color:#ffffff;text-decoration:underline;">unsubscribe@teslawealths.org</a>.</div>
-              <div style="font-size:10px;color:#7f8b9d;margin-top:14px;">© ${new Date().getFullYear()} Tesla Wealths. All rights reserved.</div>
-            </td></tr>
+            <tr><td align="center" class="tw-pad" style="padding:25px 38px 28px;"><a href="${signupUrl}" style="display:inline-block;background:linear-gradient(135deg,#e31937,#a90f29);color:#fff;text-decoration:none;font-size:14px;font-weight:800;padding:15px 30px;border-radius:8px;">Explore the website &amp; create an account&nbsp; &#8594;</a><div style="margin-top:12px;font-size:12px;color:#667085;">Review the terms, fees and risk information before deciding.</div></td></tr>
+            <tr><td class="tw-pad" style="padding:0 38px 28px;"><div style="border-top:1px solid #e8ecf2;padding-top:18px;font-size:11px;line-height:1.7;color:#667085;">Investing involves risk, including possible loss of capital. The projected figures shown above are not guarantees. This message is general information, not personalized investment advice or a recommendation to buy or sell securities.</div></td></tr>
+            <tr><td align="center" style="padding:22px 26px;background:#090a0d;color:#aab0ba;"><div style="font-size:12px;font-weight:800;color:#fff;letter-spacing:2px;">TESLA WEALTHS</div><div style="font-size:11px;line-height:1.7;margin-top:8px;">You are receiving this because you opted in to receive marketing communications.</div><div style="font-size:11px;line-height:1.7;margin-top:7px;">To unsubscribe, reply “Unsubscribe” or email <a href="mailto:unsubscribe@teslawealths.org?subject=Unsubscribe" style="color:#fff;text-decoration:underline;">unsubscribe@teslawealths.org</a>.</div><div style="font-size:10px;color:#727986;margin-top:13px;">© ${currentYear} Tesla Wealths. All rights reserved.</div></td></tr>
           </table>
-        </td></tr></table>
-      </body></html>`;
+        </td></tr></table></body></html>`;
+      const textBody = ['TESLA WEALTHS','','Hello,',message,'','PLANS CURRENTLY DISPLAYED ON OUR WEBSITE',"Explorer: 70% website-listed projected return | $30–$1,000 | 30 days\nPioneer: 100% website-listed projected return | $1,000–$10,000 | 60 days\nVisionary: 140% website-listed projected return | $10,000–$25,000 | 90 days\nPioneer Plus: 200% website-listed projected return | $25,000–$55,000 | 180 days\nDogecoin Reserve: 60%–140% website-listed projected return | $1,000–$25,000 | 90 days",'','These figures reproduce the website’s stated projected returns. They are not guaranteed, independently verified performance, or forecasts of Tesla (TSLA) share-price returns. The plan descriptions do not establish that a plan purchases Tesla shares.','','Explore the website and create an account: '+signupUrl,'','Investing involves risk, including possible loss of capital. This is general information, not personalized investment advice.','','You are receiving this because you opted in to marketing communications. To unsubscribe, reply Unsubscribe or email unsubscribe@teslawealths.org.'].join('\\n');
       const { sendEmail } = await import('../mailer.js');
       const results = [];
       for (const recipient of recipients) {
-        const sent = await sendEmail({to:recipient,name:'there',subject:safeSubject,html:emailHtml,fromName:'Tesla Wealths',headers:{'List-Unsubscribe':'<mailto:unsubscribe@teslawealths.org?subject=Unsubscribe>'},category:'custom_marketing'});
+        const sent = await sendEmail({to:recipient,name:'there',subject:safeSubject,html:emailHtml,text:textBody,fromName:'Tesla Wealths',headers:{'List-Unsubscribe':'<mailto:unsubscribe@teslawealths.org?subject=Unsubscribe>'},category:'custom_marketing'});
         const status = sent.ok ? 'sent' : 'failed';
         try {
           await conn.query(
