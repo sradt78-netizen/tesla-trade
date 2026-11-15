@@ -462,6 +462,21 @@ export default async function handler(req, res) {
   try {
     conn = await getDbConnection();
     isDbConnected = true;
+
+  if (['smtp_settings_get','smtp_settings_save','smtp_settings_delete','smtp_settings_delay'].includes(action)) {
+    if (!isDbConnected || !conn) return res.status(503).json({success:false,error:'SMTP settings require the live database. Nothing was changed.'});
+    const secret=cleanString(process.env.SMTP_CONFIG_ENCRYPTION_KEY);
+    if(!secret)return res.status(503).json({success:false,error:'SMTP_CONFIG_ENCRYPTION_KEY is missing in Vercel. Credentials have not been stored.'});
+    const encryptSecret=value=>{const key=crypto.createHash('sha256').update(secret).digest();const iv=crypto.randomBytes(12);const cipher=crypto.createCipheriv('aes-256-gcm',key,iv);const data=Buffer.concat([cipher.update(String(value),'utf8'),cipher.final()]);return [iv.toString('base64'),cipher.getAuthTag().toString('base64'),data.toString('base64')].join('.');};
+    const settings=await readAppSettings(conn);let saved={configs:[],delaySeconds:30};try{saved=Object.assign(saved,JSON.parse(String(settings.smtp_mailer_settings||'{}')));}catch(e){}
+    if(action==='smtp_settings_get'){const configs=(saved.configs||[]).map(c=>({id:c.id,name:c.name,host:c.host,port:c.port,secure:c.secure,username:c.username,fromName:c.fromName,fromEmail:c.fromEmail,hasPassword:!!c.passwordEncrypted}));await conn.end();conn=null;return res.status(200).json({success:true,configs,delaySeconds:Math.max(5,Math.min(3600,Number(saved.delaySeconds)||30))});}
+    if(action==='smtp_settings_save'){const c=body.config||{};const name=cleanString(c.name),host=cleanString(c.host),username=cleanString(c.username),password=String(c.password||''),fromEmail=cleanString(c.fromEmail),port=Number(c.port);if(!name||!host||!username||!password||!/^\S+@\S+\.\S+$/.test(fromEmail)||!Number.isInteger(port)||port<1||port>65535)return res.status(400).json({success:false,error:'Enter all SMTP fields and a valid sender email.'});if(!/^[a-z0-9.-]+$/i.test(host))return res.status(400).json({success:false,error:'SMTP host is invalid.'});saved.configs=saved.configs||[];if(saved.configs.length>=5)return res.status(400).json({success:false,error:'Maximum of five SMTP configurations reached.'});saved.configs.push({id:crypto.randomUUID(),name,host,port,secure:c.secure==='tls'?'tls':'starttls',username,passwordEncrypted:encryptSecret(password),fromName:cleanString(c.fromName)||name,fromEmail});}
+    if(action==='smtp_settings_delete')saved.configs=(saved.configs||[]).filter(c=>c.id!==String(body.id||''));
+    if(action==='smtp_settings_delay'){const delay=Number(body.delaySeconds);if(!Number.isInteger(delay)||delay<5||delay>3600)return res.status(400).json({success:false,error:'Delay must be between 5 and 3600 seconds.'});saved.delaySeconds=delay;}
+    await writeAppSettings(conn,[['smtp_mailer_settings',JSON.stringify(saved)]]);await conn.end();conn=null;return res.status(200).json({success:true,message:'SMTP settings saved.'});
+  }
+
+
     try {
       await conn.query(`
         CREATE TABLE IF NOT EXISTS marketing_emails_log (
