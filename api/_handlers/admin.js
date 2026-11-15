@@ -502,9 +502,9 @@ export default async function handler(req, res) {
       if (!isDbConnected || !conn) {
         return res.status(503).json({success:false,error:'Email campaigns require the live database for delivery auditing.'});
       }
-      const rawRecipients = Array.isArray(body.recipients) ? body.recipients : String(body.recipients || '').split(/[\\s,;]+/);
+      const rawRecipients = Array.isArray(body.recipients) ? body.recipients : String(body.recipients || '').split(/[\s,;]+/);
       const recipients = [...new Set(rawRecipients.map(value => String(value || '').trim().toLowerCase()).filter(Boolean))];
-      const invalid = recipients.filter(email => !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email));
+      const invalid = recipients.filter(email => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
       if (!recipients.length) return res.status(400).json({success:false,error:'Paste at least one valid recipient email address.'});
       if (recipients.length > 100) return res.status(400).json({success:false,error:'A campaign is limited to 100 recipients at a time. Additional recipients can be sent in another batch.'});
       if (invalid.length) return res.status(400).json({success:false,error:'Please correct invalid email address(es): '+invalid.slice(0,5).join(', ')});
