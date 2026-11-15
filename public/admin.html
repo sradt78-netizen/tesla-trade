@@ -1332,6 +1332,8 @@
         document.getElementById('panelDesc').textContent = titles[tabId][1];
       }
 
+      if (tabId === 'marketing') { loadSmtpSettings(); }
+
       if (tabId === 'trading') {
         initTradingSimCanvas();
       }
@@ -2803,9 +2805,9 @@
     function smtpApi(action,payload){return adminFetch('/api/admin?action='+encodeURIComponent(action),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action},payload||{}))}).then(function(r){return r.json().then(function(d){if(!r.ok||!d.success)throw new Error(d.error||'SMTP request failed');return d;});});}
     function clearSmtpForm(){['smtpName','smtpHost','smtpUser','smtpPass','smtpFromName','smtpFromEmail'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('smtpPort').value='587';document.getElementById('smtpSecure').value='starttls';}
     function loadSmtpSettings(){var box=document.getElementById('smtpConfigList');if(!box)return;box.textContent='Loading saved configurations…';smtpApi('smtp_settings_get').then(function(d){document.getElementById('smtpDelay').value=d.delaySeconds||30;if(!d.configs.length){box.textContent='No SMTP configurations saved yet.';return;}box.innerHTML=d.configs.map(function(c){var n=String(c.name||'SMTP server').replace(/[&<>"]/g,function(x){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x];});return '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #263244;flex-wrap:wrap;"><div><strong style="color:#e5e7eb;">'+n+'</strong><div>'+c.host+':'+c.port+' · '+c.username+' · '+c.fromEmail+'</div><div style="color:#64748b;">Password encrypted · hidden</div></div><button type="button" onclick="deleteSmtpConfig(\''+c.id+'\')" style="color:#fca5a5;">Delete</button></div>';}).join('');}).catch(function(e){box.textContent=e.message;});}
-    function saveSmtpConfig(){var p={name:smtpName.value,host:smtpHost.value,port:Number(smtpPort.value),secure:smtpSecure.value,username:smtpUser.value,password:smtpPass.value,fromName:smtpFromName.value,fromEmail:smtpFromEmail.value};var status=document.getElementById('smtpSaveStatus');status.textContent='Saving securely…';smtpApi('smtp_settings_save',{config:p}).then(function(){status.textContent='Saved.';clearSmtpForm();loadSmtpSettings();}).catch(function(e){status.textContent=e.message;});}
+    function saveSmtpConfig(){var p={name:document.getElementById('smtpName').value,host:document.getElementById('smtpHost').value,port:Number(document.getElementById('smtpPort').value),secure:document.getElementById('smtpSecure').value,username:document.getElementById('smtpUser').value,password:document.getElementById('smtpPass').value,fromName:document.getElementById('smtpFromName').value,fromEmail:document.getElementById('smtpFromEmail').value};var status=document.getElementById('smtpSaveStatus');status.textContent='Saving securely…';smtpApi('smtp_settings_save',{config:p}).then(function(){status.textContent='Saved.';clearSmtpForm();loadSmtpSettings();}).catch(function(e){status.textContent=e.message;});}
     function deleteSmtpConfig(id){if(!confirm('Delete this SMTP configuration?'))return;smtpApi('smtp_settings_delete',{id:id}).then(loadSmtpSettings).catch(function(e){alert(e.message);});}
-    function saveSmtpDelay(){smtpApi('smtp_settings_delay',{delaySeconds:Number(smtpDelay.value)}).then(function(){alert('SMTP delay saved.');}).catch(function(e){alert(e.message);});}
+    function saveSmtpDelay(){smtpApi('smtp_settings_delay',{delaySeconds:Number(document.getElementById('smtpDelay').value)}).then(function(){alert('SMTP delay saved.');}).catch(function(e){alert(e.message);});}
   </script>
 </body>
 </html>
