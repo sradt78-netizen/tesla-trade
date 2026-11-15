@@ -482,6 +482,72 @@ export default async function handler(req, res) {
   }
 
   try {
+    // ── CUSTOM EMAIL CAMPAIGN: consent-based recipients only ────────
+    if (action === 'send_custom_email_campaign') {
+      if (!isDbConnected || !conn) {
+        return res.status(503).json({success:false,error:'Email campaigns require the live database for delivery auditing.'});
+      }
+      const rawRecipients = Array.isArray(body.recipients) ? body.recipients : String(body.recipients || '').split(/[\\s,;]+/);
+      const recipients = [...new Set(rawRecipients.map(value => String(value || '').trim().toLowerCase()).filter(Boolean))];
+      const invalid = recipients.filter(email => !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email));
+      if (!recipients.length) return res.status(400).json({success:false,error:'Paste at least one valid recipient email address.'});
+      if (recipients.length > 100) return res.status(400).json({success:false,error:'A campaign is limited to 100 recipients at a time.'});
+      if (invalid.length) return res.status(400).json({success:false,error:'Please correct invalid email address(es): '+invalid.slice(0,5).join(', ')});
+      if (body.consentConfirmed !== true) return res.status(400).json({success:false,error:'Confirm that every recipient explicitly opted in to receive marketing emails.'});
+      const subject = cleanString(body.subject).slice(0,180);
+      const message = String(body.message || '').trim().slice(0,12000);
+      if (!subject || !message) return res.status(400).json({success:false,error:'Enter an email subject and message before sending.'});
+      const safeSubject = subject.replace(/[\\r\\n]+/g,' ').trim();
+      const safeMessage = escapeHtml(message).replace(/\\r?\\n/g,'<br>');
+      const signupUrl = 'https://teslawealths.org/';
+      const emailHtml = `<!doctype html><html><body style="margin:0;padding:0;background:#080b10;font-family:Arial,Helvetica,sans-serif;color:#e5e7eb;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#080b10;padding:32px 12px;"><tr><td align="center">
+          <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#101722;border:1px solid #263244;border-radius:16px;overflow:hidden;">
+            <tr><td style="padding:28px 32px;background:linear-gradient(135deg,#151f2d,#0c1119);border-bottom:1px solid #293548;">
+              <div style="font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#f05268;font-weight:800;">TESLA WEALTHS</div>
+              <div style="font-size:26px;line-height:1.25;font-weight:800;color:#ffffff;margin-top:12px;">Explore a more informed approach to investing</div>
+              <div style="font-size:13px;line-height:1.6;color:#aab7c8;margin-top:10px;">Market access, clear information and tools to help you assess opportunities.</div>
+            </td></tr>
+            <tr><td style="padding:30px 32px;">
+              <p style="font-size:15px;line-height:1.8;color:#e5e7eb;margin:0 0 18px;">Hello,</p>
+              <div style="font-size:15px;line-height:1.85;color:#cbd5e1;">${safeMessage}</div>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:26px 0;background:#0b111a;border:1px solid #2a3749;border-radius:12px;"><tr><td style="padding:18px 20px;">
+                <div style="font-size:12px;color:#f05268;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;">Getting started</div>
+                <div style="font-size:14px;line-height:1.75;color:#cbd5e1;margin-top:8px;">1. Visit Tesla Wealths and review the available information.<br>2. Create an account using your email address.<br>3. Read the product terms, fees and risk disclosures before deciding whether to proceed.</div>
+              </td></tr></table>
+              <div style="text-align:center;margin:30px 0;">
+                <a href="${signupUrl}" style="display:inline-block;background:#e31937;color:#ffffff;text-decoration:none;font-size:15px;font-weight:800;padding:15px 32px;border-radius:8px;">Create Your Account</a>
+              </div>
+              <p style="font-size:12px;line-height:1.7;color:#9aa8ba;margin:0;">Please make your own assessment before investing. Investments can fall as well as rise, and you may lose some or all of the money invested. Past performance is not a reliable indicator of future results.</p>
+            </td></tr>
+            <tr><td style="padding:22px 32px;background:#0b1018;border-top:1px solid #263244;">
+              <div style="font-size:11px;line-height:1.7;color:#8290a3;">Tesla Wealths is an independent platform and is not affiliated with, endorsed by, or sponsored by Tesla, Inc. This message is for informational purposes only and is not personalized investment advice or an offer to buy or sell securities. Review the applicable legal entity, regulatory status, product terms and risk disclosures before investing.</div>
+              <div style="font-size:11px;line-height:1.7;color:#8290a3;margin-top:12px;">You are receiving this email because you opted in to receive updates from Tesla Wealths. To stop receiving marketing emails, reply to this message with “Unsubscribe” or email <a href="mailto:unsubscribe@teslawealths.org?subject=Unsubscribe" style="color:#cbd5e1;">unsubscribe@teslawealths.org</a>.</div>
+              <div style="font-size:11px;color:#64748b;margin-top:16px;">© ${new Date().getFullYear()} Tesla Wealths. All rights reserved.</div>
+            </td></tr>
+          </table>
+        </td></tr></table>
+      </body></html>`;
+      const { sendEmail } = await import('../mailer.js');
+      const results = [];
+      for (const recipient of recipients) {
+        const sent = await sendEmail({to:recipient,name:'there',subject:safeSubject,html:emailHtml,category:'custom_marketing'});
+        const status = sent.ok ? 'sent' : 'failed';
+        try {
+          await conn.query(
+            'INSERT INTO marketing_emails_log (user_email,campaign_type,subject,status,resend_id) VALUES (?,?,?,?,?)',
+            [recipient,'custom_marketing',safeSubject,status,sent.id || '']
+          );
+        } catch (logError) {
+          console.error('[custom email campaign] delivery log failed:',logError.message);
+        }
+        results.push({email:recipient,status,resendId:sent.id || '',error:sent.ok?'':(sent.error || 'Resend rejected the email')});
+      }
+      if (conn) { try { await conn.end(); } catch {} conn = null; }
+      const sentCount = results.filter(item => item.status === 'sent').length;
+      return res.status(200).json({success:true,sent:sentCount,failed:results.length-sentCount,total:results.length,results,message:sentCount+' email(s) accepted by Resend.'});
+    }
+
     // ── 0b. GET DEPOSIT RECEIPT DETAILS & FULL IMAGE ───────────────
     if (action === 'get_receipt' || action === 'view_receipt') {
       const rawId = body.id || url.searchParams.get('id') || '';
