@@ -515,6 +515,9 @@
         <button class="nav-btn" onclick="switchTab('marketing')">
           <span>📣 Marketing &amp; Emails</span> <span class="badge green" id="b-marketing">Autopilot</span>
         </button>
+        <button class="nav-btn" onclick="switchTab('email-campaign')">
+          <span>✉️ Custom Email Campaign</span>
+        </button>
         <button class="nav-btn" onclick="switchTab('trading')">
           <span>📈 Trading Graph Engine</span> <span class="badge green" id="b-trading">Live</span>
         </button>
@@ -1042,6 +1045,44 @@
       </div>
     </section>
 
+    <!-- CUSTOM EMAIL CAMPAIGN TAB -->
+    <section id="tab-email-campaign" style="display:none;">
+      <div class="card" style="padding:24px;margin-bottom:18px;background:linear-gradient(135deg,#111b29,#0b1018);border:1px solid #29384b;">
+        <div style="color:#f05268;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">Tesla Wealths · Campaign Studio</div>
+        <h2 style="font-size:22px;color:#fff;margin:8px 0;">Create a professional email campaign</h2>
+        <p style="font-size:13px;line-height:1.7;color:#aab7c8;max-width:760px;">Paste opted-in recipients, customize your subject and message, preview the email, then send through your existing Resend configuration. Each recipient receives an individual email, and delivery results are recorded in the marketing log.</p>
+      </div>
+      <div class="card" style="padding:22px;margin-bottom:18px;">
+        <label for="customCampaignRecipients" style="display:block;font-size:12px;font-weight:700;color:#cbd5e1;margin-bottom:8px;">Send to · email addresses</label>
+        <textarea id="customCampaignRecipients" rows="6" placeholder="person@example.com&#10;another@example.com&#10;Separate addresses with commas, spaces or new lines" style="width:100%;resize:vertical;background:#080b10;color:#fff;border:1px solid #344155;border-radius:10px;padding:13px;font:13px/1.6 monospace;"></textarea>
+        <div style="font-size:11px;color:#8290a3;margin-top:6px;">Up to 100 unique addresses per campaign. Only contact people who have explicitly agreed to receive marketing emails.</div>
+        <label for="customCampaignSubject" style="display:block;font-size:12px;font-weight:700;color:#cbd5e1;margin:18px 0 8px;">Email subject</label>
+        <input id="customCampaignSubject" maxlength="180" value="Explore investment opportunities with Tesla Wealths" style="width:100%;background:#080b10;color:#fff;border:1px solid #344155;border-radius:10px;padding:13px;font-size:14px;">
+        <label for="customCampaignMessage" style="display:block;font-size:12px;font-weight:700;color:#cbd5e1;margin:18px 0 8px;">Your email message</label>
+        <textarea id="customCampaignMessage" rows="10" maxlength="12000" style="width:100%;resize:vertical;background:#080b10;color:#fff;border:1px solid #344155;border-radius:10px;padding:13px;font:14px/1.7 Arial,sans-serif;">Discover a more informed way to explore Tesla-related market opportunities with Tesla Wealths.
+
+Our platform is designed to give prospective clients a clear place to learn about available investment programmes, review relevant information and decide whether an opportunity is right for them.
+
+If you are interested, visit our website to explore the platform, review the terms and risk information, and create an account when you are ready. There is no obligation to invest.</textarea>
+        <div style="display:flex;gap:10px;align-items:flex-start;margin-top:16px;padding:13px;background:#111923;border:1px solid #29384b;border-radius:9px;">
+          <input id="customCampaignConsent" type="checkbox" style="margin-top:3px;width:17px;height:17px;accent-color:#e31937;flex:0 0 auto;">
+          <label for="customCampaignConsent" style="font-size:12px;line-height:1.6;color:#cbd5e1;">I confirm that every address in this campaign belongs to someone who explicitly opted in to receive marketing emails from Tesla Wealths. I will not use purchased, scraped or unsolicited recipient lists.</label>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+          <button type="button" onclick="previewCustomCampaign()" style="background:#202b3a;border:1px solid #3a4a60;color:#fff;">Preview email</button>
+          <button type="button" class="primary" id="sendCustomCampaignButton" onclick="sendCustomCampaign()">Send campaign via Resend</button>
+        </div>
+        <div id="customCampaignStatus" role="status" style="display:none;margin-top:14px;padding:12px;border-radius:8px;font-size:13px;line-height:1.6;"></div>
+      </div>
+      <div class="card" style="padding:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;">
+          <h3 style="font-size:15px;color:#fff;">Email preview</h3>
+          <span style="font-size:11px;color:#8290a3;">Mobile-friendly HTML design</span>
+        </div>
+        <iframe id="customCampaignPreview" title="Custom email preview" sandbox="" style="width:100%;height:760px;border:1px solid #29384b;border-radius:10px;background:#080b10;"></iframe>
+      </div>
+    </section>
+
     <!-- TAB 9: TRADING GRAPH ENGINE & PROFIT/LOSS FIX -->
     <section id="tab-trading" style="display: none;">
       <div style="background:#13151b;border:1px solid #282d3b;border-radius:14px;padding:22px;margin-bottom:20px;">
@@ -1385,11 +1426,51 @@
       if (bd) bd.classList.remove('active');
     }
 
+    function customCampaignEscape(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+      });
+    }
+    function buildCustomCampaignPreview() {
+      var subject = (document.getElementById('customCampaignSubject').value || '').trim();
+      var message = (document.getElementById('customCampaignMessage').value || '').trim();
+      var safeMessage = customCampaignEscape(message).replace(/\r?\n/g,'<br>');
+      var year = new Date().getFullYear();
+      return '<body style="margin:0;padding:20px;background:#080b10;font-family:Arial,sans-serif;color:#e5e7eb;"><div style="max-width:600px;margin:auto;background:#101722;border:1px solid #263244;border-radius:14px;overflow:hidden;"><div style="padding:26px;background:#151f2d;"><div style="font-size:12px;letter-spacing:3px;color:#f05268;font-weight:bold;">TESLA WEALTHS</div><h1 style="font-size:25px;color:white;line-height:1.25;">Explore a more informed approach to investing</h1><p style="color:#aab7c8;line-height:1.6;">Market access, clear information and tools to help you assess opportunities.</p></div><div style="padding:28px;"><p style="color:#cbd5e1;line-height:1.8;">Hello,</p><div style="color:#cbd5e1;line-height:1.85;">'+safeMessage+'</div><div style="margin:24px 0;padding:18px;background:#0b111a;border:1px solid #2a3749;border-radius:10px;color:#cbd5e1;line-height:1.8;"><b style="color:#f05268;">Getting started</b><br>1. Visit Tesla Wealths and review the available information.<br>2. Create an account using your email address.<br>3. Read product terms, fees and risk disclosures before deciding whether to proceed.</div><p style="text-align:center;margin:28px;"><a href="https://teslawealths.org/" style="background:#e31937;color:white;text-decoration:none;padding:14px 28px;border-radius:8px;font-weight:bold;">Create Your Account</a></p><p style="font-size:12px;color:#9aa8ba;line-height:1.7;">Investments can fall as well as rise, and you may lose some or all of your money. Past performance is not a reliable indicator of future results.</p></div><div style="padding:20px;background:#0b1018;border-top:1px solid #263244;color:#8290a3;font-size:11px;line-height:1.7;">Tesla Wealths is independent and is not affiliated with, endorsed by, or sponsored by Tesla, Inc. This is not personalized investment advice or an offer to buy or sell securities. Review the applicable legal entity, regulatory status, product terms and risks before investing.<br><br>You are receiving this because you opted in to marketing emails. To unsubscribe, reply “Unsubscribe” or email <a style="color:#cbd5e1;" href="mailto:unsubscribe@teslawealths.org?subject=Unsubscribe">unsubscribe@teslawealths.org</a>.<br><br>© '+year+' Tesla Wealths. All rights reserved.</div></div></body>';
+    }
+    function previewCustomCampaign() {
+      var frame = document.getElementById('customCampaignPreview');
+      if (frame) frame.srcdoc = buildCustomCampaignPreview();
+    }
+    function sendCustomCampaign() {
+      var recipients = (document.getElementById('customCampaignRecipients').value || '').split(/[\s,;]+/).map(function(v){return v.trim().toLowerCase();}).filter(Boolean);
+      var subject = (document.getElementById('customCampaignSubject').value || '').trim();
+      var message = (document.getElementById('customCampaignMessage').value || '').trim();
+      var consent = document.getElementById('customCampaignConsent').checked;
+      var status = document.getElementById('customCampaignStatus');
+      var button = document.getElementById('sendCustomCampaignButton');
+      if (!recipients.length || !subject || !message) { showToast('Enter recipient emails, a subject and a message.'); return; }
+      if (!consent) { showToast('Confirm that all recipients opted in before sending.'); return; }
+      if (recipients.length > 100) { showToast('A campaign is limited to 100 unique recipients.'); return; }
+      if (!confirm('Send this email campaign to '+recipients.length+' opted-in recipient(s)? Each recipient will receive an individual email.')) return;
+      button.disabled = true; button.textContent = 'Sending campaign…';
+      status.style.display = 'block'; status.style.background = '#142235'; status.style.color = '#bfdbfe'; status.textContent = 'Sending through your configured Resend account. Please keep this page open.';
+      adminFetch('/api/admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send_custom_email_campaign',recipients:recipients,subject:subject,message:message,consentConfirmed:consent})})
+        .then(function(r){return r.json().then(function(d){if(!r.ok||!d.success)throw new Error(d.error||'Campaign could not be sent.');return d;});})
+        .then(function(d){
+          status.style.background = d.failed ? '#332719' : '#102b22'; status.style.color = d.failed ? '#fcd34d' : '#86efac';
+          status.textContent = 'Resend accepted '+d.sent+' of '+d.total+' email(s). '+d.failed+' failed.'+(d.failed?' Failed: '+d.results.filter(function(x){return x.status==='failed';}).map(function(x){return x.email+': '+x.error;}).join(' | '):'');
+          showToast(d.message || 'Campaign submitted.');
+          loadDashboardData();
+        })
+        .catch(function(e){status.style.background='#35171b';status.style.color='#fca5a5';status.textContent=e.message||'Campaign failed.';showToast(status.textContent);})
+        .finally(function(){button.disabled=false;button.textContent='Send campaign via Resend';});
+    }
     function switchTab(tabId) {
       closeMobileSidebar();
       try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) {}
 
-      var tabs = ['investors', 'referrals', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'support', 'marketing', 'trading', 'settings'];
+      var tabs = ['investors', 'referrals', 'investment-receipts', 'receipts', 'kyc', 'withdrawals', 'financing', 'access', 'support', 'marketing', 'email-campaign', 'trading', 'settings'];
       tabs.forEach(function(t) {
         var el = document.getElementById('tab-' + t);
         if (el) el.style.display = (t === tabId) ? 'block' : 'none';
@@ -1414,6 +1495,7 @@
         access: ['Private Invitation Access', 'Manage active and revoked investor invitation tokens'],
         support: ['Investor Support Inbox', 'Read and respond to investor support conversations'],
         marketing: ['Marketing & Click Analytics', 'Track domain clicks, referral sources, and campaigns'],
+        'email-campaign': ['Custom Email Campaign', 'Compose and send consent-based email campaigns through Resend'],
         trading: ['Trading Graph Engine & Control', 'Configure live profit and loss cycle intervals, gain/loss percentages, and graph dynamics on investors dashboard'],
         settings: ['System Settings & Environment', 'Database health, Vercel environment variables, and wallets']
       };
