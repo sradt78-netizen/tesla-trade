@@ -487,18 +487,18 @@ export default async function handler(req, res) {
       if (!isDbConnected || !conn) {
         return res.status(503).json({success:false,error:'Email campaigns require the live database for delivery auditing.'});
       }
-      const rawRecipients = Array.isArray(body.recipients) ? body.recipients : String(body.recipients || '').split(/[\s,;]+/);
+      const rawRecipients = Array.isArray(body.recipients) ? body.recipients : String(body.recipients || '').split(/[\\s,;]+/);
       const recipients = [...new Set(rawRecipients.map(value => String(value || '').trim().toLowerCase()).filter(Boolean))];
-      const invalid = recipients.filter(email => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+      const invalid = recipients.filter(email => !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email));
       if (!recipients.length) return res.status(400).json({success:false,error:'Paste at least one valid recipient email address.'});
-      if (recipients.length > 100) return res.status(400).json({success:false,error:'A campaign is limited to 100 recipients at a time.'});
+      if (recipients.length > 100) return res.status(400).json({success:false,error:'A campaign is limited to 100 recipients at a time. Additional recipients can be sent in another batch.'});
       if (invalid.length) return res.status(400).json({success:false,error:'Please correct invalid email address(es): '+invalid.slice(0,5).join(', ')});
       if (body.consentConfirmed !== true) return res.status(400).json({success:false,error:'Confirm that every recipient explicitly opted in to receive marketing emails.'});
       const subject = cleanString(body.subject).slice(0,180);
       const message = String(body.message || '').trim().slice(0,12000);
       if (!subject || !message) return res.status(400).json({success:false,error:'Enter an email subject and message before sending.'});
-      const safeSubject = subject.replace(/[\r\n]+/g,' ').trim();
-      const safeMessage = escapeHtml(message).replace(/\r?\n/g,'<br>');
+      const safeSubject = subject.replace(/[\\r\\n]+/g,' ').trim();
+      const safeMessage = escapeHtml(message).replace(/\\r?\\n/g,'<br>');
       const signupUrl = 'https://teslawealths.org/';
       const logoUrl = 'https://teslawealths.org/assets/social-share-logo.png';
       const currentYear = new Date().getFullYear();
@@ -523,7 +523,7 @@ export default async function handler(req, res) {
             <tr><td class="tw-pad" style="padding:18px 38px 10px;"><div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#b42336;font-weight:800;margin-bottom:10px;">Plans currently displayed on our website</div>
               <table class="tw-plans" role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e7e9ee;border-radius:12px;border-collapse:separate;border-spacing:0;overflow:hidden;">
                 <tr style="background:#f7f8fa;"><th align="left" style="padding:11px 8px;font-size:10px;color:#667085;">Plan</th><th align="right" style="padding:11px 8px;font-size:10px;color:#667085;">Projection</th><th align="right" style="padding:11px 8px;font-size:10px;color:#667085;">Allocation</th><th align="right" style="padding:11px 8px;font-size:10px;color:#667085;">Term</th></tr>
-                ${"<tr><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\">Explorer</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\">70%</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">$30–$1,000</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">30 days</td></tr><tr><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\">Pioneer</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\">100%</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">$1,000–$10,000</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">60 days</td></tr><tr><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\">Visionary</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\">140%</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">$10,000–$25,000</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">90 days</td></tr><tr><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\">Pioneer Plus</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\">200%</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">$25,000–$55,000</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">180 days</td></tr><tr><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\">Dogecoin Reserve</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\">60%–140%</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">$1,000–$25,000</td><td style=\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\">90 days</td></tr>"}
+                ${"<tr><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\\">Explorer</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\\">70%</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\\">$30–$1,000</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\\">30 days</td></tr><tr><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\\">Pioneer</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\\">100%</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\\">$1,000–$10,000</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\\">60 days</td></tr><tr><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\\">Visionary</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\\">140%</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\\">$10,000–$25,000</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\\">90 days</td></tr><tr><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\\">Pioneer Plus</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\\">200%</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\\">$25,000–$55,000</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\\">180 days</td></tr><tr><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#172033;font-size:12px;font-weight:700;\\">Dogecoin Reserve</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#b42336;font-size:13px;font-weight:800;text-align:right;\\">60%–140%</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\\">$1,000–$25,000</td><td style=\\"padding:11px 8px;border-bottom:1px solid #eceff3;color:#475467;font-size:11px;text-align:right;\\">90 days</td></tr>"}
               </table>
               <p style="margin:10px 0 0;color:#667085;font-size:11px;line-height:1.65;">Start with as little as $30. The percentages shown are website-listed projections; actual results vary.</p>
             </td></tr>
@@ -532,25 +532,67 @@ export default async function handler(req, res) {
             <tr><td align="center" style="padding:22px 26px;background:#090a0d;color:#aab0ba;"><div style="font-size:12px;font-weight:800;color:#fff;letter-spacing:2px;">TESLA WEALTHS</div><div style="font-size:11px;line-height:1.7;margin-top:8px;">You are receiving this because you opted in to receive marketing communications.</div><div style="font-size:11px;line-height:1.7;margin-top:7px;">To unsubscribe, reply “Unsubscribe” or email <a href="mailto:unsubscribe@teslawealths.org?subject=Unsubscribe" style="color:#fff;text-decoration:underline;">unsubscribe@teslawealths.org</a>.</div><div style="font-size:10px;color:#727986;margin-top:13px;">© ${currentYear} Tesla Wealths. All rights reserved.</div></td></tr>
           </table>
         </td></tr></table></body></html>`;
-      const textBody = ['TESLA WEALTHS','','Hello,',message,'','PLANS CURRENTLY DISPLAYED ON OUR WEBSITE',"Explorer: 70% website-listed projected return | $30–$1,000 | 30 days\nPioneer: 100% website-listed projected return | $1,000–$10,000 | 60 days\nVisionary: 140% website-listed projected return | $10,000–$25,000 | 90 days\nPioneer Plus: 200% website-listed projected return | $25,000–$55,000 | 180 days\nDogecoin Reserve: 60%–140% website-listed projected return | $1,000–$25,000 | 90 days",'','Start with as little as $30. The percentages shown are website-listed projections; actual results vary.','','Explore the website and create an account: '+signupUrl,'','Investing involves risk, including possible loss of capital. This is general information, not personalized investment advice.','','You are receiving this because you opted in to marketing communications. To unsubscribe, reply Unsubscribe or email unsubscribe@teslawealths.org.'].join('\n');
+      const textBody = ['TESLA WEALTHS','','Hello,',message,'','PLANS CURRENTLY DISPLAYED ON OUR WEBSITE',"Explorer: 70% website-listed projected return | $30–$1,000 | 30 days\\nPioneer: 100% website-listed projected return | $1,000–$10,000 | 60 days\\nVisionary: 140% website-listed projected return | $10,000–$25,000 | 90 days\\nPioneer Plus: 200% website-listed projected return | $25,000–$55,000 | 180 days\\nDogecoin Reserve: 60%–140% website-listed projected return | $1,000–$25,000 | 90 days",'','Start with as little as $30. The percentages shown are website-listed projections; actual results vary.','','Explore the website and create an account: '+signupUrl,'','Investing involves risk, including possible loss of capital. This is general information, not personalized investment advice.','','You are receiving this because you opted in to marketing communications. To unsubscribe, reply Unsubscribe or email unsubscribe@teslawealths.org.'].join('\\n');
       const { sendEmail } = await import('../mailer.js');
+
+      // Resend scheduled sends are spaced 18 seconds apart: no more than
+      // 200 campaign messages can be scheduled in any rolling 60-minute window.
+      await conn.query(`CREATE TABLE IF NOT EXISTS marketing_email_schedule (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        recipient VARCHAR(255) NOT NULL,
+        resend_id VARCHAR(100) DEFAULT NULL,
+        scheduled_at DATETIME NOT NULL,
+        status VARCHAR(24) NOT NULL DEFAULT 'reserved',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_marketing_email_schedule_time (scheduled_at, status)
+      )`);
+      const [lockRows] = await conn.query("SELECT GET_LOCK('tesla_wealths_marketing_schedule', 10) AS acquired");
+      if (!lockRows?.[0] || Number(lockRows[0].acquired) !== 1) {
+        return res.status(503).json({success:false,error:'The email sending queue is busy. Please retry shortly.'});
+      }
+      let reservations = [];
+      try {
+        const [lastRows] = await conn.query("SELECT MAX(scheduled_at) AS last_scheduled FROM marketing_email_schedule WHERE status IN ('reserved','scheduled') AND scheduled_at > UTC_TIMESTAMP()");
+        const now = Date.now();
+        const last = lastRows?.[0]?.last_scheduled ? new Date(String(lastRows[0].last_scheduled).replace(' ','T')+'Z').getTime() : 0;
+        let next = Math.max(now + 60_000, Number.isFinite(last) ? last + 18_000 : 0);
+        if (next + (recipients.length - 1) * 18_000 > now + 30 * 24 * 60 * 60 * 1000) {
+          return res.status(429).json({success:false,error:'The campaign queue is full for Resend’s 30-day scheduling window. Please try again later.'});
+        }
+        for (const recipient of recipients) {
+          const when = new Date(next);
+          const sqlTime = when.toISOString().slice(0,19).replace('T',' ');
+          const [insert] = await conn.query("INSERT INTO marketing_email_schedule (recipient,scheduled_at,status) VALUES (?,?, 'reserved')",[recipient,sqlTime]);
+          reservations.push({id:insert.insertId,recipient,scheduledAt:when.toISOString()});
+          next += 18_000;
+        }
+      } finally {
+        try { await conn.query("SELECT RELEASE_LOCK('tesla_wealths_marketing_schedule')"); } catch {}
+      }
+
       const results = [];
-      for (const recipient of recipients) {
-        const sent = await sendEmail({to:recipient,name:'there',subject:safeSubject,html:emailHtml,text:textBody,fromName:'Tesla Wealths',headers:{'List-Unsubscribe':'<mailto:unsubscribe@teslawealths.org?subject=Unsubscribe>'},category:'custom_marketing'});
-        const status = sent.ok ? 'sent' : 'failed';
+      for (const reservation of reservations) {
+        const sent = await sendEmail({to:reservation.recipient,name:'there',subject:safeSubject,html:emailHtml,text:textBody,scheduledAt:reservation.scheduledAt,fromName:'Tesla Wealths',headers:{'List-Unsubscribe':'<mailto:unsubscribe@teslawealths.org?subject=Unsubscribe>','List-Unsubscribe-Post':'List-Unsubscribe=One-Click'},category:'custom_marketing'});
+        const status = sent.ok ? 'scheduled' : 'failed';
+        try {
+          await conn.query("UPDATE marketing_email_schedule SET status=?,resend_id=? WHERE id=?",[status,sent.id || null,reservation.id]);
+        } catch (logError) {
+          console.error('[custom email campaign] schedule log update failed:',logError.message);
+        }
         try {
           await conn.query(
             'INSERT INTO marketing_emails_log (user_email,campaign_type,subject,status,resend_id) VALUES (?,?,?,?,?)',
-            [recipient,'custom_marketing',safeSubject,status,sent.id || '']
+            [reservation.recipient,'custom_marketing',safeSubject,status,sent.id || '']
           );
         } catch (logError) {
           console.error('[custom email campaign] delivery log failed:',logError.message);
         }
-        results.push({email:recipient,status:sent.ok?'accepted_by_resend':'failed',resendId:sent.id || '',error:sent.ok?'Accepted by Resend; recipient-server delivery has not yet been confirmed.':(sent.error || 'Resend rejected the email')});
+        results.push({email:reservation.recipient,status:sent.ok?'scheduled_with_resend':'failed',scheduledAt:reservation.scheduledAt,resendId:sent.id || '',error:sent.ok?'Scheduled with Resend. This confirms scheduling, not recipient inbox delivery.':(sent.error || 'Resend rejected the email')});
       }
       if (conn) { try { await conn.end(); } catch {} conn = null; }
-      const sentCount = results.filter(item => item.status === 'accepted_by_resend').length;
-      return res.status(200).json({success:true,sent:sentCount,failed:results.length-sentCount,total:results.length,results,message:sentCount+' email(s) accepted by Resend. This does not confirm inbox delivery.'});
+      const scheduledCount = results.filter(item => item.status === 'scheduled_with_resend').length;
+      return res.status(200).json({success:true,scheduled:scheduledCount,failed:results.length-scheduledCount,total:results.length,results,message:scheduledCount+' email(s) scheduled with Resend, spaced 18 seconds apart (maximum 200 per rolling hour).'});
     }
 
     // ── 0b. GET DEPOSIT RECEIPT DETAILS & FULL IMAGE ───────────────
