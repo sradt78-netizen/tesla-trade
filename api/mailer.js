@@ -148,8 +148,8 @@ export async function sendEmail({ to, name, subject, html, text, scheduledAt, re
       console.log(`[Mailer] Email sent successfully to ${to} (id: ${result.data.id}): "${subject}"`);
       await safeLogUserAction({
         user_email: to,
-        action_type: 'email.sent',
-        description: `Email delivered to ${to}: "${subject}"`,
+        action_type: scheduledAt ? 'email.scheduled' : 'email.accepted',
+        description: scheduledAt ? `Email scheduled for ${to}: "${subject}"` : `Email accepted by Resend for ${to}: "${subject}"`,
         status: 'success',
         details: { resend_id: result.data.id, subject, recipient: to, category }
       });
