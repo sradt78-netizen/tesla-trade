@@ -500,30 +500,42 @@ export default async function handler(req, res) {
       const safeSubject = subject.replace(/[\r\n]+/g,' ').trim();
       const safeMessage = escapeHtml(message).replace(/\r?\n/g,'<br>');
       const signupUrl = 'https://teslawealths.org/';
-      const emailHtml = `<!doctype html><html><body style="margin:0;padding:0;background:#080b10;font-family:Arial,Helvetica,sans-serif;color:#e5e7eb;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#080b10;padding:32px 12px;"><tr><td align="center">
-          <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;background:#101722;border:1px solid #263244;border-radius:16px;overflow:hidden;">
-            <tr><td style="padding:28px 32px;background:linear-gradient(135deg,#151f2d,#0c1119);border-bottom:1px solid #293548;">
-              <div style="font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#f05268;font-weight:800;">TESLA WEALTHS</div>
-              <div style="font-size:26px;line-height:1.25;font-weight:800;color:#ffffff;margin-top:12px;">Explore a more informed approach to investing</div>
-              <div style="font-size:13px;line-height:1.6;color:#aab7c8;margin-top:10px;">Market access, clear information and tools to help you assess opportunities.</div>
+      const logoUrl = 'https://teslawealths.org/assets/social-share-logo.png?v=20260930';
+      const emailHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+      <body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">Explore Tesla Wealths, review the information and decide whether an opportunity is right for you.</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f2f4f7;padding:28px 12px;"><tr><td align="center">
+          <table role="presentation" width="620" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:620px;background:#ffffff;border:1px solid #e5e9f0;border-radius:18px;overflow:hidden;">
+            <tr><td align="center" style="padding:30px 28px 24px;background:#101827;border-bottom:4px solid #e31937;">
+              <img src="${logoUrl}" width="230" alt="Tesla Wealths" style="display:block;width:230px;max-width:80%;height:auto;margin:0 auto 18px;border:0;outline:none;text-decoration:none;">
+              <div style="font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:#c6cfdd;font-weight:700;">Investment information &amp; opportunities</div>
             </td></tr>
-            <tr><td style="padding:30px 32px;">
-              <p style="font-size:15px;line-height:1.8;color:#e5e7eb;margin:0 0 18px;">Hello,</p>
-              <div style="font-size:15px;line-height:1.85;color:#cbd5e1;">${safeMessage}</div>
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:26px 0;background:#0b111a;border:1px solid #2a3749;border-radius:12px;"><tr><td style="padding:18px 20px;">
-                <div style="font-size:12px;color:#f05268;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;">Getting started</div>
-                <div style="font-size:14px;line-height:1.75;color:#cbd5e1;margin-top:8px;">1. Visit Tesla Wealths and review the available information.<br>2. Create an account using your email address.<br>3. Read the product terms, fees and risk disclosures before deciding whether to proceed.</div>
-              </td></tr></table>
-              <div style="text-align:center;margin:30px 0;">
-                <a href="${signupUrl}" style="display:inline-block;background:#e31937;color:#ffffff;text-decoration:none;font-size:15px;font-weight:800;padding:15px 32px;border-radius:8px;">Create Your Account</a>
-              </div>
-              <p style="font-size:12px;line-height:1.7;color:#9aa8ba;margin:0;">Please make your own assessment before investing. Investments can fall as well as rise, and you may lose some or all of the money invested. Past performance is not a reliable indicator of future results.</p>
+            <tr><td style="padding:34px 36px 14px;">
+              <div style="font-size:11px;letter-spacing:1.8px;text-transform:uppercase;color:#e31937;font-weight:800;">A closer look at Tesla Wealths</div>
+              <h1 style="margin:10px 0 14px;font-size:30px;line-height:1.2;letter-spacing:-.6px;color:#111827;">Explore your next investment decision with clarity.</h1>
+              <p style="margin:0;color:#64748b;font-size:15px;line-height:1.8;">Hello,</p>
+              <div style="margin-top:14px;color:#344054;font-size:15px;line-height:1.85;">${safeMessage}</div>
             </td></tr>
-            <tr><td style="padding:22px 32px;background:#0b1018;border-top:1px solid #263244;">
-              <div style="font-size:11px;line-height:1.7;color:#8290a3;">Tesla Wealths is an independent platform and is not affiliated with, endorsed by, or sponsored by Tesla, Inc. This message is for informational purposes only and is not personalized investment advice or an offer to buy or sell securities. Review the applicable legal entity, regulatory status, product terms and risk disclosures before investing.</div>
-              <div style="font-size:11px;line-height:1.7;color:#8290a3;margin-top:12px;">You are receiving this email because you opted in to receive updates from Tesla Wealths. To stop receiving marketing emails, reply to this message with “Unsubscribe” or email <a href="mailto:unsubscribe@teslawealths.org?subject=Unsubscribe" style="color:#cbd5e1;">unsubscribe@teslawealths.org</a>.</div>
-              <div style="font-size:11px;color:#64748b;margin-top:16px;">© ${new Date().getFullYear()} Tesla Wealths. All rights reserved.</div>
+            <tr><td style="padding:12px 36px 8px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f8fafc;border:1px solid #e6eaf0;border-radius:12px;">
+                <tr><td style="padding:20px 22px;">
+                  <div style="font-size:12px;color:#e31937;font-weight:800;letter-spacing:1.3px;text-transform:uppercase;">Getting started</div>
+                  <div style="font-size:14px;line-height:1.9;color:#344054;margin-top:8px;">01 &nbsp; Explore the Tesla Wealths website and available information.<br>02 &nbsp; Create an account using your email address.<br>03 &nbsp; Review the applicable terms, fees and risk information before making any decision.</div>
+                </td></tr>
+              </table>
+            </td></tr>
+            <tr><td align="center" style="padding:26px 36px 28px;">
+              <a href="${signupUrl}" style="display:inline-block;background:#e31937;color:#ffffff;text-decoration:none;font-size:15px;font-weight:800;padding:16px 34px;border-radius:8px;letter-spacing:.2px;">Create Your Account&nbsp; &#8594;</a>
+              <div style="margin-top:12px;font-size:12px;color:#667085;">Visit <a href="${signupUrl}" style="color:#e31937;text-decoration:underline;">teslawealths.org</a> to get started.</div>
+            </td></tr>
+            <tr><td style="padding:0 36px 28px;">
+              <div style="border-top:1px solid #e8ecf2;padding-top:20px;font-size:12px;line-height:1.75;color:#667085;">Investing involves risk. The value of investments can rise or fall and you may lose some or all of the amount invested. Past performance is not a reliable indicator of future results. This email is for general information only and is not personalized investment advice or a recommendation to buy or sell any security. Please review all applicable product information and legal disclosures before making an investment decision.</div>
+            </td></tr>
+            <tr><td align="center" style="padding:22px 28px;background:#101827;color:#aab5c5;">
+              <div style="font-size:12px;font-weight:700;color:#ffffff;letter-spacing:1px;">TESLA WEALTHS</div>
+              <div style="font-size:11px;line-height:1.7;margin-top:8px;">You are receiving this message because you opted in to receive marketing communications from Tesla Wealths.</div>
+              <div style="font-size:11px;line-height:1.7;margin-top:8px;">To unsubscribe, reply to this email with “Unsubscribe” or email <a href="mailto:unsubscribe@teslawealths.org?subject=Unsubscribe" style="color:#ffffff;text-decoration:underline;">unsubscribe@teslawealths.org</a>.</div>
+              <div style="font-size:10px;color:#7f8b9d;margin-top:14px;">© ${new Date().getFullYear()} Tesla Wealths. All rights reserved.</div>
             </td></tr>
           </table>
         </td></tr></table>
@@ -531,7 +543,7 @@ export default async function handler(req, res) {
       const { sendEmail } = await import('../mailer.js');
       const results = [];
       for (const recipient of recipients) {
-        const sent = await sendEmail({to:recipient,name:'there',subject:safeSubject,html:emailHtml,category:'custom_marketing'});
+        const sent = await sendEmail({to:recipient,name:'there',subject:safeSubject,html:emailHtml,fromName:'Tesla Wealths',headers:{'List-Unsubscribe':'<mailto:unsubscribe@teslawealths.org?subject=Unsubscribe>'},category:'custom_marketing'});
         const status = sent.ok ? 'sent' : 'failed';
         try {
           await conn.query(
@@ -541,11 +553,11 @@ export default async function handler(req, res) {
         } catch (logError) {
           console.error('[custom email campaign] delivery log failed:',logError.message);
         }
-        results.push({email:recipient,status,resendId:sent.id || '',error:sent.ok?'':(sent.error || 'Resend rejected the email')});
+        results.push({email:recipient,status:sent.ok?'accepted_by_resend':'failed',resendId:sent.id || '',error:sent.ok?'Accepted by Resend; recipient-server delivery has not yet been confirmed.':(sent.error || 'Resend rejected the email')});
       }
       if (conn) { try { await conn.end(); } catch {} conn = null; }
       const sentCount = results.filter(item => item.status === 'sent').length;
-      return res.status(200).json({success:true,sent:sentCount,failed:results.length-sentCount,total:results.length,results,message:sentCount+' email(s) accepted by Resend.'});
+      return res.status(200).json({success:true,sent:sentCount,failed:results.length-sentCount,total:results.length,results,message:sentCount+' email(s) accepted by Resend. This does not confirm inbox delivery.'});
     }
 
     // ── 0b. GET DEPOSIT RECEIPT DETAILS & FULL IMAGE ───────────────
