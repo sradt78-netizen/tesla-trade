@@ -92,7 +92,7 @@ async function safeLogUserAction(entry) {
  * Base email dispatcher with automatic fallback for unverified custom domains.
  * Logs all deliveries to the User Action Audit Log.
  */
-export async function sendEmail({ to, name, subject, html, replyTo, category = 'notification' }) {
+export async function sendEmail({ to, name, subject, html, replyTo, fromName: requestedFromName, headers, category = 'notification' }) {
   const { apiKey, fromEmail, fromName, replyTo: configuredReplyTo } = await getMailerConfig();
   const safeName = name || 'Investor';
 
@@ -127,10 +127,11 @@ export async function sendEmail({ to, name, subject, html, replyTo, category = '
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: `${fromName || 'Tesla Trade'} <${senderAddress}>`,
+        from: `${requestedFromName || fromName || 'Tesla Wealths'} <${senderAddress}>`,
         to: [to],
         subject,
         html,
+        ...(headers && typeof headers === 'object' ? { headers } : {}),
         ...((replyTo || configuredReplyTo) ? { reply_to: [replyTo || configuredReplyTo] } : {})
       })
     });
