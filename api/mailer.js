@@ -127,7 +127,7 @@ export async function sendEmail({ to, name, subject, html, replyTo, fromName: re
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        from: `${requestedFromName || fromName || 'Tesla Wealths'} <${senderAddress}>`,
+        from: `${requestedFromName || fromName || 'Tesla Trade'} <${senderAddress}>`,
         to: [to],
         subject,
         html,
