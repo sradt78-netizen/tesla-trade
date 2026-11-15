@@ -553,7 +553,7 @@ export default async function handler(req, res) {
       }
       let reservations = [];
       try {
-        const [lastRows] = await conn.query("SELECT MAX(scheduled_at) AS last_scheduled FROM marketing_email_schedule WHERE status IN ('reserved','scheduled') AND scheduled_at > UTC_TIMESTAMP()");
+        const [lastRows] = await conn.query("SELECT DATE_FORMAT(MAX(scheduled_at), '%Y-%m-%d %H:%i:%s') AS last_scheduled FROM marketing_email_schedule WHERE status IN ('reserved','scheduled') AND scheduled_at > UTC_TIMESTAMP()");
         const now = Date.now();
         const last = lastRows?.[0]?.last_scheduled ? new Date(String(lastRows[0].last_scheduled).replace(' ','T')+'Z').getTime() : 0;
         let next = Math.max(now + 60_000, Number.isFinite(last) ? last + 18_000 : 0);
