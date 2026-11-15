@@ -487,9 +487,9 @@ export default async function handler(req, res) {
       if (!isDbConnected || !conn) {
         return res.status(503).json({success:false,error:'Email campaigns require the live database for delivery auditing.'});
       }
-      const rawRecipients = Array.isArray(body.recipients) ? body.recipients : String(body.recipients || '').split(/[\\s,;]+/);
+      const rawRecipients = Array.isArray(body.recipients) ? body.recipients : String(body.recipients || '').split(/[\s,;]+/);
       const recipients = [...new Set(rawRecipients.map(value => String(value || '').trim().toLowerCase()).filter(Boolean))];
-      const invalid = recipients.filter(email => !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email));
+      const invalid = recipients.filter(email => !/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(email));
       if (!recipients.length) return res.status(400).json({success:false,error:'Paste at least one valid recipient email address.'});
       if (recipients.length > 100) return res.status(400).json({success:false,error:'A campaign is limited to 100 recipients at a time.'});
       if (invalid.length) return res.status(400).json({success:false,error:'Please correct invalid email address(es): '+invalid.slice(0,5).join(', ')});
@@ -497,8 +497,8 @@ export default async function handler(req, res) {
       const subject = cleanString(body.subject).slice(0,180);
       const message = String(body.message || '').trim().slice(0,12000);
       if (!subject || !message) return res.status(400).json({success:false,error:'Enter an email subject and message before sending.'});
-      const safeSubject = subject.replace(/[\\r\\n]+/g,' ').trim();
-      const safeMessage = escapeHtml(message).replace(/\\r?\\n/g,'<br>');
+      const safeSubject = subject.replace(/[\r\n]+/g,' ').trim();
+      const safeMessage = escapeHtml(message).replace(/\r?\n/g,'<br>');
       const signupUrl = 'https://teslawealths.org/';
       const emailHtml = `<!doctype html><html><body style="margin:0;padding:0;background:#080b10;font-family:Arial,Helvetica,sans-serif;color:#e5e7eb;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#080b10;padding:32px 12px;"><tr><td align="center">
