@@ -451,7 +451,6 @@
               '<span class="ttinc-live-phase ' + phase + '"><span class="ttinc-pulse-dot"></span> ' + (phase === 'profit' ? '▲ Simulated Positive Phase' : '▼ Simulated Negative Phase') + '</span>' +
               '<span class="ttinc-live-meta">Mode: <strong>Demo simulation</strong></span>' +
               '<span class="ttinc-live-meta">Reference: <strong>TSLA / USD · BTC</strong></span>' +
-              '<span class="ttinc-live-meta">Target Accuracy: <strong style="color:#22c55e;">98.4%</strong></span>' +
             '</div>' +
             '<div style="text-align:right;">' +
               '<div class="ttinc-live-value">' + money(trade.tradeValue) + '</div>' +
