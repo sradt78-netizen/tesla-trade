@@ -586,7 +586,7 @@
     var button = document.querySelector('#' + shellId + ' [data-stop-trading]');
     if (button) {
       button.disabled = true;
-      button.textContent = 'Locking Profit…';
+      button.textContent = 'Stopping…';
     }
 
     var u = auth();
@@ -620,7 +620,7 @@
       busy = false;
       if (button) {
         button.disabled = false;
-        button.textContent = 'Stop Trade & Lock Profit';
+        button.textContent = 'Stop Trade';
       }
     });
   }
