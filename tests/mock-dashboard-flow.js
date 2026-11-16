@@ -44,6 +44,11 @@ assert.match(page, /grid-cols-3/);
 assert.match(page, /Admin investors view/);
 assert.doesNotMatch(page, /ttinc-add-plan|>Add plan</);
 assert.match(sharedStyles, /#ttinc-portfolio-plans/);
+assert.match(sharedStyles, /#ttinc-trading-flow \.ttinc-start-btn/);
+assert.match(sharedStyles, /min-width: 112px/);
+assert.match(sharedStyles, /ttinc-trade-active-label/);
+assert.doesNotMatch(trading, /Target Accuracy:.*98\.4%/);
+assert.doesNotMatch(trading, /Stop Trade & Lock Profit/);
 assert.match(sharedStyles, /overflow-x:\s*auto\s*!important/);
 assert.match(fs.readFileSync('assets/trace-fund-experience.js', 'utf8'), /relocateDisclosure/);
 
