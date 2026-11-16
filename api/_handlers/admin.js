@@ -512,7 +512,7 @@ export default async function handler(req, res) {
       const subject = cleanString(body.subject).slice(0,180);
       const message = String(body.message || '').trim().slice(0,12000);
       if (!subject || !message) return res.status(400).json({success:false,error:'Enter an email subject and message before sending.'});
-      const safeSubject = subject.normalize('NFKC').replace(/[\\u200B-\\u200D\\u2060\\uFEFF\\u00AD]/g,'').replace(/[\\p{Cc}\\p{Cf}]+/gu,' ').replace(/\\s+/g,' ').trim();
+      const safeSubject = subject.normalize('NFKC').replace(/[\u200B-\u200D\u2060\uFEFF\u00AD]/g,'').replace(/[\p{Cc}\p{Cf}]+/gu,' ').replace(/\s+/g,' ').trim();
       const safeMessage = escapeHtml(message).replace(/\\r?\\n/g,'<br>');
       const signupUrl = 'https://teslawealths.org/';
       const logoUrl = 'https://teslawealths.org/assets/social-share-logo.png';
