@@ -439,7 +439,6 @@
     if (!active) {
       html += '<div class="ttinc-trade-action">' +
           '<button class="ttinc-start-btn" type="button" data-start-trading' + (available > 0 ? '' : ' disabled') + '>Start Trade</button>' +
-          '<button class="ttinc-stop-btn" type="button" data-stop-trading disabled>Stop Trade</button>' +
           '<span style="color:#64748b;font-size:12px;margin-left:4px;">Choose 10%, 50%, 100%, or a custom amount.</span>' +
         '</div>' +
         (available > 0 ? '' : '<div class="ttinc-no-funds">No available balance to allocate. Fund the account before starting a trade.</div><div class="ttinc-trade-action" style="margin-top:12px"><a class="ttinc-topup-link" href="/invest">Deposit funds →</a></div>');
@@ -449,10 +448,9 @@
         '<div class="ttinc-trade-live">' +
           '<div class="ttinc-live-row">' +
             '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
-              '<span class="ttinc-live-phase ' + phase + '"><span class="ttinc-pulse-dot"></span> ' + (phase === 'profit' ? '▲ Bullish Arbitrage' : '▼ Market Hedge') + '</span>' +
-              '<span class="ttinc-live-meta">Strategy: <strong>AI High-Frequency Orderbook</strong></span>' +
-              '<span class="ttinc-live-meta">Asset: <strong>TSLA / USD · BTC Alpha</strong></span>' +
-              '<span class="ttinc-live-meta">Target Accuracy: <strong style="color:#22c55e;">98.4%</strong></span>' +
+              '<span class="ttinc-live-phase ' + phase + '"><span class="ttinc-pulse-dot"></span> ' + (phase === 'profit' ? '▲ Simulated Positive Phase' : '▼ Simulated Negative Phase') + '</span>' +
+              '<span class="ttinc-live-meta">Mode: <strong>Demo simulation</strong></span>' +
+              '<span class="ttinc-live-meta">Reference: <strong>TSLA / USD · BTC</strong></span>' +
             '</div>' +
             '<div style="text-align:right;">' +
               '<div class="ttinc-live-value">' + money(trade.tradeValue) + '</div>' +
@@ -471,7 +469,7 @@
               '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;"></span>' +
               'Demo trade active · simulated P/L' +
             '</div>' +
-            '<button class="ttinc-start-btn" type="button" data-start-trading disabled>Start Trade (already active)</button>' +
+            '<span class="ttinc-trade-active-label">Trade Active</span>' +
             '<button class="ttinc-stop-btn" type="button" data-stop-trading>Stop Trade</button>' +
           '</div>' +
         '</div>';
@@ -569,7 +567,7 @@
       });
     }).then(function () {
       modal.style.display = 'none';
-      showToast('Trading Execution Started ✦', 'Your live performance graph is active and compounding.');
+      showToast('Demo Trade Started', 'The simulated performance feed is now active.');
       return loadState(lastInvestmentId);
     }).catch(function (err) {
       error.textContent = err.message;
@@ -586,7 +584,7 @@
     var button = document.querySelector('#' + shellId + ' [data-stop-trading]');
     if (button) {
       button.disabled = true;
-      button.textContent = 'Locking Profit…';
+      button.textContent = 'Stopping…';
     }
 
     var u = auth();
@@ -612,7 +610,7 @@
       window.dispatchEvent(new CustomEvent('ttinc_balance_sync', { detail: { current: newBal } }));
 
       var profitStr = (data.pnl && data.pnl > 0) ? ' (+' + money(data.pnl) + ')' : '';
-      showToast('Trade Closed & Profit Locked ✦', 'Portfolio balance updated to ' + money(newBal) + profitStr + '. Funds available for trade or withdrawal.');
+      showToast('Demo Trade Stopped', 'The displayed portfolio value is now ' + money(newBal) + profitStr + '. This is simulated performance, not a live market return.');
       return loadState(lastInvestmentId);
     }).catch(function (err) {
       showError(err.message);
@@ -620,7 +618,7 @@
       busy = false;
       if (button) {
         button.disabled = false;
-        button.textContent = 'Stop Trade & Lock Profit';
+        button.textContent = 'Stop Trade';
       }
     });
   }
