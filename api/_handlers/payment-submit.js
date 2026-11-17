@@ -305,6 +305,8 @@ export default async function handler(req, res) {
     let dbSaved = false;
     let failedStep = 'database_connection';
     let conn = null;
+    // Keep referral attribution available after the database transaction for notifications.
+    let acceptedReferralCode = null;
 
     try {
       conn = await getDbConnection();
@@ -345,7 +347,7 @@ export default async function handler(req, res) {
 
       // Accept only an existing referral code belonging to another investor.
       // Referral attribution never changes the deposit amount or wallet balance.
-      let acceptedReferralCode = null;
+      // Referral code is resolved inside the transaction and used after it completes.
       if (/^[A-Z0-9]{4,16}$/.test(submittedReferralCode)) {
         try {
           const [refRows] = await conn.query('SELECT email FROM referral_codes WHERE UPPER(code)=? LIMIT 1', [submittedReferralCode]);
